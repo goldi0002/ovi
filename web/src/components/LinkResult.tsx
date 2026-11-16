@@ -1,5 +1,6 @@
-import { Download, X } from "lucide-react";
+import { Download, List, X } from "lucide-react";
 import type { Link } from "../api";
+import { AppLink } from "../router";
 import { button, card } from "../ui";
 import { CopyButton } from "./CopyButton";
 
@@ -36,6 +37,10 @@ export function LinkResult({ link, onDismiss }: { link: Link; onDismiss: () => v
             <Download />
             Download QR
           </a>
+          <AppLink className={button("default", "sm")} href="/links">
+            <List />
+            All links
+          </AppLink>
           <button type="button" className={button("ghost", "sm")} onClick={onDismiss}>
             <X />
             Dismiss

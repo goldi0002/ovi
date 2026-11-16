@@ -10,8 +10,6 @@ const PAGE_SIZE = 20;
 
 interface Props {
   api: OviApi;
-  /** Changes whenever the list should reload (e.g. after creating a link). */
-  refreshKey: number;
   onUnauthorized: () => void;
 }
 
@@ -34,7 +32,7 @@ function Status({ link }: { link: Link }) {
   return <span className={`${badge} bg-ok-bg text-ok-ink`}>Active</span>;
 }
 
-export function LinksTable({ api, refreshKey, onUnauthorized }: Props) {
+export function LinksTable({ api, onUnauthorized }: Props) {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<Page<Link> | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +56,7 @@ export function LinksTable({ api, refreshKey, onUnauthorized }: Props) {
 
   useEffect(() => {
     void load();
-  }, [load, refreshKey]);
+  }, [load]);
 
   async function remove(code: string) {
     if (!window.confirm(`Delete /${code}? Anyone using it will get "not found", and the code can't be used again.`)) return;
@@ -81,7 +79,7 @@ export function LinksTable({ api, refreshKey, onUnauthorized }: Props) {
     <section className={`${card} p-7 max-sm:p-5`} aria-label="Your links">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-2xl font-bold tracking-tight">
-          Your links {data && <span className="ml-1 font-medium text-muted">{data.total}</span>}
+          All links {data && <span className="ml-1 font-medium text-muted">{data.total}</span>}
         </h2>
         <button type="button" className={button("default", "sm")} onClick={() => void load()} disabled={loading}>
           <RefreshCw className={loading ? "animate-spin motion-reduce:animate-none" : undefined} />
@@ -96,7 +94,7 @@ export function LinksTable({ api, refreshKey, onUnauthorized }: Props) {
       )}
 
       {data && data.items.length === 0 && !loading && (
-        <p className="py-8 text-center text-muted">No links yet. Shorten one above.</p>
+        <p className="py-8 text-center text-muted">No links yet. Create one on the home page.</p>
       )}
 
       {data && data.items.length > 0 && (

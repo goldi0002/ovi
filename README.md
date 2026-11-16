@@ -30,7 +30,7 @@ A React app in [`web/`](web) (Vite, TypeScript, Tailwind CSS, Lucide icons) is t
 - A landing page with the shortener front and center, plus features, pricing and about sections, and a light/dark toggle (it follows the system until you pick one).
 - Sign in with the API key from **Get Started**, or just paste a URL and press **Shorten URL**: you're asked for the key first. It's kept for the browser tab, or on the device if you tick **Remember on this device**.
 - Shorten links with an optional custom code and expiry, then copy the result or download its QR code.
-- See all links with clicks, creation time and status (active, expiring, expired), page through them and delete them.
+- The **Links** page (`/links`) lists all links with clicks, creation time and status (active, expiring, expired); page through them and delete them. Its address works directly, so you can bookmark it.
 - Open **Stats** on any link for its clicks per day over the last 7, 30 or 90 days, its top referrers, and the devices and browsers visitors used. Each click stores only the time, the referring site's name (no page path), and a device and browser category: no IP address or full user agent.
 
 Develop it with hot reload while the API runs on `:5080` (see above). Vite proxies `/api` calls to it:

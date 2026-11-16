@@ -1,11 +1,12 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OviApi, type Link } from "./api";
 import { Check, ChartColumn, Link as LinkIcon, ShieldCheck, Zap } from "lucide-react";
 import { Brand, Header } from "./components/Header";
 import { LinkResult } from "./components/LinkResult";
-import { LinksTable } from "./components/LinksTable";
 import { ShortenCard } from "./components/ShortenCard";
 import { SignInDialog } from "./components/SignInDialog";
+import { LinksPage } from "./pages/LinksPage";
+import { scrollAfterNavigation, usePath } from "./router";
 import { clearApiKey, loadApiKey, saveApiKey } from "./storage";
 import { initialTheme, saveTheme, type Theme } from "./theme";
 import { card, iconBubble } from "./ui";
@@ -29,10 +30,20 @@ export function App() {
   const [apiKey, setApiKey] = useState<string | null>(() => loadApiKey());
   const [signInOpen, setSignInOpen] = useState(false);
   const [created, setCreated] = useState<Link | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const path = usePath();
+  const firstRender = useRef(true);
   const api = useMemo(() => (apiKey ? new OviApi(apiKey) : null), [apiKey]);
   // Resolves a pending "shorten" once the user signs in (or cancels) in the dialog.
   const pendingSignIn = useRef<((api: OviApi | null) => void) | null>(null);
+
+  // The browser handles the anchor on first load; after that, every page change scrolls here.
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    scrollAfterNavigation();
+  }, [path]);
 
   const toggleTheme = useCallback(() => {
     setTheme((t) => {
@@ -86,6 +97,7 @@ export function App() {
         </div>
 
         <Header
+          path={path}
           theme={theme}
           onToggleTheme={toggleTheme}
           signedIn={api !== null}
@@ -93,97 +105,92 @@ export function App() {
           onSignOut={signOut}
         />
 
-        <main>
-          <section className="mx-auto max-w-[820px] px-4 pt-8 pb-14 text-center max-sm:pt-6 max-sm:pb-8">
-            <p className="inline-flex items-center gap-2 rounded-full border border-line bg-accent-soft px-[1.1rem] py-[0.45rem] font-semibold max-sm:text-[0.9rem]">
-              <LinkIcon className="size-5 text-accent" />
-              URL Shortener by Ovi
-            </p>
-            <h1 className="mt-5 mb-3 text-[clamp(2.75rem,8vw,5.25rem)] leading-[1.05] font-extrabold tracking-[-0.04em]">
-              URL <span className="text-accent-ink">Shortener</span>
-            </h1>
-            <p className="mx-auto max-w-xl text-[clamp(1.1rem,2.4vw,1.5rem)] text-muted">
-              Turn long, messy URLs into short, clean, and shareable links in seconds.
-            </p>
-          </section>
-
-          <div className="mx-auto grid max-w-[1200px] gap-8 px-4 pb-16">
-            <ShortenCard
-              getApi={getApi}
-              onUnauthorized={signOut}
-              onCreated={(link) => {
-                setCreated(link);
-                setRefreshKey((k) => k + 1);
-              }}
-            />
-
-            {created && <LinkResult link={created} onDismiss={() => setCreated(null)} />}
-
-            <section
-              id="features"
-              className="grid grid-cols-3 gap-8 max-lg:grid-cols-1 max-lg:gap-4"
-              aria-labelledby="features-title"
-            >
-              <h2 id="features-title" className="sr-only">
-                Features
-              </h2>
-              {FEATURES.map(({ icon: FeatureIcon, title, text }) => (
-                <article key={title} className={`${card} flex items-center gap-6 p-7 max-sm:gap-4 max-sm:p-5`}>
-                  <span className={`${iconBubble} size-20 max-sm:size-15`}>
-                    <FeatureIcon className="size-10 max-sm:size-7" />
-                  </span>
-                  <div>
-                    <h3 className="mb-1 text-[1.3rem] font-bold tracking-tight">{title}</h3>
-                    <p className="text-muted">{text}</p>
-                  </div>
-                </article>
-              ))}
-            </section>
-
-            {api && (
-              <div id="links">
-                <LinksTable api={api} refreshKey={refreshKey} onUnauthorized={signOut} />
-              </div>
-            )}
-
-            <section id="pricing" className="pt-8 text-center" aria-labelledby="pricing-title">
-              <h2 id="pricing-title" className={sectionTitle}>
-                Pricing
-              </h2>
-              <p className={`${sectionLead} mb-7`}>One plan, with everything in it.</p>
-              <div
-                className={`${card} mx-auto grid max-w-[820px] grid-cols-2 items-center gap-8 rounded-3xl px-9 py-8 text-left max-sm:grid-cols-1 max-sm:gap-5 max-sm:p-6`}
-              >
-                <div>
-                  <p className="font-bold text-accent-ink">Self-hosted</p>
-                  <p className="text-5xl leading-[1.2] font-extrabold tracking-[-0.03em]">
-                    $0 <span className="text-base font-medium tracking-normal text-muted">forever</span>
-                  </p>
-                  <p className="text-muted">You only pay for the server and database you run it on.</p>
-                </div>
-                <ul className="grid gap-3">
-                  {INCLUDED.map((item) => (
-                    <li key={item} className="flex items-center gap-2.5">
-                      <Check className="size-6 shrink-0 rounded-full bg-accent-soft p-1 text-accent" strokeWidth={3} />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </section>
-
-            <section id="about" className="pt-8 text-center" aria-labelledby="about-title">
-              <h2 id="about-title" className={sectionTitle}>
-                About Ovi
-              </h2>
-              <p className={sectionLead}>
-                Ovi is a small URL shortener: an ASP.NET Core API with a PostgreSQL database, and this React app as
-                its interface. Short links redirect instantly, count their clicks, come with a QR code and can expire
-                on a date you choose.
+        {path === "/links" ? (
+          <LinksPage api={api} onSignIn={() => setSignInOpen(true)} onUnauthorized={signOut} />
+        ) : (
+          <main>
+            <section className="mx-auto max-w-[820px] px-4 pt-8 pb-14 text-center max-sm:pt-6 max-sm:pb-8">
+              <p className="inline-flex items-center gap-2 rounded-full border border-line bg-accent-soft px-[1.1rem] py-[0.45rem] font-semibold max-sm:text-[0.9rem]">
+                <LinkIcon className="size-5 text-accent" />
+                URL Shortener by Ovi
+              </p>
+              <h1 className="mt-5 mb-3 text-[clamp(2.75rem,8vw,5.25rem)] leading-[1.05] font-extrabold tracking-[-0.04em]">
+                URL <span className="text-accent-ink">Shortener</span>
+              </h1>
+              <p className="mx-auto max-w-xl text-[clamp(1.1rem,2.4vw,1.5rem)] text-muted">
+                Turn long, messy URLs into short, clean, and shareable links in seconds.
               </p>
             </section>
-          </div>
-        </main>
+
+            <div className="mx-auto grid max-w-[1200px] gap-8 px-4 pb-16">
+              <ShortenCard
+                getApi={getApi}
+                onUnauthorized={signOut}
+                onCreated={setCreated}
+              />
+
+              {created && <LinkResult link={created} onDismiss={() => setCreated(null)} />}
+
+              <section
+                id="features"
+                className="grid grid-cols-3 gap-8 max-lg:grid-cols-1 max-lg:gap-4"
+                aria-labelledby="features-title"
+              >
+                <h2 id="features-title" className="sr-only">
+                  Features
+                </h2>
+                {FEATURES.map(({ icon: FeatureIcon, title, text }) => (
+                  <article key={title} className={`${card} flex items-center gap-6 p-7 max-sm:gap-4 max-sm:p-5`}>
+                    <span className={`${iconBubble} size-20 max-sm:size-15`}>
+                      <FeatureIcon className="size-10 max-sm:size-7" />
+                    </span>
+                    <div>
+                      <h3 className="mb-1 text-[1.3rem] font-bold tracking-tight">{title}</h3>
+                      <p className="text-muted">{text}</p>
+                    </div>
+                  </article>
+                ))}
+              </section>
+
+              <section id="pricing" className="pt-8 text-center" aria-labelledby="pricing-title">
+                <h2 id="pricing-title" className={sectionTitle}>
+                  Pricing
+                </h2>
+                <p className={`${sectionLead} mb-7`}>One plan, with everything in it.</p>
+                <div
+                  className={`${card} mx-auto grid max-w-[820px] grid-cols-2 items-center gap-8 rounded-3xl px-9 py-8 text-left max-sm:grid-cols-1 max-sm:gap-5 max-sm:p-6`}
+                >
+                  <div>
+                    <p className="font-bold text-accent-ink">Self-hosted</p>
+                    <p className="text-5xl leading-[1.2] font-extrabold tracking-[-0.03em]">
+                      $0 <span className="text-base font-medium tracking-normal text-muted">forever</span>
+                    </p>
+                    <p className="text-muted">You only pay for the server and database you run it on.</p>
+                  </div>
+                  <ul className="grid gap-3">
+                    {INCLUDED.map((item) => (
+                      <li key={item} className="flex items-center gap-2.5">
+                        <Check className="size-6 shrink-0 rounded-full bg-accent-soft p-1 text-accent" strokeWidth={3} />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </section>
+
+              <section id="about" className="pt-8 text-center" aria-labelledby="about-title">
+                <h2 id="about-title" className={sectionTitle}>
+                  About Ovi
+                </h2>
+                <p className={sectionLead}>
+                  Ovi is a small URL shortener: an ASP.NET Core API with a PostgreSQL database, and this React app as
+                  its interface. Short links redirect instantly, count their clicks, come with a QR code and can expire
+                  on a date you choose.
+                </p>
+              </section>
+            </div>
+          </main>
+        )}
 
         <footer className="mx-auto flex max-w-[1200px] items-center justify-between gap-4 border-t border-line px-4 pt-6 pb-8 text-[0.9rem]">
           <Brand small />
