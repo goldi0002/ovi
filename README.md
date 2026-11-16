@@ -27,17 +27,38 @@ docker run -d -p 8080:8080 -v ovi-data:/data \
 
 The container runs as a non-root user and stores the database in the `/data` volume.
 
+## Deploy to Render
+
+[`render.yaml`](render.yaml) is a [Render Blueprint](https://render.com/docs/blueprint-spec) for one Docker web service:
+- It builds from the `Dockerfile` and runs on Render's **free plan**.
+- It uses the `/health` check, and runs one instance because SQLite is a single file.
+- It deploys new commits on `main` only after their GitHub checks (CI) pass.
+
+One-time setup:
+
+1. In the [Render dashboard](https://dashboard.render.com), choose **New → Blueprint** and connect this repository. Render reads `render.yaml` and creates the `ovi` service.
+2. Render generates a random `Auth__ApiKey`. Copy it from the service's **Environment** tab. This is the key for `/api/links`.
+3. The service is live at its `https://<name>.onrender.com` URL. Short URLs use that address automatically through `RENDER_EXTERNAL_URL`. To use a custom domain, add it in Render and set `App__PublicBaseUrl`.
+
+Free plan limits:
+- The service sleeps after about 15 minutes without traffic. The next request wakes it, which takes up to a minute or so.
+- There's no persistent disk, so **all links are lost whenever the service redeploys, restarts or goes to sleep**.
+
+To keep data, switch to a paid instance: set `plan: starter` and add the `disk` block shown in the comment in `render.yaml`.
+
 ## Configuration
 
 | Setting | Env var | Default | Notes |
 |---|---|---|---|
 | `Auth:ApiKey` | `Auth__ApiKey` | none (`dev-key-change-me` in Development) | **Required.** Protects `/api/links/*`. If unset, those endpoints reject every request. |
-| `App:PublicBaseUrl` | `App__PublicBaseUrl` | none | **Set in production.** Base for short URLs and QR codes. If unset, they're built from the request's Host header, which clients control. |
+| `App:PublicBaseUrl` | `App__PublicBaseUrl` | none (`RENDER_EXTERNAL_URL` on Render) | **Set in production.** Base for short URLs and QR codes. If neither is set, they're built from the request's Host header, which clients control. |
 | `ConnectionStrings:Default` | `ConnectionStrings__Default` | `Data Source=ovi.db` (`/data/ovi.db` in Docker) | SQLite connection string |
 | `RateLimits:CreatePerMinute` | `RateLimits__CreatePerMinute` | `30` | Per client IP |
 | `RateLimits:RedirectPerMinute` | `RateLimits__RedirectPerMinute` | `300` | Per client IP, covers redirects and QR codes |
 | `ReverseProxy:KnownProxies` | `ReverseProxy__KnownProxies__0` | none | IPs of your reverse proxy / load balancer. Needed so rate limits see real client IPs |
 | `ReverseProxy:KnownNetworks` | `ReverseProxy__KnownNetworks__0` | none | Same, as CIDR ranges (e.g. `10.0.0.0/8`) |
+| `ReverseProxy:TrustAllProxies` | `ReverseProxy__TrustAllProxies` | `false` | Trust forwarded headers from any sender. Only for platforms where the app is reachable solely through the platform's proxy (Render). |
+| `ReverseProxy:ClientIpHeader` | `ReverseProxy__ClientIpHeader` | `X-Forwarded-For` | Header holding the client IP, if the platform uses a different one |
 | `Swagger:Enabled` | `Swagger__Enabled` | `true` in Development, else `false` | Serves `/openapi/v1.json` and `/swagger` |
 
 ### Deploying behind a reverse proxy

@@ -1,12 +1,12 @@
 namespace Ovi.Api.Infrastructure;
 
 /// <summary>
-/// Builds public short URLs. Uses App:PublicBaseUrl when set so that links and QR codes
-/// can't be pointed at another host by a forged Host header.
+/// Builds public short URLs. Uses App:PublicBaseUrl (or, on Render, RENDER_EXTERNAL_URL) when set
+/// so that links and QR codes can't be pointed at another host by a forged Host header.
 /// </summary>
 public class ShortUrlBuilder(IConfiguration config, IHttpContextAccessor http)
 {
-    public Uri? ConfiguredBaseUrl { get; } = ParseBaseUrl(config["App:PublicBaseUrl"]);
+    public Uri? ConfiguredBaseUrl { get; } = ParseBaseUrl(ConfiguredValue(config));
 
     public string BaseUrl
     {
@@ -23,6 +23,10 @@ public class ShortUrlBuilder(IConfiguration config, IHttpContextAccessor http)
     /// <summary>True if the URL points back at this shortener, which would create a redirect loop.</summary>
     public bool IsSelf(Uri target) =>
         string.Equals(target.Authority, new Uri(BaseUrl).Authority, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>App:PublicBaseUrl wins; RENDER_EXTERNAL_URL is set automatically by Render.</summary>
+    public static string? ConfiguredValue(IConfiguration config) =>
+        config["App:PublicBaseUrl"] is { Length: > 0 } explicitUrl ? explicitUrl : config["RENDER_EXTERNAL_URL"];
 
     public static Uri? ParseBaseUrl(string? value)
     {
