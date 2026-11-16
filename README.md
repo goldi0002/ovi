@@ -2,49 +2,64 @@
 
 [![CI](https://github.com/goldi0002/ovi/actions/workflows/ci.yml/badge.svg)](https://github.com/goldi0002/ovi/actions/workflows/ci.yml)
 
-A small URL shortener API built with ASP.NET Core minimal APIs (.NET 10 LTS), EF Core and SQLite.
+A small URL shortener API built with ASP.NET Core minimal APIs (.NET 10 LTS), EF Core and PostgreSQL (hosted on [Neon](https://neon.com) in production).
 
 ## Run locally
 
 ```bash
 dotnet tool restore                      # installs dotnet-ef locally
+docker run -d --name ovi-pg -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=ovi postgres:17-alpine
 ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/Ovi.Api --urls http://localhost:5080
+```
+
+Development connects to that local Postgres by default (`ConnectionStrings:Default` in `appsettings.Development.json`). To use a Neon branch instead, export its variables first:
+
+```bash
+neon env pull                            # writes DATABASE_URL etc. to .env.local (git-ignored)
+set -a; source .env.local; set +a
 ```
 
 Swagger UI: http://localhost:5080/swagger. Click **Authorize** and enter `dev-key-change-me`.
 
-The database (`ovi.db`) is created and migrated automatically on startup.
+The schema is created and migrated automatically on startup.
 
 ## Run with Docker
 
 ```bash
 docker build -t ovi .
-docker run -d -p 8080:8080 -v ovi-data:/data \
+docker run -d -p 8080:8080 \
+  -e DATABASE_URL='postgresql://user:pass@host/db?sslmode=require' \
   -e Auth__ApiKey='a-long-random-secret' \
   -e App__PublicBaseUrl='https://your.domain' \
   ovi
 ```
 
-The container runs as a non-root user and stores the database in the `/data` volume.
+The container runs as a non-root user. It keeps no local state: all data is in Postgres.
 
 ## Deploy to Render
 
 [`render.yaml`](render.yaml) is a [Render Blueprint](https://render.com/docs/blueprint-spec) for one Docker web service:
 - It builds from the `Dockerfile` and runs on Render's **free plan**.
-- It uses the `/health` check, and runs one instance because SQLite is a single file.
+- It uses the `/health` check, and stores data in Neon Postgres.
 - It deploys new commits on `main` only after their GitHub checks (CI) pass.
 
 One-time setup:
 
 1. In the [Render dashboard](https://dashboard.render.com), choose **New → Blueprint** and connect this repository. Render reads `render.yaml` and creates the `ovi` service.
-2. Render generates a random `Auth__ApiKey`. Copy it from the service's **Environment** tab. This is the key for `/api/links`.
-3. The service is live at its `https://<name>.onrender.com` URL. Short URLs use that address automatically through `RENDER_EXTERNAL_URL`. To use a custom domain, add it in Render and set `App__PublicBaseUrl`.
+2. Render asks for `DATABASE_URL` and `DATABASE_URL_UNPOOLED`. Copy them from `neon env pull` (`.env.local`) or the Neon Console's **Connect** dialog: the pooled string (host ends in `-pooler`) for `DATABASE_URL`, the direct one for `DATABASE_URL_UNPOOLED`. For a service created before these were added, set them in the service's **Environment** tab.
+3. Render generates a random `Auth__ApiKey`. Copy it from the service's **Environment** tab. This is the key for `/api/links`.
+4. The service is live at its `https://<name>.onrender.com` URL. Short URLs use that address automatically through `RENDER_EXTERNAL_URL`. To use a custom domain, add it in Render and set `App__PublicBaseUrl`.
 
-Free plan limits:
-- The service sleeps after about 15 minutes without traffic. The next request wakes it, which takes up to a minute or so.
-- There's no persistent disk, so **all links are lost whenever the service redeploys, restarts or goes to sleep**.
+On the free plan the service sleeps after about 15 minutes without traffic, and the next request wakes it, which takes up to a minute or so. Links are kept in Neon, so they survive sleeps, restarts and deploys.
 
-To keep data, switch to a paid instance: set `plan: starter` and add the `disk` block shown in the comment in `render.yaml`.
+## Database (Neon)
+
+The production database is the `production` branch of a Neon project. Neon's config lives in [`neon.ts`](neon.ts); `neon deploy` applies it and pulls the branch's variables into `.env.local`.
+
+- `DATABASE_URL`: the **pooled** endpoint, used for app traffic.
+- `DATABASE_URL_UNPOOLED`: the **direct** endpoint, used only to run EF Core migrations at startup, as Neon recommends for schema changes.
+
+Both accept Neon's `postgresql://…?sslmode=require&channel_binding=require` URLs. To browse the data, use the Neon Console's **Tables** or **SQL Editor**, or any Postgres client with the connection string.
 
 ## Configuration
 
@@ -52,7 +67,9 @@ To keep data, switch to a paid instance: set `plan: starter` and add the `disk` 
 |---|---|---|---|
 | `Auth:ApiKey` | `Auth__ApiKey` | none (`dev-key-change-me` in Development) | **Required.** Protects `/api/links/*`. If unset, those endpoints reject every request. |
 | `App:PublicBaseUrl` | `App__PublicBaseUrl` | none (`RENDER_EXTERNAL_URL` on Render) | **Set in production.** Base for short URLs and QR codes. If neither is set, they're built from the request's Host header, which clients control. |
-| `ConnectionStrings:Default` | `ConnectionStrings__Default` | `Data Source=ovi.db` (`/data/ovi.db` in Docker) | SQLite connection string |
+| — | `DATABASE_URL` | none | **Required in production.** Postgres URL or Npgsql connection string for app traffic (Neon: pooled endpoint) |
+| — | `DATABASE_URL_UNPOOLED` | `DATABASE_URL` | Connection used to run migrations (Neon: direct endpoint) |
+| `ConnectionStrings:Default` | `ConnectionStrings__Default` | none (local Postgres in Development) | Fallback when `DATABASE_URL` isn't set |
 | `RateLimits:CreatePerMinute` | `RateLimits__CreatePerMinute` | `30` | Per client IP |
 | `RateLimits:RedirectPerMinute` | `RateLimits__RedirectPerMinute` | `300` | Per client IP, covers redirects and QR codes |
 | `ReverseProxy:KnownProxies` | `ReverseProxy__KnownProxies__0` | none | IPs of your reverse proxy / load balancer. Needed so rate limits see real client IPs |
@@ -67,7 +84,7 @@ Terminate TLS at the proxy (nginx, Caddy, a cloud load balancer and so on). Set 
 
 `X-Forwarded-For`, `X-Forwarded-Proto` and `X-Forwarded-Host` are only trusted from those addresses. If you skip this, every client shares the proxy's rate limit. HSTS is sent outside Development.
 
-SQLite is a single file, so run **one instance**. To scale out, switch to a server database such as PostgreSQL.
+The app keeps no local state, so you can run several instances against the same database.
 
 ## Endpoints
 
@@ -116,7 +133,7 @@ dotnet ef migrations add <Name> --project src/Ovi.Api -o Data/Migrations
 dotnet test
 ```
 
-Tests use MSTest and `WebApplicationFactory`, with an in-memory SQLite database and a fake clock (`FakeTimeProvider`).
+Tests use MSTest and `WebApplicationFactory` with a fake clock (`FakeTimeProvider`). They run against a real Postgres started with [Testcontainers](https://dotnet.testcontainers.org), so **Docker must be running**. Each test gets its own database.
 
 ## CI
 
@@ -135,10 +152,10 @@ The package is private by default. To make it public, change its visibility in t
 
 ## Dependencies and licenses
 
-All NuGet dependencies are free and open source: MIT, except the SQLite native bindings (`SQLitePCLRaw.*`), which are Apache-2.0 and required by EF Core's SQLite provider. SQLite itself is public domain. CI enforces this. Run the same check locally after `dotnet restore`:
+All NuGet dependencies are free and open source: MIT, except Npgsql (the .NET Postgres driver) and its EF Core provider, which use the permissive, MIT-like [PostgreSQL License](https://opensource.org/license/postgresql). CI enforces this. Run the same check locally after `dotnet restore`:
 
 ```bash
 python3 scripts/check-packages.py
 ```
 
-Allowed licenses are MIT and Apache-2.0, set in `ALLOWED_LICENSES` in the script.
+Allowed licenses are MIT, Apache-2.0 and PostgreSQL, set in `ALLOWED_LICENSES` in the script.

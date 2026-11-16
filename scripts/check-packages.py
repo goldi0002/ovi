@@ -9,7 +9,8 @@ import re
 import subprocess
 import sys
 
-ALLOWED_LICENSES = {"MIT", "Apache-2.0"}
+# PostgreSQL License: permissive (MIT-like), used by Npgsql, the .NET Postgres driver.
+ALLOWED_LICENSES = {"MIT", "Apache-2.0", "PostgreSQL"}
 NUGET_ROOT = os.environ.get("NUGET_PACKAGES", os.path.expanduser("~/.nuget/packages"))
 
 

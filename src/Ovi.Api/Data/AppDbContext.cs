@@ -8,7 +8,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
-        // SQLite has no timezone-aware type; mark everything read back as UTC.
+        // Store and return every DateTime as UTC (maps to Postgres timestamptz).
         builder.Properties<DateTime>().HaveConversion<UtcDateTimeConverter>();
     }
 
