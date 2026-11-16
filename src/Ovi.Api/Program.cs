@@ -19,7 +19,7 @@ var behindProxy = builder.Services.ConfigureReverseProxy(builder.Configuration);
 var app = builder.Build();
 
 // Fail fast on bad config, and warn about insecure defaults.
-var publicBaseUrl = ShortUrlBuilder.ParseBaseUrl(app.Configuration["App:PublicBaseUrl"]);
+var publicBaseUrl = ShortUrlBuilder.ParseBaseUrl(ShortUrlBuilder.ConfiguredValue(app.Configuration));
 if (string.IsNullOrEmpty(app.Configuration["Auth:ApiKey"]))
     app.Logger.LogWarning("Auth:ApiKey is not set; all /api/links requests will be rejected.");
 if (publicBaseUrl is null && !app.Environment.IsDevelopment())

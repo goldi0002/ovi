@@ -27,36 +27,34 @@ docker run -d -p 8080:8080 -v ovi-data:/data \
 
 The container runs as a non-root user and stores the database in the `/data` volume.
 
-## Deploy to Fly.io
+## Deploy to Render
 
-The `deploy` job in CI deploys every push to `main` to https://ovi-goldi0002.fly.dev. It uses [`fly.toml`](fly.toml): one small machine (512 MB) that stops when idle and starts on the next request, with a 1 GB volume for the SQLite database.
+[`render.yaml`](render.yaml) is a [Render Blueprint](https://render.com/docs/blueprint-spec) for one Docker web service:
+- It builds from the `Dockerfile` and has a 1 GB persistent disk at `/data` for the SQLite database.
+- It uses the `/health` check, and runs one instance because SQLite is a single file.
+- It deploys new commits on `main` only after their GitHub checks (CI) pass.
 
 One-time setup:
 
-1. Create a [Fly.io](https://fly.io) account. Fly asks for a payment card, and a small idle-stopping app like this costs a few dollars a month at most.
-2. Create an **org token** in the Fly dashboard (**Tokens → Create token → Org token**), or run `fly tokens create org`. An org token is needed because the first deploy creates the app.
-3. In GitHub, go to **Settings → Secrets and variables → Actions** and add two repository secrets:
-   - `FLY_API_TOKEN`: the token from step 2.
-   - `OVI_API_KEY`: a long random string, e.g. from `openssl rand -base64 32`. This becomes the API key for `/api/links`.
-4. Push to `main` or re-run the latest CI run. The first deploy creates the app and the `ovi_data` volume, sets the API key as a Fly secret, deploys and checks `/health`.
+1. In the [Render dashboard](https://dashboard.render.com), choose **New → Blueprint** and connect this repository. Render reads `render.yaml` and creates the `ovi` service.
+2. Render generates a random `Auth__ApiKey`. Copy it from the service's **Environment** tab. This is the key for `/api/links`.
+3. The service is live at its `https://<name>.onrender.com` URL. Short URLs use that address automatically through `RENDER_EXTERNAL_URL`. To use a custom domain, add it in Render and set `App__PublicBaseUrl`.
 
-Until both secrets exist, the deploy job is skipped with a notice and CI stays green.
-
-The app name is global on Fly.io. If `ovi-goldi0002` is taken, change `app` and `App__PublicBaseUrl` in `fly.toml`, plus the URL in the deploy job.
+Cost: a persistent disk needs a paid instance. `plan: starter` is the smallest. On the free plan, set `plan: free` and remove the `disk` block. The service then sleeps when idle, and **the database is wiped on every deploy or restart**, so it's only suitable for trying things out.
 
 ## Configuration
 
 | Setting | Env var | Default | Notes |
 |---|---|---|---|
 | `Auth:ApiKey` | `Auth__ApiKey` | none (`dev-key-change-me` in Development) | **Required.** Protects `/api/links/*`. If unset, those endpoints reject every request. |
-| `App:PublicBaseUrl` | `App__PublicBaseUrl` | none | **Set in production.** Base for short URLs and QR codes. If unset, they're built from the request's Host header, which clients control. |
+| `App:PublicBaseUrl` | `App__PublicBaseUrl` | none (`RENDER_EXTERNAL_URL` on Render) | **Set in production.** Base for short URLs and QR codes. If neither is set, they're built from the request's Host header, which clients control. |
 | `ConnectionStrings:Default` | `ConnectionStrings__Default` | `Data Source=ovi.db` (`/data/ovi.db` in Docker) | SQLite connection string |
 | `RateLimits:CreatePerMinute` | `RateLimits__CreatePerMinute` | `30` | Per client IP |
 | `RateLimits:RedirectPerMinute` | `RateLimits__RedirectPerMinute` | `300` | Per client IP, covers redirects and QR codes |
 | `ReverseProxy:KnownProxies` | `ReverseProxy__KnownProxies__0` | none | IPs of your reverse proxy / load balancer. Needed so rate limits see real client IPs |
 | `ReverseProxy:KnownNetworks` | `ReverseProxy__KnownNetworks__0` | none | Same, as CIDR ranges (e.g. `10.0.0.0/8`) |
-| `ReverseProxy:TrustAllProxies` | `ReverseProxy__TrustAllProxies` | `false` | Trust forwarded headers from any sender. Only for platforms where the app is reachable solely through the platform's proxy (Fly.io). |
-| `ReverseProxy:ClientIpHeader` | `ReverseProxy__ClientIpHeader` | `X-Forwarded-For` | Header holding the client IP, e.g. `Fly-Client-IP` |
+| `ReverseProxy:TrustAllProxies` | `ReverseProxy__TrustAllProxies` | `false` | Trust forwarded headers from any sender. Only for platforms where the app is reachable solely through the platform's proxy (Render). |
+| `ReverseProxy:ClientIpHeader` | `ReverseProxy__ClientIpHeader` | `X-Forwarded-For` | Header holding the client IP, if the platform uses a different one |
 | `Swagger:Enabled` | `Swagger__Enabled` | `true` in Development, else `false` | Serves `/openapi/v1.json` and `/swagger` |
 
 ### Deploying behind a reverse proxy

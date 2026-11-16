@@ -1,0 +1,34 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Connect it in the Render dashboard (New → Blueprint → this repo).
+services:
+  - type: web
+    name: ovi
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    region: oregon
+    # A persistent disk (needed so the SQLite database survives deploys and restarts)
+    # requires a paid instance; "starter" is the smallest.
+    plan: starter
+    branch: main
+    # Deploy a new commit on main only after its GitHub checks (CI) pass.
+    autoDeployTrigger: checksPass
+    healthCheckPath: /health
+    numInstances: 1
+    disk:
+      name: ovi-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: PORT
+        value: "8080"
+      # Render generates a random API key; copy it from the service's Environment tab.
+      - key: Auth__ApiKey
+        generateValue: true
+      # Render's proxy is the only way in and appends the client IP to X-Forwarded-For.
+      - key: ReverseProxy__TrustAllProxies
+        value: "true"
+      - key: DOTNET_gcServer
+        value: "0"
+      # Short URLs use RENDER_EXTERNAL_URL (set by Render) unless you set App__PublicBaseUrl,
+      # e.g. to a custom domain.

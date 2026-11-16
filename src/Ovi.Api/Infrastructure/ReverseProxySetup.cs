@@ -9,9 +9,9 @@ namespace Ovi.Api.Infrastructure;
 /// </summary>
 /// <remarks>
 /// Either list the proxies (<c>ReverseProxy:KnownProxies</c> / <c>KnownNetworks</c>), or, on a platform
-/// where the app is reachable only through the platform's proxy (e.g. Fly.io), set
+/// where the app is reachable only through the platform's proxy (e.g. Render), set
 /// <c>ReverseProxy:TrustAllProxies</c>. <c>ReverseProxy:ClientIpHeader</c> names the header carrying the
-/// client IP (default <c>X-Forwarded-For</c>; <c>Fly-Client-IP</c> on Fly.io).
+/// client IP (default <c>X-Forwarded-For</c>).
 /// </remarks>
 public static class ReverseProxySetup
 {
