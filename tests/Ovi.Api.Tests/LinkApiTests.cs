@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Ovi.Api.Links;
 
 namespace Ovi.Api.Tests;
@@ -12,14 +11,14 @@ public class LinkApiTests : IDisposable
 
     public LinkApiTests()
     {
-        _client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        _client = _factory.CreateAuthedClient();
     }
 
     public void Dispose() => _factory.Dispose();
 
-    private async Task<LinkResponse> CreateAsync(string url, string? code = null)
+    private async Task<LinkResponse> CreateAsync(string url, string? code = null, DateTime? expiresAt = null)
     {
-        var res = await _client.PostAsJsonAsync("/api/links", new CreateLinkRequest(url, code));
+        var res = await _client.PostAsJsonAsync("/api/links", new CreateLinkRequest(url, code, expiresAt));
         Assert.Equal(HttpStatusCode.Created, res.StatusCode);
         return (await res.Content.ReadFromJsonAsync<LinkResponse>())!;
     }
@@ -59,6 +58,7 @@ public class LinkApiTests : IDisposable
     [InlineData("has space")]
     [InlineData("api")]
     [InlineData("swagger")]
+    [InlineData("qr")]
     public async Task Create_rejects_invalid_custom_codes(string code)
     {
         var res = await _client.PostAsJsonAsync("/api/links", new CreateLinkRequest("https://example.com", code));
@@ -122,5 +122,104 @@ public class LinkApiTests : IDisposable
     public async Task Health_is_ok()
     {
         Assert.Equal(HttpStatusCode.OK, (await _client.GetAsync("/health")).StatusCode);
+    }
+
+    // ---- API key ----
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("wrong-key")]
+    public async Task Management_endpoints_require_api_key(string? key)
+    {
+        var client = _factory.CreateUnauthedClient();
+        if (key is not null) client.DefaultRequestHeaders.Add("X-Api-Key", key);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/links")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await client.PostAsJsonAsync("/api/links", new CreateLinkRequest("https://example.com"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.DeleteAsync("/api/links/abc")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Redirect_and_qr_are_public()
+    {
+        await CreateAsync("https://example.com", "public");
+        var anon = _factory.CreateUnauthedClient();
+
+        Assert.Equal(HttpStatusCode.Redirect, (await anon.GetAsync("/public")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await anon.GetAsync("/public/qr")).StatusCode);
+    }
+
+    // ---- Expiry ----
+
+    [Fact]
+    public async Task Expired_link_returns_410_and_does_not_count_click()
+    {
+        var link = await CreateAsync("https://example.com", "soon", _factory.Time.GetUtcNow().UtcDateTime.AddHours(1));
+        Assert.NotNull(link.ExpiresAt);
+
+        Assert.Equal(HttpStatusCode.Redirect, (await _client.GetAsync("/soon")).StatusCode);
+
+        _factory.Time.Advance(TimeSpan.FromHours(1));
+        Assert.Equal(HttpStatusCode.Gone, (await _client.GetAsync("/soon")).StatusCode);
+        Assert.Equal(HttpStatusCode.Gone, (await _client.GetAsync("/soon/qr")).StatusCode);
+
+        var details = await _client.GetFromJsonAsync<LinkResponse>("/api/links/soon");
+        Assert.Equal(1, details!.Clicks);
+    }
+
+    [Fact]
+    public async Task Create_rejects_expiry_in_the_past()
+    {
+        var past = _factory.Time.GetUtcNow().UtcDateTime.AddMinutes(-1);
+        var res = await _client.PostAsJsonAsync("/api/links", new CreateLinkRequest("https://example.com", null, past));
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+    }
+
+    // ---- QR ----
+
+    [Fact]
+    public async Task Qr_returns_png()
+    {
+        var link = await CreateAsync("https://example.com", "qrme");
+        Assert.EndsWith("/qrme/qr", link.QrCodeUrl);
+
+        var res = await _client.GetAsync("/qrme/qr");
+        Assert.Equal("image/png", res.Content.Headers.ContentType!.MediaType);
+        var bytes = await res.Content.ReadAsByteArrayAsync();
+        Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, bytes[..4]);
+    }
+
+    [Fact]
+    public async Task Qr_for_unknown_code_is_404()
+    {
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync("/nope123/qr")).StatusCode);
+    }
+}
+
+public class RateLimitTests
+{
+    [Fact]
+    public async Task Create_is_rate_limited()
+    {
+        using var factory = new OviApiFactory(createPerMinute: 2);
+        var client = factory.CreateAuthedClient();
+
+        var statuses = new List<HttpStatusCode>();
+        for (var i = 0; i < 3; i++)
+            statuses.Add((await client.PostAsJsonAsync("/api/links", new CreateLinkRequest("https://example.com"))).StatusCode);
+
+        Assert.Equal([HttpStatusCode.Created, HttpStatusCode.Created, HttpStatusCode.TooManyRequests], statuses);
+    }
+
+    [Fact]
+    public async Task Redirect_is_rate_limited()
+    {
+        using var factory = new OviApiFactory(redirectPerMinute: 1);
+        var client = factory.CreateAuthedClient();
+        await client.PostAsJsonAsync("/api/links", new CreateLinkRequest("https://example.com", "lim"));
+
+        Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync("/lim")).StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await client.GetAsync("/lim")).StatusCode);
     }
 }
