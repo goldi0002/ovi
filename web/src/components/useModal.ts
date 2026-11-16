@@ -10,10 +10,10 @@ export function useModal(onClose: () => void) {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
-    document.body.classList.add("no-scroll");
+    document.body.classList.add("overflow-hidden");
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.classList.remove("no-scroll");
+      document.body.classList.remove("overflow-hidden");
       if (opener instanceof HTMLElement) opener.focus();
     };
   }, [onClose, opener]);

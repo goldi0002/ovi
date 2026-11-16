@@ -25,7 +25,7 @@ The schema is created and migrated automatically on startup.
 
 ## Web UI
 
-A React app in [`web/`](web) (Vite, TypeScript) is the UI for the API. It's served by the API itself at `/`, so there's one address and no CORS setup.
+A React app in [`web/`](web) (Vite, TypeScript, Tailwind CSS, Lucide icons) is the UI for the API. It's served by the API itself at `/`, so there's one address and no CORS setup.
 
 - A landing page with the shortener front and center, plus features, pricing and about sections, and a light/dark toggle (it follows the system until you pick one).
 - Sign in with the API key from **Get Started**, or just paste a URL and press **Shorten URL**: you're asked for the key first. It's kept for the browser tab, or on the device if you tick **Remember on this device**.
@@ -182,7 +182,7 @@ The package is private by default. To make it public, change its visibility in t
 
 ## Dependencies and licenses
 
-All NuGet dependencies are free and open source: MIT, except Npgsql (the .NET Postgres driver) and its EF Core provider, which use the permissive, MIT-like [PostgreSQL License](https://opensource.org/license/postgresql). The web UI ships only MIT packages (React). Its build and test tools use other common open-source licenses (Apache-2.0, ISC, BSD, and MPL-2.0 for Vite's CSS minifier, lightningcss), none of which reach users. CI enforces both. Run the same checks locally:
+All NuGet dependencies are free and open source: MIT, except Npgsql (the .NET Postgres driver) and its EF Core provider, which use the permissive, MIT-like [PostgreSQL License](https://opensource.org/license/postgresql). The web UI ships only MIT and ISC packages (React, and Lucide's icons, whose ISC licence is functionally the same as MIT); it's styled with Tailwind CSS (MIT), which runs at build time. Its build and test tools use other common open-source licenses (Apache-2.0, ISC, BSD, and MPL-2.0 for Vite's CSS minifier, lightningcss), none of which reach users. CI enforces both. Run the same checks locally:
 
 ```bash
 python3 scripts/check-packages.py                              # NuGet, after dotnet restore

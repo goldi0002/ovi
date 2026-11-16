@@ -50,7 +50,7 @@ describe("App", () => {
     await screen.findByText(/No links yet/);
 
     await user.type(screen.getByLabelText("Long URL"), "https://example.com/new");
-    await user.click(screen.getByRole("button", { name: "+ Custom code and expiry" }));
+    await user.click(screen.getByRole("button", { name: "Custom code and expiry" }));
     await user.type(screen.getByLabelText(/Custom code/), "fresh");
     await user.click(screen.getByRole("button", { name: "Shorten URL" }));
 
@@ -68,7 +68,7 @@ describe("App", () => {
     await screen.findByRole("table");
 
     await user.type(screen.getByLabelText("Long URL"), "https://example.com");
-    await user.click(screen.getByRole("button", { name: "+ Custom code and expiry" }));
+    await user.click(screen.getByRole("button", { name: "Custom code and expiry" }));
     await user.type(screen.getByLabelText(/Custom code/), "taken");
     await user.click(screen.getByRole("button", { name: "Shorten URL" }));
 

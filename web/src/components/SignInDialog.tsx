@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { ApiError, OviApi } from "../api";
-import { LinkIcon } from "./Icons";
+import { KeyRound } from "lucide-react";
+import { backdrop, button, card, errorBox, field, iconBubble, input } from "../ui";
 import { useModal } from "./useModal";
 
 interface Props {
@@ -36,20 +37,22 @@ export function SignInDialog({ onSignedIn, onCancel }: Props) {
   }
 
   return (
-    <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onCancel()}>
+    <div className={backdrop} onMouseDown={(e) => e.target === e.currentTarget && onCancel()}>
       <form
-        className="card dialog"
+        className={`${card} grid w-full max-w-[420px] gap-4 rounded-3xl p-8 text-center`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="sign-in-title"
         onSubmit={submit}
       >
-        <span className="icon-bubble">
-          <LinkIcon />
+        <span className={`${iconBubble} size-16 justify-self-center`}>
+          <KeyRound className="size-8" />
         </span>
-        <h2 id="sign-in-title">Sign in to Ovi</h2>
-        <p className="muted">Enter your API key to create and manage short links.</p>
-        <label className="field">
+        <h2 id="sign-in-title" className="text-xl font-bold tracking-tight">
+          Sign in to Ovi
+        </h2>
+        <p className="text-muted">Enter your API key to create and manage short links.</p>
+        <label className={field}>
           <span>API key</span>
           <input
             type="password"
@@ -58,22 +61,28 @@ export function SignInDialog({ onSignedIn, onCancel }: Props) {
             onChange={(e) => setKey(e.target.value)}
             required
             autoFocus
+            className={input}
           />
         </label>
-        <label className="check">
-          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+        <label className="flex items-center gap-2 text-left text-[0.95rem]">
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+            className="size-4 accent-accent"
+          />
           Remember on this device
         </label>
         {error && (
-          <p className="error" role="alert">
+          <p className={`${errorBox} text-left`} role="alert">
             {error}
           </p>
         )}
-        <div className="dialog-actions">
-          <button type="button" className="btn" onClick={onCancel}>
+        <div className="grid grid-cols-2 gap-3">
+          <button type="button" className={button()} onClick={onCancel}>
             Cancel
           </button>
-          <button className="btn btn-primary" type="submit" disabled={checking || !key.trim()}>
+          <button className={button("primary")} type="submit" disabled={checking || !key.trim()}>
             {checking ? "Checking…" : "Continue"}
           </button>
         </div>

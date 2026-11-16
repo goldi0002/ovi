@@ -1,4 +1,6 @@
+import { Check, Copy } from "lucide-react";
 import { useState } from "react";
+import { button } from "../ui";
 
 export function CopyButton({ text, label = "Copy", primary = false }: { text: string; label?: string; primary?: boolean }) {
   const [copied, setCopied] = useState(false);
@@ -16,10 +18,11 @@ export function CopyButton({ text, label = "Copy", primary = false }: { text: st
   return (
     <button
       type="button"
-      className={primary ? "btn btn-small btn-primary" : "btn btn-small"}
+      className={button(primary ? "primary" : "default", "sm")}
       onClick={copy}
       aria-label={`${label} ${text}`}
     >
+      {copied ? <Check /> : <Copy />}
       {copied ? "Copied!" : label}
     </button>
   );
