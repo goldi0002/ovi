@@ -26,3 +26,22 @@ public record LinkResponse(
 }
 
 public record PagedResponse<T>(IReadOnlyList<T> Items, int Page, int PageSize, int Total);
+
+public record DailyClicks(DateOnly Date, int Clicks);
+
+public record NamedCount(string Name, int Clicks);
+
+/// <param name="TotalClicks">Every click since the link was created, including ones before detailed stats were recorded.</param>
+/// <param name="Days">Length of the range, ending today (UTC).</param>
+/// <param name="ClicksInRange">Clicks recorded within the range.</param>
+/// <param name="Daily">One entry per day in the range, oldest first, including days with no clicks.</param>
+/// <param name="Referrers">Top referring sites in the range; "Direct" means no referrer.</param>
+public record LinkStatsResponse(
+    string Code,
+    int TotalClicks,
+    int Days,
+    int ClicksInRange,
+    IReadOnlyList<DailyClicks> Daily,
+    IReadOnlyList<NamedCount> Referrers,
+    IReadOnlyList<NamedCount> Devices,
+    IReadOnlyList<NamedCount> Browsers);

@@ -87,6 +87,49 @@ describe("App", () => {
     expect(store).toHaveLength(0);
   });
 
+  it("shows a link's stats and switches the date range", async () => {
+    const { fetchMock } = fakeApi({ links: [link({ code: "docs" })] });
+    render(<App />);
+    const user = await signIn();
+
+    await user.click(await screen.findByRole("button", { name: "Stats for /docs" }));
+    const dialog = await screen.findByRole("dialog", { name: "Stats for /docs" });
+    expect(await within(dialog).findByText("Clicks, last 30 days")).toBeInTheDocument();
+    expect(within(dialog).getByText("All-time clicks").nextSibling).toHaveTextContent("9");
+    expect(within(dialog).getByText("Top referrer").nextSibling).toHaveTextContent("news.ycombinator.com");
+    expect(within(dialog).getByRole("img", { name: /4 clicks between .* Busiest day .* with 3/ })).toBeInTheDocument();
+    const devices = within(dialog).getByRole("region", { name: "Devices" });
+    expect(within(devices).getByText("Desktop")).toBeInTheDocument();
+    expect(within(devices).getByText(/75%/)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Last 7 days" }));
+    expect(await within(dialog).findByText("Clicks, last 7 days")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Last 7 days" })).toHaveAttribute("aria-pressed", "true");
+    expect(fetchMock).toHaveBeenCalledWith("/api/links/docs/stats?days=7", expect.anything());
+
+    // The table view lists every day, so nothing depends on hovering the chart.
+    await user.click(within(dialog).getByRole("button", { name: "Show table" }));
+    expect(within(within(dialog).getByRole("table")).getAllByRole("row")).toHaveLength(8);
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stats for /docs" })).toHaveFocus();
+  });
+
+  it("reads out a day's clicks from the keyboard", async () => {
+    fakeApi({ links: [link({ code: "docs" })] });
+    render(<App />);
+    const user = await signIn();
+
+    await user.click(await screen.findByRole("button", { name: "Stats for /docs" }));
+    const chart = await screen.findByRole("img", { name: /clicks between/ });
+    chart.focus();
+    await user.keyboard("{End}");
+    expect(screen.getByText(/on .*Nov 16/)).toHaveTextContent("3 clicks on");
+    await user.keyboard("{ArrowLeft}");
+    expect(screen.getByText(/on .*Nov 15/)).toHaveTextContent("1 click on");
+  });
+
   it("marks expired links", async () => {
     fakeApi({ links: [link({ code: "old", expiresAt: "2020-01-01T00:00:00Z" })] });
     render(<App />);

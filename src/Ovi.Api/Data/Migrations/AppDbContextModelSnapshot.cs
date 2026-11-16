@@ -22,6 +22,40 @@ namespace Ovi.Api.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Ovi.Api.Data.Click", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Browser")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Device")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<int>("LinkId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Referrer")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LinkId", "At");
+
+                    b.ToTable("Clicks");
+                });
+
             modelBuilder.Entity("Ovi.Api.Data.Link", b =>
                 {
                     b.Property<int>("Id")
@@ -61,6 +95,15 @@ namespace Ovi.Api.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Links");
+                });
+
+            modelBuilder.Entity("Ovi.Api.Data.Click", b =>
+                {
+                    b.HasOne("Ovi.Api.Data.Link", null)
+                        .WithMany()
+                        .HasForeignKey("LinkId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

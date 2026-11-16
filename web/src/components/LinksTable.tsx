@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError, isExpired, type Link, type OviApi, type Page } from "../api";
 import { formatDateTime, formatRelative } from "../format";
 import { CopyButton } from "./CopyButton";
+import { StatsDialog } from "./StatsDialog";
 
 const PAGE_SIZE = 20;
 
@@ -29,6 +30,8 @@ export function LinksTable({ api, refreshKey, onUnauthorized }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [statsFor, setStatsFor] = useState<Link | null>(null);
+  const closeStats = useCallback(() => setStatsFor(null), []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -121,6 +124,14 @@ export function LinksTable({ api, refreshKey, onUnauthorized }: Props) {
                   <td className="actions-cell">
                     <div className="row-actions">
                     <CopyButton text={link.shortUrl} />
+                    <button
+                      type="button"
+                      className="btn btn-small"
+                      onClick={() => setStatsFor(link)}
+                      aria-label={`Stats for /${link.code}`}
+                    >
+                      Stats
+                    </button>
                     <a className="btn btn-small" href={link.qrCodeUrl} target="_blank" rel="noreferrer">
                       QR
                     </a>
@@ -141,6 +152,8 @@ export function LinksTable({ api, refreshKey, onUnauthorized }: Props) {
           </table>
         </div>
       )}
+
+      {statsFor && <StatsDialog api={api} link={statsFor} onClose={closeStats} onUnauthorized={onUnauthorized} />}
 
       {data && totalPages > 1 && (
         <nav className="pager" aria-label="Pages">

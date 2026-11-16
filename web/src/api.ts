@@ -16,6 +16,24 @@ export interface Page<T> {
   total: number;
 }
 
+export interface NamedCount {
+  name: string;
+  clicks: number;
+}
+
+export interface LinkStats {
+  code: string;
+  /** Every click since the link was created. */
+  totalClicks: number;
+  days: number;
+  clicksInRange: number;
+  /** One entry per day (UTC, "YYYY-MM-DD"), oldest first. */
+  daily: { date: string; clicks: number }[];
+  referrers: NamedCount[];
+  devices: NamedCount[];
+  browsers: NamedCount[];
+}
+
 export interface CreateLinkInput {
   url: string;
   customCode?: string;
@@ -82,6 +100,10 @@ export class OviApi {
 
   create(input: CreateLinkInput): Promise<Link> {
     return this.request("/api/links", { method: "POST", body: JSON.stringify(input) });
+  }
+
+  stats(code: string, days = 30): Promise<LinkStats> {
+    return this.request(`/api/links/${encodeURIComponent(code)}/stats?days=${days}`);
   }
 
   remove(code: string): Promise<void> {

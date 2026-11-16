@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { Link } from "../api";
+import type { Link, LinkStats } from "../api";
 
 export function link(overrides: Partial<Link> = {}): Link {
   const code = overrides.code ?? "abc1234";
@@ -23,6 +23,31 @@ const json = (status: number, body: unknown) =>
   });
 
 /** An in-memory fake of the Ovi API behind a mocked fetch. */
+/** Stats for `code` over `days` days ending 2026-11-16, with clicks on the last two days. */
+export function stats(code: string, days = 30, overrides: Partial<LinkStats> = {}): LinkStats {
+  const daily = Array.from({ length: days }, (_, i) => {
+    const date = new Date(Date.UTC(2026, 10, 16 - (days - 1 - i))).toISOString().slice(0, 10);
+    return { date, clicks: i === days - 1 ? 3 : i === days - 2 ? 1 : 0 };
+  });
+  return {
+    code,
+    totalClicks: 9,
+    days,
+    clicksInRange: 4,
+    daily,
+    referrers: [
+      { name: "news.ycombinator.com", clicks: 3 },
+      { name: "Direct", clicks: 1 },
+    ],
+    devices: [
+      { name: "Desktop", clicks: 3 },
+      { name: "Mobile", clicks: 1 },
+    ],
+    browsers: [{ name: "Chrome", clicks: 4 }],
+    ...overrides,
+  };
+}
+
 export function fakeApi({ apiKey = "good-key", links = [] as Link[] } = {}) {
   const store = [...links];
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
@@ -45,6 +70,12 @@ export function fakeApi({ apiKey = "good-key", links = [] as Link[] } = {}) {
       const created = link({ code: body.customCode ?? "gen1234", url: body.url, expiresAt: body.expiresAt ?? null });
       store.unshift(created);
       return json(201, created);
+    }
+    const st = url.pathname.match(/^\/api\/links\/(.+)\/stats$/);
+    if (method === "GET" && st) {
+      const code = decodeURIComponent(st[1]);
+      if (!store.some((l) => l.code === code)) return json(404, { title: "Not Found" });
+      return json(200, stats(code, Number(url.searchParams.get("days") ?? 30)));
     }
     const del = url.pathname.match(/^\/api\/links\/(.+)$/);
     if (method === "DELETE" && del) {

@@ -27,3 +27,21 @@ export function localInputToIso(value: string): string | undefined {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
+
+const shortDay = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+const longDay = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+
+/** Formats an API date ("2026-11-16", a UTC day) as "Nov 16", or "Mon, Nov 16" when long. */
+export function formatDay(date: string, long = false): string {
+  return (long ? longDay : shortDay).format(new Date(`${date}T00:00:00Z`));
+}
+
+/** Rounds up to a clean axis maximum (1, 2, 5, 10, 20, 50, …), never below 4 so small counts get whole-number ticks. */
+export function niceMax(value: number): number {
+  if (value <= 4) return 4;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  for (const step of [1, 2, 5, 10]) {
+    if (value <= step * magnitude) return step * magnitude;
+  }
+  return 10 * magnitude;
+}

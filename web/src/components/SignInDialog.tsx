@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { ApiError, OviApi } from "../api";
 import { LinkIcon } from "./Icons";
+import { useModal } from "./useModal";
 
 interface Props {
   onSignedIn: (apiKey: string, remember: boolean) => void;
@@ -13,21 +14,7 @@ export function SignInDialog({ onSignedIn, onCancel }: Props) {
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
-  const opener = useRef<Element | null>(null);
-
-  useEffect(() => {
-    opener.current = document.activeElement;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
-    };
-    document.addEventListener("keydown", onKey);
-    document.body.classList.add("no-scroll");
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.classList.remove("no-scroll");
-      if (opener.current instanceof HTMLElement) opener.current.focus();
-    };
-  }, [onCancel]);
+  useModal(onCancel);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
