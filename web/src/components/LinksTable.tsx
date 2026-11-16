@@ -48,7 +48,7 @@ export function LinksTable({ api, refreshKey, onUnauthorized }: Props) {
   }, [load, refreshKey]);
 
   async function remove(code: string) {
-    if (!window.confirm(`Delete /${code}? Anyone using it will get "not found".`)) return;
+    if (!window.confirm(`Delete /${code}? Anyone using it will get "not found", and the code can't be used again.`)) return;
     setDeleting(code);
     try {
       await api.remove(code);

@@ -1,5 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Ovi.Api.Data;
 using Ovi.Api.Links;
 
 namespace Ovi.Api.Tests;
@@ -147,13 +150,40 @@ public sealed class LinkApiTests : IDisposable
     }
 
     [TestMethod]
-    public async Task Delete_removes_link()
+    public async Task Delete_is_soft_and_hides_the_link_everywhere()
     {
         await CreateAsync("https://example.com", "bye");
+        await CreateAsync("https://example.com/kept", "kept");
 
         Assert.AreEqual(HttpStatusCode.NoContent, (await _client.DeleteAsync("/api/links/bye")).StatusCode);
+
+        // Gone from every endpoint...
         Assert.AreEqual(HttpStatusCode.NotFound, (await _client.GetAsync("/bye")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.NotFound, (await _client.GetAsync("/bye/qr")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.NotFound, (await _client.GetAsync("/api/links/bye")).StatusCode);
         Assert.AreEqual(HttpStatusCode.NotFound, (await _client.DeleteAsync("/api/links/bye")).StatusCode);
+        var list = (await _client.GetFromJsonAsync<PagedResponse<LinkResponse>>("/api/links"))!;
+        Assert.AreEqual(1, list.Total);
+        Assert.AreEqual("kept", list.Items.Single().Code);
+
+        // ...but the row is still in the database, marked with when it was deleted.
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var row = await db.Links.IgnoreQueryFilters().SingleAsync(l => l.Code == "bye");
+        Assert.AreEqual(_factory.Time.GetUtcNow().UtcDateTime, row.DeletedAt);
+        Assert.AreEqual("https://example.com/", row.Url);
+    }
+
+    [TestMethod]
+    public async Task Deleted_code_cannot_be_reused()
+    {
+        await CreateAsync("https://example.com/original", "printed");
+        await _client.DeleteAsync("/api/links/printed");
+
+        var res = await PostAsync(new CreateLinkRequest("https://evil.example", "printed"));
+
+        Assert.AreEqual(HttpStatusCode.Conflict, res.StatusCode);
+        StringAssert.Contains(await res.Content.ReadAsStringAsync(), "deleted link");
     }
 
     // ---- API key ----
