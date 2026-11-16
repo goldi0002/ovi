@@ -18,6 +18,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         link.HasIndex(l => l.Code).IsUnique();
         link.Property(l => l.Code).HasMaxLength(32);
         link.Property(l => l.Url).HasMaxLength(2048);
+        // Soft delete: every query skips deleted links unless it calls IgnoreQueryFilters().
+        // The unique index on Code still covers them, so a deleted code is never handed out again.
+        link.HasQueryFilter(l => l.DeletedAt == null);
     }
 }
 

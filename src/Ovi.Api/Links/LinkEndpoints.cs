@@ -40,8 +40,10 @@ public static class LinkEndpoints
             .Produces<LinkResponse>()
             .Produces(StatusCodes.Status404NotFound);
 
-        api.MapDelete("/{code}", async (string code, AppDbContext db) =>
-            await db.Links.Where(l => l.Code == code).ExecuteDeleteAsync() > 0
+        // Soft delete: the row stays, marked deleted, and disappears from every other endpoint.
+        api.MapDelete("/{code}", async (string code, AppDbContext db, TimeProvider time) =>
+            await db.Links.Where(l => l.Code == code)
+                .ExecuteUpdateAsync(s => s.SetProperty(l => l.DeletedAt, time.GetUtcNow().UtcDateTime)) > 0
                 ? Results.NoContent()
                 : Results.NotFound())
             .Produces(StatusCodes.Status204NoContent)
@@ -136,14 +138,17 @@ public static class LinkEndpoints
 
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
+        // Deleted links keep their code, so check against every row, deleted or not.
+        var allLinks = db.Links.IgnoreQueryFilters();
         if (!string.IsNullOrEmpty(code))
         {
-            if (await db.Links.AnyAsync(l => l.Code == code)) return Taken(code);
+            if (await allLinks.Where(l => l.Code == code).Select(l => new { l.DeletedAt }).FirstOrDefaultAsync() is { } existing)
+                return existing.DeletedAt is null ? Taken(code) : TakenByDeleted(code);
         }
         else
         {
             do { code = CodeGenerator.Generate(); }
-            while (await db.Links.AnyAsync(l => l.Code == code));
+            while (await allLinks.AnyAsync(l => l.Code == code));
         }
 
         var link = new Link { Code = code, Url = uri!.ToString(), CreatedAt = now, ExpiresAt = expiresAt };
@@ -163,4 +168,8 @@ public static class LinkEndpoints
 
     private static IResult Taken(string code) =>
         Results.Problem(statusCode: StatusCodes.Status409Conflict, title: $"Code '{code}' is already taken.");
+
+    private static IResult TakenByDeleted(string code) =>
+        Results.Problem(statusCode: StatusCodes.Status409Conflict,
+            title: $"Code '{code}' belonged to a deleted link and can't be reused.");
 }

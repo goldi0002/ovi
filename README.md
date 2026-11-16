@@ -119,7 +119,7 @@ Management endpoints need the `X-Api-Key` header. Redirects and QR codes are pub
 | `POST` | `/api/links` | key | Create a link. Body: `{ "url": "https://...", "customCode": "optional", "expiresAt": "optional, e.g. 2030-01-01T00:00:00Z" }` |
 | `GET` | `/api/links?page=1&pageSize=50` | key | List links, newest first. Returns `{ items, page, pageSize, total }`; `pageSize` max 100 |
 | `GET` | `/api/links/{code}` | key | Show one link's details and click count |
-| `DELETE` | `/api/links/{code}` | key | Delete a link |
+| `DELETE` | `/api/links/{code}` | key | Delete a link (soft delete: the row is kept with `DeletedAt` set, and the link disappears from every endpoint) |
 | `GET` | `/{code}` | public | 302 redirect and count the click. Returns 410 Gone if expired |
 | `GET` | `/{code}/qr` | public | PNG QR code for the short URL |
 | `GET` | `/health` | public | Health check, including the database connection (503 if the database is unavailable) |
@@ -130,6 +130,7 @@ Validation rules:
 - URLs must be absolute `http` or `https`, at most 2048 characters, and can't point back at the shortener.
 - A custom code is 3 to 32 characters of letters, digits, `-` or `_`. It can't be a reserved word (`api`, `swagger`, `openapi`, `health`, `qr`, `assets`).
 - `expiresAt` must be in the future.
+- A deleted link's code stays reserved, so an old short URL or printed QR code can never start pointing somewhere else.
 
 Errors use RFC 7807 problem JSON:
 - 400: validation failed.
