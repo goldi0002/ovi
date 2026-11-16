@@ -1,16 +1,33 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError, OviApi } from "../api";
+import { LinkIcon } from "./Icons";
 
 interface Props {
   onSignedIn: (apiKey: string, remember: boolean) => void;
+  onCancel: () => void;
 }
 
 /** Asks for the API key and checks it against the API before continuing. */
-export function ApiKeyGate({ onSignedIn }: Props) {
+export function SignInDialog({ onSignedIn, onCancel }: Props) {
   const [key, setKey] = useState("");
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
+  const opener = useRef<Element | null>(null);
+
+  useEffect(() => {
+    opener.current = document.activeElement;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    document.body.classList.add("no-scroll");
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.classList.remove("no-scroll");
+      if (opener.current instanceof HTMLElement) opener.current.focus();
+    };
+  }, [onCancel]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -27,19 +44,24 @@ export function ApiKeyGate({ onSignedIn }: Props) {
           ? "That API key was rejected."
           : "Couldn't reach the API. If the server was asleep, wait a moment and try again.",
       );
-    } finally {
       setChecking(false);
     }
   }
 
   return (
-    <main className="gate">
-      <form className="card gate-card" onSubmit={submit}>
-        <div className="brand brand-large">
-          <img src="/favicon.svg" alt="" width={40} height={40} />
-          <span>Ovi</span>
-        </div>
-        <p className="muted">Enter your API key to manage short links.</p>
+    <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onCancel()}>
+      <form
+        className="card dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sign-in-title"
+        onSubmit={submit}
+      >
+        <span className="icon-bubble">
+          <LinkIcon />
+        </span>
+        <h2 id="sign-in-title">Sign in to Ovi</h2>
+        <p className="muted">Enter your API key to create and manage short links.</p>
         <label className="field">
           <span>API key</span>
           <input
@@ -60,10 +82,15 @@ export function ApiKeyGate({ onSignedIn }: Props) {
             {error}
           </p>
         )}
-        <button className="btn btn-primary" type="submit" disabled={checking || !key.trim()}>
-          {checking ? "Checking…" : "Continue"}
-        </button>
+        <div className="dialog-actions">
+          <button type="button" className="btn" onClick={onCancel}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" type="submit" disabled={checking || !key.trim()}>
+            {checking ? "Checking…" : "Continue"}
+          </button>
+        </div>
       </form>
-    </main>
+    </div>
   );
 }

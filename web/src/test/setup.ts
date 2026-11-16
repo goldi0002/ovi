@@ -7,4 +7,5 @@ afterEach(() => {
   vi.restoreAllMocks();
   sessionStorage.clear();
   localStorage.clear();
+  delete document.documentElement.dataset.theme;
 });

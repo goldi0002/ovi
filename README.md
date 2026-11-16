@@ -27,7 +27,8 @@ The schema is created and migrated automatically on startup.
 
 A React app in [`web/`](web) (Vite, TypeScript) is the UI for the API. It's served by the API itself at `/`, so there's one address and no CORS setup.
 
-- Sign in with the API key. It's kept for the browser tab, or on the device if you tick **Remember on this device**.
+- A landing page with the shortener front and center, plus features, pricing and about sections, and a light/dark toggle (it follows the system until you pick one).
+- Sign in with the API key from **Get Started**, or just paste a URL and press **Shorten URL**: you're asked for the key first. It's kept for the browser tab, or on the device if you tick **Remember on this device**.
 - Shorten links with an optional custom code and expiry, then copy the result or download its QR code.
 - See all links with clicks, creation time and status (active, expiring, expired), page through them and delete them.
 

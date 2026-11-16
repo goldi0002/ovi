@@ -4,7 +4,7 @@ import { CopyButton } from "./CopyButton";
 export function LinkResult({ link, onDismiss }: { link: Link; onDismiss: () => void }) {
   return (
     <section className="card result" aria-live="polite" aria-label="New short link">
-      <img className="qr" src={link.qrCodeUrl} alt={`QR code for ${link.shortUrl}`} width={128} height={128} />
+      <img className="qr" src={link.qrCodeUrl} alt={`QR code for ${link.shortUrl}`} width={120} height={120} />
       <div className="result-body">
         <p className="muted">Your short link is ready</p>
         <a className="short-url" href={link.shortUrl} target="_blank" rel="noreferrer">
@@ -14,7 +14,7 @@ export function LinkResult({ link, onDismiss }: { link: Link; onDismiss: () => v
           → {link.url}
         </p>
         <div className="actions">
-          <CopyButton text={link.shortUrl} />
+          <CopyButton text={link.shortUrl} primary />
           <a className="btn btn-small" href={link.qrCodeUrl} download={`${link.code}-qr.png`}>
             Download QR
           </a>

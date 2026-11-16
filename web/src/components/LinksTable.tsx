@@ -118,7 +118,8 @@ export function LinksTable({ api, refreshKey, onUnauthorized }: Props) {
                   <td data-label="Status">
                     <Status link={link} />
                   </td>
-                  <td className="row-actions">
+                  <td className="actions-cell">
+                    <div className="row-actions">
                     <CopyButton text={link.shortUrl} />
                     <a className="btn btn-small" href={link.qrCodeUrl} target="_blank" rel="noreferrer">
                       QR
@@ -132,6 +133,7 @@ export function LinksTable({ api, refreshKey, onUnauthorized }: Props) {
                     >
                       {deleting === link.code ? "…" : "Delete"}
                     </button>
+                    </div>
                   </td>
                 </tr>
               ))}
