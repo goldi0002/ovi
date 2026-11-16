@@ -11,11 +11,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app .
 
-# SQLite database lives on a volume; the image's built-in non-root user owns it.
-RUN mkdir -p /data && chown "$APP_UID" /data
-VOLUME /data
-ENV ConnectionStrings__Default="Data Source=/data/ovi.db" \
-    ASPNETCORE_HTTP_PORTS=8080
+# The database is external (Postgres, e.g. Neon): set DATABASE_URL at runtime.
+ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 USER $APP_UID
 

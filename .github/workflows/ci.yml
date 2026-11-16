@@ -104,7 +104,12 @@ jobs:
         run: |
           set -euo pipefail
           image=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
-          docker run -d --name ovi -p 8080:8080 -e Auth__ApiKey=ci-key -e App__PublicBaseUrl=https://ovi.example "$image"
+          docker network create ovi-net
+          docker run -d --name pg --network ovi-net -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=ovi postgres:17-alpine
+          for i in $(seq 30); do docker exec pg pg_isready -U postgres >/dev/null 2>&1 && break; sleep 1; done
+          docker run -d --name ovi --network ovi-net -p 8080:8080 \
+            -e DATABASE_URL=postgresql://postgres:postgres@pg:5432/ovi \
+            -e Auth__ApiKey=ci-key -e App__PublicBaseUrl=https://ovi.example "$image"
           for i in $(seq 30); do curl -fsS localhost:8080/health >/dev/null 2>&1 && break; sleep 1; done
           curl -fsS localhost:8080/health
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/api/links)" = 401

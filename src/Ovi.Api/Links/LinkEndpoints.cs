@@ -1,4 +1,4 @@
-using Microsoft.Data.Sqlite;
+using Npgsql;
 using Microsoft.EntityFrameworkCore;
 using Ovi.Api.Data;
 using Ovi.Api.Infrastructure;
@@ -149,9 +149,9 @@ public static class LinkEndpoints
         {
             await db.SaveChangesAsync();
         }
-        catch (DbUpdateException ex) when (ex.InnerException is SqliteException { SqliteErrorCode: 19 })
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
-            // SQLITE_CONSTRAINT: lost a race with a concurrent request that took the same code.
+            // Lost a race with a concurrent request that took the same code.
             return Taken(code);
         }
 

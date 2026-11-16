@@ -7,7 +7,7 @@ using Ovi.Api.Security;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("Default") ?? "Data Source=ovi.db"));
+    options.UseNpgsql(DatabaseConfig.AppConnectionString(builder.Configuration)));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ShortUrlBuilder>();
@@ -25,9 +25,11 @@ if (string.IsNullOrEmpty(app.Configuration["Auth:ApiKey"]))
 if (publicBaseUrl is null && !app.Environment.IsDevelopment())
     app.Logger.LogWarning("App:PublicBaseUrl is not set; short URLs will be built from the request Host header.");
 
-using (var scope = app.Services.CreateScope())
+// Migrate over the direct (unpooled) connection, as Neon recommends for schema changes.
+await using (var migrationDb = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>()
+    .UseNpgsql(DatabaseConfig.MigrationConnectionString(app.Configuration)).Options))
 {
-    scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
+    await migrationDb.Database.MigrateAsync();
 }
 
 if (behindProxy) app.UseForwardedHeaders();
@@ -49,6 +51,6 @@ app.MapGet("/health", async (AppDbContext db) =>
     .WithTags("Health");
 app.MapLinkEndpoints();
 
-app.Run();
+await app.RunAsync();
 
 public partial class Program;

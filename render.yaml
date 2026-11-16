@@ -7,13 +7,7 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     region: oregon
-    # Free plan: sleeps after ~15 minutes idle and has NO persistent disk, so the
-    # SQLite database (/data/ovi.db) is wiped on every deploy, restart or sleep.
-    # To keep data, switch to `plan: starter` and add:
-    #   disk:
-    #     name: ovi-data
-    #     mountPath: /data
-    #     sizeGB: 1
+    # Free plan: sleeps after ~15 minutes idle. Data lives in Neon Postgres, so it survives.
     plan: free
     branch: main
     # Deploy a new commit on main only after its GitHub checks (CI) pass.
@@ -31,5 +25,13 @@ services:
         value: "true"
       - key: DOTNET_gcServer
         value: "0"
+      # Neon Postgres. Render asks for these when the Blueprint is applied; copy them from
+      # `neon env pull` (.env.local) or the Neon Console's Connect dialog.
+      # Pooled (-pooler host) for app traffic:
+      - key: DATABASE_URL
+        sync: false
+      # Direct host, used only to run migrations at startup:
+      - key: DATABASE_URL_UNPOOLED
+        sync: false
       # Short URLs use RENDER_EXTERNAL_URL (set by Render) unless you set App__PublicBaseUrl,
       # e.g. to a custom domain.
