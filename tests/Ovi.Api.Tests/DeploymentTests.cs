@@ -75,6 +75,37 @@ public sealed class DeploymentTests
     }
 
     [TestMethod]
+    public async Task Fly_client_ip_header_is_used_when_trusting_platform_proxy()
+    {
+        using var factory = new OviApiFactory(new()
+        {
+            ["RateLimits:RedirectPerMinute"] = "1",
+            ["ReverseProxy:TrustAllProxies"] = "true",
+            ["ReverseProxy:ClientIpHeader"] = "Fly-Client-IP"
+        }, remoteIp: Proxy);
+        var client = await ClientWithLink(factory);
+
+        Assert.AreEqual(HttpStatusCode.Redirect, await Hit(client, "203.0.113.1", "Fly-Client-IP"));
+        Assert.AreEqual(HttpStatusCode.Redirect, await Hit(client, "203.0.113.2", "Fly-Client-IP"));
+        Assert.AreEqual(HttpStatusCode.TooManyRequests, await Hit(client, "203.0.113.1", "Fly-Client-IP"));
+    }
+
+    [TestMethod]
+    public async Task X_forwarded_for_is_ignored_when_another_client_ip_header_is_configured()
+    {
+        using var factory = new OviApiFactory(new()
+        {
+            ["RateLimits:RedirectPerMinute"] = "1",
+            ["ReverseProxy:TrustAllProxies"] = "true",
+            ["ReverseProxy:ClientIpHeader"] = "Fly-Client-IP"
+        }, remoteIp: Proxy);
+        var client = await ClientWithLink(factory);
+
+        Assert.AreEqual(HttpStatusCode.Redirect, await Hit(client, "203.0.113.1"));
+        Assert.AreEqual(HttpStatusCode.TooManyRequests, await Hit(client, "203.0.113.2"));
+    }
+
+    [TestMethod]
     public async Task Create_is_rate_limited()
     {
         using var factory = new OviApiFactory(new() { ["RateLimits:CreatePerMinute"] = "2" });
@@ -95,10 +126,10 @@ public sealed class DeploymentTests
         return client;
     }
 
-    private static async Task<HttpStatusCode> Hit(HttpClient client, string forwardedFor)
+    private static async Task<HttpStatusCode> Hit(HttpClient client, string clientIp, string header = "X-Forwarded-For")
     {
         var req = new HttpRequestMessage(HttpMethod.Get, "/lim");
-        req.Headers.Add("X-Forwarded-For", forwardedFor);
+        req.Headers.Add(header, clientIp);
         return (await client.SendAsync(req)).StatusCode;
     }
 }

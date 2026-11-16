@@ -27,6 +27,23 @@ docker run -d -p 8080:8080 -v ovi-data:/data \
 
 The container runs as a non-root user and stores the database in the `/data` volume.
 
+## Deploy to Fly.io
+
+The `deploy` job in CI deploys every push to `main` to https://ovi-goldi0002.fly.dev. It uses [`fly.toml`](fly.toml): one small machine (512 MB) that stops when idle and starts on the next request, with a 1 GB volume for the SQLite database.
+
+One-time setup:
+
+1. Create a [Fly.io](https://fly.io) account. Fly asks for a payment card, and a small idle-stopping app like this costs a few dollars a month at most.
+2. Create an **org token** in the Fly dashboard (**Tokens → Create token → Org token**), or run `fly tokens create org`. An org token is needed because the first deploy creates the app.
+3. In GitHub, go to **Settings → Secrets and variables → Actions** and add two repository secrets:
+   - `FLY_API_TOKEN`: the token from step 2.
+   - `OVI_API_KEY`: a long random string, e.g. from `openssl rand -base64 32`. This becomes the API key for `/api/links`.
+4. Push to `main` or re-run the latest CI run. The first deploy creates the app and the `ovi_data` volume, sets the API key as a Fly secret, deploys and checks `/health`.
+
+Until both secrets exist, the deploy job is skipped with a notice and CI stays green.
+
+The app name is global on Fly.io. If `ovi-goldi0002` is taken, change `app` and `App__PublicBaseUrl` in `fly.toml`, plus the URL in the deploy job.
+
 ## Configuration
 
 | Setting | Env var | Default | Notes |
@@ -38,6 +55,8 @@ The container runs as a non-root user and stores the database in the `/data` vol
 | `RateLimits:RedirectPerMinute` | `RateLimits__RedirectPerMinute` | `300` | Per client IP, covers redirects and QR codes |
 | `ReverseProxy:KnownProxies` | `ReverseProxy__KnownProxies__0` | none | IPs of your reverse proxy / load balancer. Needed so rate limits see real client IPs |
 | `ReverseProxy:KnownNetworks` | `ReverseProxy__KnownNetworks__0` | none | Same, as CIDR ranges (e.g. `10.0.0.0/8`) |
+| `ReverseProxy:TrustAllProxies` | `ReverseProxy__TrustAllProxies` | `false` | Trust forwarded headers from any sender. Only for platforms where the app is reachable solely through the platform's proxy (Fly.io). |
+| `ReverseProxy:ClientIpHeader` | `ReverseProxy__ClientIpHeader` | `X-Forwarded-For` | Header holding the client IP, e.g. `Fly-Client-IP` |
 | `Swagger:Enabled` | `Swagger__Enabled` | `true` in Development, else `false` | Serves `/openapi/v1.json` and `/swagger` |
 
 ### Deploying behind a reverse proxy
