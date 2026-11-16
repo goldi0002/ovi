@@ -71,7 +71,7 @@ One-time setup:
 3. Render generates a random `Auth__ApiKey`. Copy it from the service's **Environment** tab. This is the key for `/api/links`.
 4. The service is live at its `https://<name>.onrender.com` URL. Short URLs use that address automatically through `RENDER_EXTERNAL_URL`. To use a custom domain, add it in Render and set `App__PublicBaseUrl`.
 
-On the free plan the service sleeps after about 15 minutes without traffic, and the next request wakes it, which takes up to a minute or so. Links are kept in Neon, so they survive sleeps, restarts and deploys.
+On the free plan a service sleeps after about 15 minutes without traffic, and the next request takes up to a minute to wake it. To avoid that, `render.yaml` turns on `KeepAlive__Enabled`: a background service pings the app's own public URL (`/health/live`) every 10 minutes, through Render's proxy, so it never goes idle. That keeps one instance up all month, about 744 of the workspace's 750 free instance hours, so turn it off if you run other free services. `/health/live` doesn't touch the database, so the pings don't keep Neon awake. Links are kept in Neon, so they survive restarts and deploys.
 
 ## Database (Neon)
 
@@ -97,6 +97,9 @@ Both accept Neon's `postgresql://…?sslmode=require&channel_binding=require` UR
 | `ReverseProxy:KnownNetworks` | `ReverseProxy__KnownNetworks__0` | none | Same, as CIDR ranges (e.g. `10.0.0.0/8`) |
 | `ReverseProxy:TrustAllProxies` | `ReverseProxy__TrustAllProxies` | `false` | Trust forwarded headers from any sender. Only for platforms where the app is reachable solely through the platform's proxy (Render). |
 | `ReverseProxy:ClientIpHeader` | `ReverseProxy__ClientIpHeader` | `X-Forwarded-For` | Header holding the client IP, if the platform uses a different one |
+| `KeepAlive:Enabled` | `KeepAlive__Enabled` | `false` | Ping the app's own public URL on a timer so sleeping hosts (Render free) keep it awake |
+| `KeepAlive:IntervalMinutes` | `KeepAlive__IntervalMinutes` | `10` | Time between pings; keep it under the host's idle timeout |
+| `KeepAlive:Url` | `KeepAlive__Url` | public base URL + `/health/live` | URL to ping. It must go through the host's proxy, so not `localhost` |
 | `Swagger:Enabled` | `Swagger__Enabled` | `true` in Development, else `false` | Serves `/openapi/v1.json` and `/swagger` |
 
 ### Deploying behind a reverse proxy
@@ -120,6 +123,7 @@ Management endpoints need the `X-Api-Key` header. Redirects and QR codes are pub
 | `GET` | `/{code}` | public | 302 redirect and count the click. Returns 410 Gone if expired |
 | `GET` | `/{code}/qr` | public | PNG QR code for the short URL |
 | `GET` | `/health` | public | Health check, including the database connection (503 if the database is unavailable) |
+| `GET` | `/health/live` | public | Liveness check that doesn't touch the database (used by keep-alive) |
 | `GET` | `/` | public | The web UI, when it has been built into `wwwroot` |
 
 Validation rules:
