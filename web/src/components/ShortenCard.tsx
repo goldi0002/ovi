@@ -1,7 +1,8 @@
+import { Link as LinkIcon, Minus, Plus, Scissors } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { ApiError, type Link, type OviApi } from "../api";
 import { localInputToIso } from "../format";
-import { LinkIcon, ScissorsIcon } from "./Icons";
+import { button, card, errorBox, field, focusRing, input } from "../ui";
 
 interface Props {
   /** Returns a signed-in client, asking for the API key first if needed; null if the user cancels. */
@@ -47,16 +48,23 @@ export function ShortenCard({ getApi, onCreated, onUnauthorized }: Props) {
   }
 
   return (
-    <section id="shorten" className="card shorten" aria-labelledby="shorten-title">
-      <h2 id="shorten-title" className="shorten-title">
-        <LinkIcon className="shorten-title-icon" />
+    <section
+      id="shorten"
+      className={`${card} w-full max-w-[1100px] justify-self-center rounded-3xl px-10 py-9 max-sm:px-5 max-sm:py-6`}
+      aria-labelledby="shorten-title"
+    >
+      <h2
+        id="shorten-title"
+        className="mb-6 flex items-center gap-4 text-[clamp(1.5rem,3vw,2rem)] font-bold tracking-tight"
+      >
+        <LinkIcon className="size-12 shrink-0 text-accent max-sm:size-9" strokeWidth={2.3} />
         Shorten a URL
       </h2>
-      <form onSubmit={submit} aria-label="Create a short link">
-        <div className="shorten-row">
-          <label className="url-input">
+      <form onSubmit={submit} aria-label="Create a short link" className="grid gap-3.5">
+        <div className="flex gap-5 max-sm:flex-col max-sm:gap-3">
+          <label className="relative min-w-0 flex-1">
             <span className="sr-only">Long URL</span>
-            <LinkIcon className="url-input-icon" />
+            <LinkIcon className="pointer-events-none absolute top-1/2 left-5 size-6 -translate-y-1/2 text-muted" />
             <input
               type="url"
               inputMode="url"
@@ -65,29 +73,31 @@ export function ShortenCard({ getApi, onCreated, onUnauthorized }: Props) {
               onChange={(e) => setUrl(e.target.value)}
               required
               maxLength={2048}
+              className={`${input} min-h-16 rounded-xl pl-[3.6rem] text-xl max-sm:min-h-14 max-sm:text-[1.05rem]`}
             />
           </label>
-          <button className="btn btn-primary btn-lg" type="submit" disabled={saving}>
-            <ScissorsIcon />
+          <button className={button("primary", "lg")} type="submit" disabled={saving}>
+            <Scissors />
             {saving ? "Shortening…" : "Shorten URL"}
           </button>
         </div>
 
         <button
           type="button"
-          className="text-btn"
+          className={`inline-flex cursor-pointer items-center gap-1 justify-self-start rounded py-1 text-[0.95rem] font-medium text-accent-ink hover:underline ${focusRing}`}
           aria-expanded={showOptions}
           aria-controls="shorten-options"
           onClick={() => setShowOptions((v) => !v)}
         >
-          {showOptions ? "− Hide options" : "+ Custom code and expiry"}
+          {showOptions ? <Minus className="size-4" /> : <Plus className="size-4" />}
+          {showOptions ? "Hide options" : "Custom code and expiry"}
         </button>
 
         {showOptions && (
-          <div id="shorten-options" className="row">
-            <label className="field">
+          <div id="shorten-options" className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+            <label className={field}>
               <span>
-                Custom code <em className="muted">(optional)</em>
+                Custom code <em className="font-normal text-muted not-italic">(optional)</em>
               </span>
               <input
                 type="text"
@@ -97,19 +107,25 @@ export function ShortenCard({ getApi, onCreated, onUnauthorized }: Props) {
                 pattern="[A-Za-z0-9_\-]{3,32}"
                 title="3–32 letters, digits, - or _"
                 maxLength={32}
+                className={input}
               />
             </label>
-            <label className="field">
+            <label className={field}>
               <span>
-                Expires <em className="muted">(optional)</em>
+                Expires <em className="font-normal text-muted not-italic">(optional)</em>
               </span>
-              <input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+              <input
+                type="datetime-local"
+                value={expiresAt}
+                onChange={(e) => setExpiresAt(e.target.value)}
+                className={input}
+              />
             </label>
           </div>
         )}
 
         {error && (
-          <p className="error" role="alert">
+          <p className={errorBox} role="alert">
             {error}
           </p>
         )}

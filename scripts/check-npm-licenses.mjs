@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // Fails if an npm package in web/package-lock.json has a disallowed license.
-// Shipped (production) packages must be MIT. Build/test tools may use other
+// Shipped (production) packages must be MIT or ISC (a shorter MIT-equivalent
+// licence, used by lucide-react). Build/test tools may use other
 // common open-source licenses, since they never reach users.
 // Usage: node scripts/check-npm-licenses.mjs [path/to/package-lock.json]
 import { readFileSync } from "node:fs";
 
-const PROD_ALLOWED = new Set(["MIT"]);
+const PROD_ALLOWED = new Set(["MIT", "ISC"]);
 const DEV_ALLOWED = new Set([
   "MIT", "ISC", "0BSD", "BSD-2-Clause", "BSD-3-Clause", "Apache-2.0", "BlueOak-1.0.0",
   // lightningcss (Vite's CSS minifier): weak copyleft, build-time only.

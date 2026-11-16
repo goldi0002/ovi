@@ -11,6 +11,9 @@ public static class LinkEndpoints
 {
     public const int MaxUrlLength = 2048;
     public const int MaxPageSize = 100;
+    public const int MaxStatsDays = 365;
+    public const int TopN = 8;
+    public const string DirectReferrer = "Direct";
 
     // Codes never contain dots, so files like /favicon.svg don't match and reach the static-file middleware.
     private const string CodeRoute = "{code:regex(^[A-Za-z0-9_-]+$)}";
@@ -40,6 +43,11 @@ public static class LinkEndpoints
             .Produces<LinkResponse>()
             .Produces(StatusCodes.Status404NotFound);
 
+        api.MapGet("/{code}/stats", LinkStats)
+            .Produces<LinkStatsResponse>()
+            .ProducesValidationProblem()
+            .Produces(StatusCodes.Status404NotFound);
+
         // Soft delete: the row stays, marked deleted, and disappears from every other endpoint.
         api.MapDelete("/{code}", async (string code, AppDbContext db, TimeProvider time) =>
             await db.Links.Where(l => l.Code == code)
@@ -51,7 +59,7 @@ public static class LinkEndpoints
 
         var pub = app.MapGroup("/").WithTags("Public").RequireRateLimiting(RateLimits.Redirect);
 
-        pub.MapGet("/" + CodeRoute, async (string code, AppDbContext db, TimeProvider time) =>
+        pub.MapGet("/" + CodeRoute, async (string code, HttpRequest request, AppDbContext db, TimeProvider time) =>
         {
             var now = time.GetUtcNow().UtcDateTime;
             var link = await db.Links.AsNoTracking().FirstOrDefaultAsync(l => l.Code == code);
@@ -62,6 +70,17 @@ public static class LinkEndpoints
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(l => l.Clicks, l => l.Clicks + 1)
                     .SetProperty(l => l.LastClickedAt, now));
+
+            var (device, browser) = ClientInfo.ParseUserAgent(request.Headers.UserAgent);
+            db.Clicks.Add(new Click
+            {
+                LinkId = link.Id,
+                At = now,
+                Referrer = ClientInfo.ParseReferrer(request.Headers.Referer),
+                Device = device,
+                Browser = browser,
+            });
+            await db.SaveChangesAsync();
             return Results.Redirect(link.Url);
         })
         .Produces(StatusCodes.Status302Found)
@@ -87,6 +106,59 @@ public static class LinkEndpoints
 
     private static IResult Expired() =>
         Results.Problem(statusCode: StatusCodes.Status410Gone, title: "This link has expired.");
+
+    private static async Task<IResult> LinkStats(string code, AppDbContext db, TimeProvider time, int days = 30)
+    {
+        if (days < 1 || days > MaxStatsDays)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["days"] = [$"days must be between 1 and {MaxStatsDays}."]
+            });
+        }
+
+        var link = await db.Links.AsNoTracking().FirstOrDefaultAsync(l => l.Code == code);
+        if (link is null) return Results.NotFound();
+
+        var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+        var firstDay = today.AddDays(1 - days);
+        var from = firstDay.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var clicks = db.Clicks.Where(c => c.LinkId == link.Id && c.At >= from);
+
+        var perDay = await clicks
+            .GroupBy(c => c.At.Date)
+            .Select(g => new { Day = g.Key, Clicks = g.Count() })
+            .ToDictionaryAsync(x => DateOnly.FromDateTime(x.Day), x => x.Clicks);
+        var daily = Enumerable.Range(0, days)
+            .Select(i => firstDay.AddDays(i))
+            .Select(d => new DailyClicks(d, perDay.GetValueOrDefault(d)))
+            .ToList();
+
+        var referrers = await CountByAsync(clicks.Select(c => c.Referrer), TopN);
+        var devices = await CountByAsync(clicks.Select(c => c.Device), take: null);
+        var browsers = await CountByAsync(clicks.Where(c => c.Browser != null).Select(c => c.Browser), TopN);
+
+        return Results.Ok(new LinkStatsResponse(
+            link.Code,
+            link.Clicks,
+            days,
+            daily.Sum(d => d.Clicks),
+            daily,
+            referrers.Select(r => r with { Name = r.Name ?? DirectReferrer }).ToList(),
+            devices,
+            browsers));
+    }
+
+    /// <summary>Counts each distinct value, most common first (ties alphabetical, null last), optionally keeping only the top few.</summary>
+    private static async Task<List<NamedCount>> CountByAsync(IQueryable<string?> values, int? take)
+    {
+        var grouped = values
+            .GroupBy(v => v)
+            .Select(g => new { Name = g.Key, Clicks = g.Count() })
+            .OrderByDescending(x => x.Clicks).ThenBy(x => x.Name);
+        var rows = await (take is { } n ? grouped.Take(n) : grouped).ToListAsync();
+        return rows.Select(r => new NamedCount(r.Name!, r.Clicks)).ToList();
+    }
 
     private static async Task<IResult> ListLinks(AppDbContext db, ShortUrlBuilder urls, int page = 1, int pageSize = 50)
     {

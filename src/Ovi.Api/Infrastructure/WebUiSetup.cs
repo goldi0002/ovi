@@ -8,6 +8,9 @@ namespace Ovi.Api.Infrastructure;
 /// </summary>
 public static class WebUiSetup
 {
+    /// <summary>Paths the React app handles itself; each returns index.html.</summary>
+    public static readonly string[] Pages = ["/", "/links"];
+
     public static void UseOviWebUi(this WebApplication app)
     {
         var index = app.Environment.WebRootFileProvider.GetFileInfo("index.html");
@@ -27,7 +30,7 @@ public static class WebUiSetup
             }
         });
 
-        app.MapGet("/", (HttpContext ctx, ShortUrlBuilder urls) =>
+        IResult ServeIndex(HttpContext ctx, ShortUrlBuilder urls)
         {
             var headers = ctx.Response.Headers;
             headers[HeaderNames.CacheControl] = "no-cache";
@@ -35,7 +38,12 @@ public static class WebUiSetup
             headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
             headers[HeaderNames.ContentSecurityPolicy] = ContentSecurityPolicy(urls);
             return Results.Stream(index.CreateReadStream(), "text/html; charset=utf-8");
-        }).ExcludeFromDescription();
+        }
+
+        // The UI's pages. Each path here must also be a reserved code (see CodeGenerator),
+        // since these literal routes win over the short-code redirect route.
+        foreach (var page in Pages)
+            app.MapGet(page, ServeIndex).ExcludeFromDescription();
     }
 
     /// <summary>

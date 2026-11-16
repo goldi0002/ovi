@@ -33,6 +33,27 @@ public sealed class WebUiTests
     }
 
     [TestMethod]
+    public async Task Links_page_serves_the_ui_and_its_code_is_reserved()
+    {
+        using var factory = new OviApiFactory(webRoot: FakeBuiltUi());
+        var res = await factory.CreateUnauthedClient().GetAsync("/links");
+
+        Assert.AreEqual(HttpStatusCode.OK, res.StatusCode);
+        Assert.Contains("<div id=root>", await res.Content.ReadAsStringAsync());
+        Assert.IsNotNull(res.Headers.GetValues("Content-Security-Policy").Single());
+
+        var create = await factory.CreateAuthedClient().PostAsJsonAsync("/api/links", new CreateLinkRequest("https://example.com", "links"));
+        Assert.AreEqual(HttpStatusCode.BadRequest, create.StatusCode);
+    }
+
+    [TestMethod]
+    public void Every_ui_page_is_a_reserved_code()
+    {
+        foreach (var page in Ovi.Api.Infrastructure.WebUiSetup.Pages.Where(p => p != "/"))
+            Assert.IsFalse(CodeGenerator.IsValidCustomCode(page.TrimStart('/')), page);
+    }
+
+    [TestMethod]
     public async Task Csp_allows_qr_images_from_the_public_base_url()
     {
         using var factory = new OviApiFactory(new() { ["App:PublicBaseUrl"] = "https://short.example" }, webRoot: FakeBuiltUi());
