@@ -30,7 +30,7 @@ The container runs as a non-root user and stores the database in the `/data` vol
 ## Deploy to Render
 
 [`render.yaml`](render.yaml) is a [Render Blueprint](https://render.com/docs/blueprint-spec) for one Docker web service:
-- It builds from the `Dockerfile` and has a 1 GB persistent disk at `/data` for the SQLite database.
+- It builds from the `Dockerfile` and runs on Render's **free plan**.
 - It uses the `/health` check, and runs one instance because SQLite is a single file.
 - It deploys new commits on `main` only after their GitHub checks (CI) pass.
 
@@ -40,7 +40,11 @@ One-time setup:
 2. Render generates a random `Auth__ApiKey`. Copy it from the service's **Environment** tab. This is the key for `/api/links`.
 3. The service is live at its `https://<name>.onrender.com` URL. Short URLs use that address automatically through `RENDER_EXTERNAL_URL`. To use a custom domain, add it in Render and set `App__PublicBaseUrl`.
 
-Cost: a persistent disk needs a paid instance. `plan: starter` is the smallest. On the free plan, set `plan: free` and remove the `disk` block. The service then sleeps when idle, and **the database is wiped on every deploy or restart**, so it's only suitable for trying things out.
+Free plan limits:
+- The service sleeps after about 15 minutes without traffic. The next request wakes it, which takes up to a minute or so.
+- There's no persistent disk, so **all links are lost whenever the service redeploys, restarts or goes to sleep**.
+
+To keep data, switch to a paid instance: set `plan: starter` and add the `disk` block shown in the comment in `render.yaml`.
 
 ## Configuration
 

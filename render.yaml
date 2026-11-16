@@ -7,18 +7,19 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     region: oregon
-    # A persistent disk (needed so the SQLite database survives deploys and restarts)
-    # requires a paid instance; "starter" is the smallest.
-    plan: starter
+    # Free plan: sleeps after ~15 minutes idle and has NO persistent disk, so the
+    # SQLite database (/data/ovi.db) is wiped on every deploy, restart or sleep.
+    # To keep data, switch to `plan: starter` and add:
+    #   disk:
+    #     name: ovi-data
+    #     mountPath: /data
+    #     sizeGB: 1
+    plan: free
     branch: main
     # Deploy a new commit on main only after its GitHub checks (CI) pass.
     autoDeployTrigger: checksPass
     healthCheckPath: /health
     numInstances: 1
-    disk:
-      name: ovi-data
-      mountPath: /data
-      sizeGB: 1
     envVars:
       - key: PORT
         value: "8080"
