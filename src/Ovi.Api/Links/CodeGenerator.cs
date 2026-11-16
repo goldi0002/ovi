@@ -10,7 +10,7 @@ public static partial class CodeGenerator
     /// <summary>Codes that would collide with real routes.</summary>
     private static readonly HashSet<string> Reserved = new(StringComparer.OrdinalIgnoreCase)
     {
-        "api", "swagger", "openapi", "health", "qr"
+        "api", "swagger", "openapi", "health", "qr", "assets"
     };
 
     public static string Generate(int length = 7) => RandomNumberGenerator.GetString(Alphabet, length);

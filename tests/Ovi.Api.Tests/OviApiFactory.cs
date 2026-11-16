@@ -4,13 +4,14 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Time.Testing;
 using Ovi.Api.Security;
 
 namespace Ovi.Api.Tests;
 
 /// <summary>Runs the API against its own Postgres database (in the shared test container) with a controllable clock.</summary>
-public class OviApiFactory(Dictionary<string, string?>? settings = null, IPAddress? remoteIp = null) : WebApplicationFactory<Program>
+public class OviApiFactory(Dictionary<string, string?>? settings = null, IPAddress? remoteIp = null, string? webRoot = null) : WebApplicationFactory<Program>
 {
     public const string ApiKey = "test-key";
 
@@ -37,6 +38,16 @@ public class OviApiFactory(Dictionary<string, string?>? settings = null, IPAddre
 
         builder.ConfigureServices(services =>
         {
+            // An empty web root unless a test supplies one, so API tests don't depend on a built UI.
+            // (UseWebRoot doesn't apply to minimal hosting here; set it on the environment directly.)
+            var root = webRoot ?? Directory.CreateTempSubdirectory("ovi-webroot-").FullName;
+            foreach (var env in services.Where(d => d.ServiceType == typeof(IWebHostEnvironment))
+                         .Select(d => d.ImplementationInstance).OfType<IWebHostEnvironment>().Distinct())
+            {
+                env.WebRootPath = root;
+                env.WebRootFileProvider = new PhysicalFileProvider(root);
+            }
+
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Time);
             if (remoteIp is not null) services.AddSingleton<IStartupFilter>(new RemoteIpStartupFilter(remoteIp));

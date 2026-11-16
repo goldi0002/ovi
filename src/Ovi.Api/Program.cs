@@ -36,6 +36,7 @@ if (behindProxy) app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 if (!app.Environment.IsDevelopment()) app.UseHsts();
+app.UseOviWebUi();
 app.UseRateLimiter();
 
 if (app.Configuration.GetValue("Swagger:Enabled", app.Environment.IsDevelopment()))
