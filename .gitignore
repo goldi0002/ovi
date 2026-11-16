@@ -486,3 +486,5 @@ $RECYCLE.BIN/
 *.db-*
 .neon
 .env.local
+# Built web UI (from /web)
+src/Ovi.Api/wwwroot/

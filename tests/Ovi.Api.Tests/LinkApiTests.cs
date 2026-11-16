@@ -77,6 +77,7 @@ public sealed class LinkApiTests : IDisposable
     [DataRow("swagger")]
     [DataRow("openapi")]
     [DataRow("QR")]
+    [DataRow("assets")]
     public async Task Create_rejects_invalid_custom_codes(string code)
     {
         Assert.AreEqual(HttpStatusCode.BadRequest, (await PostAsync(new CreateLinkRequest("https://example.com", code))).StatusCode);

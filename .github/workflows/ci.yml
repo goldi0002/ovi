@@ -56,9 +56,39 @@ jobs:
           dotnet tool restore
           dotnet ef migrations has-pending-model-changes --project src/Ovi.Api --no-build --configuration Release
 
+  web:
+    name: Web UI
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Type-check and build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Check licenses and vulnerabilities
+        run: |
+          node ../scripts/check-npm-licenses.mjs package-lock.json
+          npm audit --audit-level=high
+
   docker:
     name: Docker image
-    needs: test
+    needs: [test, web]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -117,6 +147,9 @@ jobs:
             -d '{"url":"https://example.com","customCode":"ci-smoke"}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["shortUrl"])')
           test "$code" = "https://ovi.example/ci-smoke"
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/ci-smoke)" = 302
+          curl -fsS localhost:8080/ | grep -q '<div id="root">'
+          asset=$(curl -fsS localhost:8080/ | grep -o '/assets/[^"]*\.js' | head -n1)
+          curl -fsS -o /dev/null "localhost:8080$asset"
 
       - name: Container logs
         if: failure()

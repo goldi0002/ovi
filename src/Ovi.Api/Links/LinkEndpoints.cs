@@ -12,6 +12,9 @@ public static class LinkEndpoints
     public const int MaxUrlLength = 2048;
     public const int MaxPageSize = 100;
 
+    // Codes never contain dots, so files like /favicon.svg don't match and reach the static-file middleware.
+    private const string CodeRoute = "{code:regex(^[A-Za-z0-9_-]+$)}";
+
     public static void MapLinkEndpoints(this IEndpointRouteBuilder app)
     {
         var api = app.MapGroup("/api/links")
@@ -46,7 +49,7 @@ public static class LinkEndpoints
 
         var pub = app.MapGroup("/").WithTags("Public").RequireRateLimiting(RateLimits.Redirect);
 
-        pub.MapGet("/{code}", async (string code, AppDbContext db, TimeProvider time) =>
+        pub.MapGet("/" + CodeRoute, async (string code, AppDbContext db, TimeProvider time) =>
         {
             var now = time.GetUtcNow().UtcDateTime;
             var link = await db.Links.AsNoTracking().FirstOrDefaultAsync(l => l.Code == code);
@@ -64,7 +67,7 @@ public static class LinkEndpoints
         .Produces(StatusCodes.Status410Gone)
         .Produces(StatusCodes.Status429TooManyRequests);
 
-        pub.MapGet("/{code}/qr", async (string code, AppDbContext db, ShortUrlBuilder urls, TimeProvider time) =>
+        pub.MapGet("/" + CodeRoute + "/qr", async (string code, AppDbContext db, ShortUrlBuilder urls, TimeProvider time) =>
         {
             var link = await db.Links.AsNoTracking().FirstOrDefaultAsync(l => l.Code == code);
             if (link is null) return Results.NotFound();

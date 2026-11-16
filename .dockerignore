@@ -5,3 +5,6 @@
 .config/
 tests/
 Dockerfile
+**/node_modules/
+src/Ovi.Api/wwwroot/
+.env*

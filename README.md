@@ -23,6 +23,26 @@ Swagger UI: http://localhost:5080/swagger. Click **Authorize** and enter `dev-ke
 
 The schema is created and migrated automatically on startup.
 
+## Web UI
+
+A React app in [`web/`](web) (Vite, TypeScript) is the UI for the API. It's served by the API itself at `/`, so there's one address and no CORS setup.
+
+- Sign in with the API key. It's kept for the browser tab, or on the device if you tick **Remember on this device**.
+- Shorten links with an optional custom code and expiry, then copy the result or download its QR code.
+- See all links with clicks, creation time and status (active, expiring, expired), page through them and delete them.
+
+Develop it with hot reload while the API runs on `:5080` (see above). Vite proxies `/api` calls to it:
+
+```bash
+cd web
+npm ci
+npm run dev          # http://localhost:5173
+npm test             # Vitest + Testing Library
+npm run build        # type-checks, then builds into src/Ovi.Api/wwwroot
+```
+
+After `npm run build`, the API serves the UI at http://localhost:5080/. The Docker image builds it automatically. `index.html` is sent with a strict Content-Security-Policy and `no-cache`, and the hashed files in `/assets` are cached for a year.
+
 ## Run with Docker
 
 ```bash
@@ -99,10 +119,11 @@ Management endpoints need the `X-Api-Key` header. Redirects and QR codes are pub
 | `GET` | `/{code}` | public | 302 redirect and count the click. Returns 410 Gone if expired |
 | `GET` | `/{code}/qr` | public | PNG QR code for the short URL |
 | `GET` | `/health` | public | Health check, including the database connection (503 if the database is unavailable) |
+| `GET` | `/` | public | The web UI, when it has been built into `wwwroot` |
 
 Validation rules:
 - URLs must be absolute `http` or `https`, at most 2048 characters, and can't point back at the shortener.
-- A custom code is 3 to 32 characters of letters, digits, `-` or `_`. It can't be a reserved word (`api`, `swagger`, `openapi`, `health`, `qr`).
+- A custom code is 3 to 32 characters of letters, digits, `-` or `_`. It can't be a reserved word (`api`, `swagger`, `openapi`, `health`, `qr`, `assets`).
 - `expiresAt` must be in the future.
 
 Errors use RFC 7807 problem JSON:
@@ -142,7 +163,8 @@ Tests use MSTest and `WebApplicationFactory` with a fake clock (`FakeTimeProvide
 1. Builds in Release mode and runs the tests. Results are uploaded as a `test-results` artifact.
 2. Checks every NuGet package, including transitive ones, for a disallowed license or a known vulnerability (`scripts/check-packages.py`).
 3. Fails if the EF model has changed without a migration.
-4. Builds the Docker image. On pull requests it starts the container and smoke-tests it. On `main` it pushes the image to GitHub Container Registry:
+4. Type-checks, tests and builds the web UI, checks npm licenses, and runs `npm audit`.
+5. Builds the Docker image. On pull requests it starts the container with a Postgres next to it and smoke-tests the API and UI. On `main` it pushes the image to GitHub Container Registry:
 
 ```bash
 docker pull ghcr.io/goldi0002/ovi:latest   # or :sha-<short commit>
@@ -152,10 +174,11 @@ The package is private by default. To make it public, change its visibility in t
 
 ## Dependencies and licenses
 
-All NuGet dependencies are free and open source: MIT, except Npgsql (the .NET Postgres driver) and its EF Core provider, which use the permissive, MIT-like [PostgreSQL License](https://opensource.org/license/postgresql). CI enforces this. Run the same check locally after `dotnet restore`:
+All NuGet dependencies are free and open source: MIT, except Npgsql (the .NET Postgres driver) and its EF Core provider, which use the permissive, MIT-like [PostgreSQL License](https://opensource.org/license/postgresql). The web UI ships only MIT packages (React). Its build and test tools use other common open-source licenses (Apache-2.0, ISC, BSD, and MPL-2.0 for Vite's CSS minifier, lightningcss), none of which reach users. CI enforces both. Run the same checks locally:
 
 ```bash
-python3 scripts/check-packages.py
+python3 scripts/check-packages.py                              # NuGet, after dotnet restore
+node scripts/check-npm-licenses.mjs web/package-lock.json     # npm
 ```
 
 Allowed licenses are MIT, Apache-2.0 and PostgreSQL, set in `ALLOWED_LICENSES` in the script.
