@@ -1,5 +1,7 @@
 # ovi
 
+[![CI](https://github.com/goldi0002/ovi/actions/workflows/ci.yml/badge.svg)](https://github.com/goldi0002/ovi/actions/workflows/ci.yml)
+
 A small URL shortener API built with ASP.NET Core minimal APIs (.NET 10 LTS), EF Core and SQLite.
 
 ## Run locally
@@ -95,11 +97,27 @@ dotnet test
 
 Tests use MSTest and `WebApplicationFactory`, with an in-memory SQLite database and a fake clock (`FakeTimeProvider`).
 
-## Dependencies and licenses
+## CI
 
-All NuGet dependencies are free and open source: MIT, except the SQLite native bindings (`SQLitePCLRaw.*`), which are Apache-2.0 and required by EF Core's SQLite provider. SQLite itself is public domain. Check with:
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every pull request and on pushes to `main`. It:
+
+1. Builds in Release mode and runs the tests. Results are uploaded as a `test-results` artifact.
+2. Checks every NuGet package, including transitive ones, for a disallowed license or a known vulnerability (`scripts/check-packages.py`).
+3. Fails if the EF model has changed without a migration.
+4. Builds the Docker image. On pull requests it starts the container and smoke-tests it. On `main` it pushes the image to GitHub Container Registry:
 
 ```bash
-dotnet list package --include-transitive
-dotnet list package --vulnerable --include-transitive
+docker pull ghcr.io/goldi0002/ovi:latest   # or :sha-<short commit>
 ```
+
+The package is private by default. To make it public, change its visibility in the package's settings on GitHub.
+
+## Dependencies and licenses
+
+All NuGet dependencies are free and open source: MIT, except the SQLite native bindings (`SQLitePCLRaw.*`), which are Apache-2.0 and required by EF Core's SQLite provider. SQLite itself is public domain. CI enforces this. Run the same check locally after `dotnet restore`:
+
+```bash
+python3 scripts/check-packages.py
+```
+
+Allowed licenses are MIT and Apache-2.0, set in `ALLOWED_LICENSES` in the script.
