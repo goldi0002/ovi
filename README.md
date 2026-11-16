@@ -1,11 +1,105 @@
-<div align="center">
+# ovi
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+A small URL shortener API built with ASP.NET Core minimal APIs (.NET 10 LTS), EF Core and SQLite.
 
-  <h1>Built with AI Studio</h2>
+## Run locally
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+```bash
+dotnet tool restore                      # installs dotnet-ef locally
+ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/Ovi.Api --urls http://localhost:5080
+```
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+Swagger UI: http://localhost:5080/swagger. Click **Authorize** and enter `dev-key-change-me`.
 
-</div>
+The database (`ovi.db`) is created and migrated automatically on startup.
+
+## Run with Docker
+
+```bash
+docker build -t ovi .
+docker run -d -p 8080:8080 -v ovi-data:/data \
+  -e Auth__ApiKey='a-long-random-secret' \
+  -e App__PublicBaseUrl='https://your.domain' \
+  ovi
+```
+
+The container runs as a non-root user and stores the database in the `/data` volume.
+
+## Configuration
+
+| Setting | Env var | Default | Notes |
+|---|---|---|---|
+| `Auth:ApiKey` | `Auth__ApiKey` | none (`dev-key-change-me` in Development) | **Required.** Protects `/api/links/*`. If unset, those endpoints reject every request. |
+| `App:PublicBaseUrl` | `App__PublicBaseUrl` | none | **Set in production.** Base for short URLs and QR codes. If unset, they're built from the request's Host header, which clients control. |
+| `ConnectionStrings:Default` | `ConnectionStrings__Default` | `Data Source=ovi.db` (`/data/ovi.db` in Docker) | SQLite connection string |
+| `RateLimits:CreatePerMinute` | `RateLimits__CreatePerMinute` | `30` | Per client IP |
+| `RateLimits:RedirectPerMinute` | `RateLimits__RedirectPerMinute` | `300` | Per client IP, covers redirects and QR codes |
+| `ReverseProxy:KnownProxies` | `ReverseProxy__KnownProxies__0` | none | IPs of your reverse proxy / load balancer. Needed so rate limits see real client IPs |
+| `ReverseProxy:KnownNetworks` | `ReverseProxy__KnownNetworks__0` | none | Same, as CIDR ranges (e.g. `10.0.0.0/8`) |
+| `Swagger:Enabled` | `Swagger__Enabled` | `true` in Development, else `false` | Serves `/openapi/v1.json` and `/swagger` |
+
+### Deploying behind a reverse proxy
+
+Terminate TLS at the proxy (nginx, Caddy, a cloud load balancer and so on). Set `ReverseProxy:KnownProxies` or `KnownNetworks` to the proxy's address.
+
+`X-Forwarded-For`, `X-Forwarded-Proto` and `X-Forwarded-Host` are only trusted from those addresses. If you skip this, every client shares the proxy's rate limit. HSTS is sent outside Development.
+
+SQLite is a single file, so run **one instance**. To scale out, switch to a server database such as PostgreSQL.
+
+## Endpoints
+
+Management endpoints need the `X-Api-Key` header. Redirects and QR codes are public.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/links` | key | Create a link. Body: `{ "url": "https://...", "customCode": "optional", "expiresAt": "optional, e.g. 2030-01-01T00:00:00Z" }` |
+| `GET` | `/api/links?page=1&pageSize=50` | key | List links, newest first. Returns `{ items, page, pageSize, total }`; `pageSize` max 100 |
+| `GET` | `/api/links/{code}` | key | Show one link's details and click count |
+| `DELETE` | `/api/links/{code}` | key | Delete a link |
+| `GET` | `/{code}` | public | 302 redirect and count the click. Returns 410 Gone if expired |
+| `GET` | `/{code}/qr` | public | PNG QR code for the short URL |
+| `GET` | `/health` | public | Health check, including the database connection (503 if the database is unavailable) |
+
+Validation rules:
+- URLs must be absolute `http` or `https`, at most 2048 characters, and can't point back at the shortener.
+- A custom code is 3 to 32 characters of letters, digits, `-` or `_`. It can't be a reserved word (`api`, `swagger`, `openapi`, `health`, `qr`).
+- `expiresAt` must be in the future.
+
+Errors use RFC 7807 problem JSON:
+- 400: validation failed.
+- 401: the API key is missing or wrong.
+- 409: the code is already taken.
+- 429: the client is over its rate limit.
+
+```bash
+KEY=dev-key-change-me
+curl -X POST localhost:5080/api/links -H "X-Api-Key: $KEY" -H 'content-type: application/json' \
+  -d '{"url":"https://learn.microsoft.com/dotnet","customCode":"dotnet","expiresAt":"2030-01-01T00:00:00Z"}'
+curl -i localhost:5080/dotnet
+curl -o dotnet.png localhost:5080/dotnet/qr
+```
+
+## Database migrations
+
+The schema is managed with EF Core migrations in `src/Ovi.Api/Data/Migrations`. After changing the model:
+
+```bash
+dotnet ef migrations add <Name> --project src/Ovi.Api -o Data/Migrations
+```
+
+## Test
+
+```bash
+dotnet test
+```
+
+Tests use MSTest and `WebApplicationFactory`, with an in-memory SQLite database and a fake clock (`FakeTimeProvider`).
+
+## Dependencies and licenses
+
+All NuGet dependencies are free and open source: MIT, except the SQLite native bindings (`SQLitePCLRaw.*`), which are Apache-2.0 and required by EF Core's SQLite provider. SQLite itself is public domain. Check with:
+
+```bash
+dotnet list package --include-transitive
+dotnet list package --vulnerable --include-transitive
+```
