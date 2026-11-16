@@ -15,6 +15,11 @@ builder.Services.AddOviRateLimits(builder.Configuration);
 builder.Services.AddProblemDetails();
 builder.Services.AddOviOpenApi();
 var behindProxy = builder.Services.ConfigureReverseProxy(builder.Configuration);
+if (builder.Configuration.GetValue("KeepAlive:Enabled", false))
+{
+    builder.Services.AddHttpClient(KeepAliveService.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(30));
+    builder.Services.AddHostedService<KeepAliveService>();
+}
 
 var app = builder.Build();
 
@@ -50,6 +55,8 @@ app.MapGet("/health", async (AppDbContext db) =>
             ? Results.Ok(new { status = "ok" })
             : Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "Database unavailable"))
     .WithTags("Health");
+// Liveness only: answers without touching the database, so keep-alive pings don't wake Neon.
+app.MapGet("/health/live", () => Results.Ok(new { status = "ok" })).WithTags("Health");
 app.MapLinkEndpoints();
 
 await app.RunAsync();

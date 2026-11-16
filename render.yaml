@@ -23,6 +23,10 @@ services:
       # Render's proxy is the only way in and appends the client IP to X-Forwarded-For.
       - key: ReverseProxy__TrustAllProxies
         value: "true"
+      # Ping our own public URL every 10 minutes so the free instance doesn't sleep after
+      # 15 idle minutes. Uses about 744 of the workspace's 750 free instance hours a month.
+      - key: KeepAlive__Enabled
+        value: "true"
       - key: DOTNET_gcServer
         value: "0"
       # Neon Postgres. Render asks for these when the Blueprint is applied; copy them from
