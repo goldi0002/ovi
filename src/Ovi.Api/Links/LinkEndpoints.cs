@@ -45,6 +45,7 @@ public static class LinkEndpoints
             .Produces(StatusCodes.Status404NotFound);
 
         api.MapGet("/{code}/stats", LinkStats)
+            .RequireRateLimiting(RateLimits.Stats)
             .Produces<LinkStatsResponse>()
             .ProducesValidationProblem()
             .Produces(StatusCodes.Status404NotFound);
@@ -61,29 +62,40 @@ public static class LinkEndpoints
 
         var pub = app.MapGroup("/").WithTags("Public").RequireRateLimiting(RateLimits.Redirect);
 
-        pub.MapGet("/" + CodeRoute, async (string code, HttpRequest request, AppDbContext db, TimeProvider time) =>
+        pub.MapGet("/" + CodeRoute, async (string code, HttpRequest request, AppDbContext db, TimeProvider time,
+            IConfiguration config, ClickRecorder recorder, ILogger<Link> log) =>
         {
             var now = time.GetUtcNow().UtcDateTime;
             var link = await db.Links.AsNoTracking().FirstOrDefaultAsync(l => l.Code == code);
             if (link is null) return Results.NotFound();
             if (link.IsExpired(now)) return Expired();
-            if (await OwnerSuspendedAsync(db, link)) return Disabled();
-
-            await db.Links.Where(l => l.Id == link.Id)
-                .ExecuteUpdateAsync(s => s
-                    .SetProperty(l => l.Clicks, l => l.Clicks + 1)
-                    .SetProperty(l => l.LastClickedAt, now));
+            if (await UnavailableAsync(db, link, config)) return Disabled();
 
             var (device, browser) = ClientInfo.ParseUserAgent(request.Headers.UserAgent);
-            db.Clicks.Add(new Click
+            if (recorder.ShouldRecord(ClientKey.For(request.HttpContext.Connection.RemoteIpAddress), link.Id, device))
             {
-                LinkId = link.Id,
-                At = now,
-                Referrer = ClientInfo.ParseReferrer(request.Headers.Referer),
-                Device = device,
-                Browser = browser,
-            });
-            await db.SaveChangesAsync();
+                try
+                {
+                    await db.Links.Where(l => l.Id == link.Id)
+                        .ExecuteUpdateAsync(s => s
+                            .SetProperty(l => l.Clicks, l => l.Clicks + 1)
+                            .SetProperty(l => l.LastClickedAt, now));
+                    db.Clicks.Add(new Click
+                    {
+                        LinkId = link.Id,
+                        At = now,
+                        Referrer = ClientInfo.ParseReferrer(request.Headers.Referer),
+                        Device = device,
+                        Browser = browser,
+                    });
+                    await db.SaveChangesAsync();
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // Counting is secondary: a full or struggling database must not stop the link from working.
+                    log.LogWarning(ex, "Couldn't record a click on {Code}", code);
+                }
+            }
             return Results.Redirect(link.Url);
         })
         .Produces(StatusCodes.Status302Found)
@@ -91,12 +103,12 @@ public static class LinkEndpoints
         .Produces(StatusCodes.Status410Gone)
         .Produces(StatusCodes.Status429TooManyRequests);
 
-        pub.MapGet("/" + CodeRoute + "/qr", async (string code, AppDbContext db, ShortUrlBuilder urls, TimeProvider time) =>
+        pub.MapGet("/" + CodeRoute + "/qr", async (string code, AppDbContext db, ShortUrlBuilder urls, TimeProvider time, IConfiguration config) =>
         {
             var link = await db.Links.AsNoTracking().FirstOrDefaultAsync(l => l.Code == code);
             if (link is null) return Results.NotFound();
             if (link.IsExpired(time.GetUtcNow().UtcDateTime)) return Expired();
-            if (await OwnerSuspendedAsync(db, link)) return Disabled();
+            if (await UnavailableAsync(db, link, config)) return Disabled();
 
             using var data = QRCodeGenerator.GenerateQrCode(urls.For(link.Code), QRCodeGenerator.ECCLevel.M);
             var png = new PngByteQRCode(data).GetGraphic(10);
@@ -111,9 +123,13 @@ public static class LinkEndpoints
     private static IResult SignInRequired() =>
         Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Sign in to see and manage your links.");
 
-    /// <summary>Links of a suspended account stop working, so an admin can stop abuse in one step.</summary>
-    private static Task<bool> OwnerSuspendedAsync(AppDbContext db, Link link) =>
-        link.OwnerId is { } owner ? db.Users.AnyAsync(u => u.Id == owner && u.BlockedAt != null) : Task.FromResult(false);
+    /// <summary>
+    /// Links stop working when their site is on the blocklist (including links made before it was blocked) or their
+    /// owner is suspended, so an admin can stop abuse in one step.
+    /// </summary>
+    private static async Task<bool> UnavailableAsync(AppDbContext db, Link link, IConfiguration config) =>
+        LinkRules.IsBlockedUrl(link.Url, config) ||
+        (link.OwnerId is { } owner && await db.Users.AnyAsync(u => u.Id == owner && u.BlockedAt != null));
 
     private static IResult Disabled() =>
         Results.Problem(statusCode: StatusCodes.Status410Gone, title: "This link has been disabled.");

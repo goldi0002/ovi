@@ -21,8 +21,12 @@ public class ShortUrlBuilder(IConfiguration config, IHttpContextAccessor http)
     public string For(string code) => $"{BaseUrl}/{code}";
 
     /// <summary>True if the URL points back at this shortener, which would create a redirect loop.</summary>
-    public bool IsSelf(Uri target) =>
-        string.Equals(target.Authority, new Uri(BaseUrl).Authority, StringComparison.OrdinalIgnoreCase);
+    public bool IsSelf(Uri target)
+    {
+        var self = new Uri(BaseUrl);
+        return target.Port == self.Port &&
+               Ovi.Api.Links.LinkRules.NormalizeHost(target.IdnHost) == Ovi.Api.Links.LinkRules.NormalizeHost(self.IdnHost);
+    }
 
     /// <summary>App:PublicBaseUrl wins; RENDER_EXTERNAL_URL is set automatically by Render.</summary>
     public static string? ConfiguredValue(IConfiguration config) =>

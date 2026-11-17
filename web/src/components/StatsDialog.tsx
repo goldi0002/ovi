@@ -132,8 +132,9 @@ export function StatsDialog({ api, link, onClose, onUnauthorized }: Props) {
             </div>
 
             <p className="text-[0.8rem] text-muted">
-              Days are in UTC. Referrers show only the site, never the full page address. Clicks from before stats were
-              added count toward the all-time total only.
+              Days are in UTC. Referrers show only the site, never the full page address. Bots, and repeat visits from
+              the same person within 30 seconds, aren't counted. Clicks from before stats were added count toward the
+              all-time total only.
             </p>
           </div>
         )}

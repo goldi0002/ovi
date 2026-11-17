@@ -13,6 +13,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ShortUrlBuilder>();
+builder.Services.AddSingleton<ClickRecorder>();
+builder.Services.AddHostedService<ClickRetentionService>();
 builder.Services.AddOviRateLimits(builder.Configuration);
 builder.Services.AddOviAuth(builder.Configuration, builder.Environment);
 // Requests are small JSON bodies; refuse anything big before reading it.

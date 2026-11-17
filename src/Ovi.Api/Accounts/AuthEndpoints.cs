@@ -51,9 +51,14 @@ public static class AuthEndpoints
         .Produces(StatusCodes.Status204NoContent);
     }
 
-    /// <summary>Only paths on this site ("/links"), never another site ("//evil.com", "https://evil.com").</summary>
+    /// <summary>
+    /// Only paths on this site ("/links"), never another site ("//evil.com", "https://evil.com"). Browsers drop tabs and
+    /// newlines and treat "\" like "/", so "/\t/evil.com" would become "//evil.com": any whitespace, control character
+    /// or backslash is refused outright.
+    /// </summary>
     public static string SafeReturnUrl(string? returnUrl) =>
-        returnUrl is { Length: > 0 and <= 512 } url && url[0] == '/' && !url.StartsWith("//") && !url.StartsWith("/\\") &&
+        returnUrl is { Length: > 0 and <= 512 } url && url[0] == '/' && (url.Length == 1 || url[1] != '/') &&
+        !url.Any(c => char.IsControl(c) || char.IsWhiteSpace(c) || c == '\\') &&
         Uri.TryCreate(url, UriKind.Relative, out _)
             ? url
             : "/";
