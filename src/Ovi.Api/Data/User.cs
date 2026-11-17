@@ -13,6 +13,12 @@ public class User
 
     public required string Name { get; set; }
     public string? Email { get; set; }
+
+    /// <summary>True only when the provider confirmed the person owns <see cref="Email"/>. Admin rights need a verified email.</summary>
+    public bool EmailVerified { get; set; }
+
+    /// <summary>Set when an admin suspends the account: it can't sign in or use the API, and its links stop redirecting.</summary>
+    public DateTime? BlockedAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime LastLoginAt { get; set; }
 }

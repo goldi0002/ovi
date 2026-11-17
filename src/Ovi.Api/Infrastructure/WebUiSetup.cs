@@ -9,7 +9,7 @@ namespace Ovi.Api.Infrastructure;
 public static class WebUiSetup
 {
     /// <summary>Paths the React app handles itself; each returns index.html.</summary>
-    public static readonly string[] Pages = ["/", "/links"];
+    public static readonly string[] Pages = ["/", "/links", "/admin"];
 
     public static void UseOviWebUi(this WebApplication app)
     {

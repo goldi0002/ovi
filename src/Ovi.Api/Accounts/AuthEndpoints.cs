@@ -7,10 +7,10 @@ using Ovi.Api.Security;
 
 namespace Ovi.Api.Accounts;
 
-public record SessionUser(string Name, string? Email, string Provider);
+public record SessionUser(string Name, string? Email, string Provider, bool IsAdmin);
 
 /// <param name="User">The signed-in user, or null.</param>
-/// <param name="Admin">True when the request carried the admin API key.</param>
+/// <param name="Admin">True for admins: the API key, or a signed-in user on the admin list.</param>
 /// <param name="Providers">Sign-in providers that are turned on ("google", "github").</param>
 /// <param name="AnonymousLinkDays">How long links made without signing in last.</param>
 public record SessionResponse(SessionUser? User, bool Admin, IReadOnlyList<string> Providers, int AnonymousLinkDays);
@@ -34,12 +34,10 @@ public static class AuthEndpoints
         {
             var caller = Caller.From(http);
             SessionUser? user = null;
-            if (caller is Caller.User u)
+            if (caller.AccountId is { } id)
             {
-                user = await db.Users.Where(x => x.Id == u.Id)
-                    .Select(x => new SessionUser(x.Name, x.Email, x.Provider)).FirstOrDefaultAsync();
-                // The account is gone (deleted from the database): end the stale session.
-                if (user is null) await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                user = await db.Users.Where(x => x.Id == id)
+                    .Select(x => new SessionUser(x.Name, x.Email, x.Provider, caller is Caller.Admin)).FirstOrDefaultAsync();
             }
             return Results.Ok(new SessionResponse(user, caller is Caller.Admin, AuthSetup.EnabledProviders(config), LinkRules.AnonymousLinkDays));
         })

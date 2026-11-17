@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Ovi.Api.Accounts;
+using Ovi.Api.Admin;
 using Ovi.Api.Data;
 using Ovi.Api.Infrastructure;
 using Ovi.Api.Links;
@@ -75,6 +76,7 @@ app.MapGet("/health", async (AppDbContext db) =>
 app.MapGet("/health/live", () => Results.Ok(new { status = "ok" })).WithTags("Health");
 app.MapAuthEndpoints();
 app.MapLinkEndpoints();
+app.MapAdminEndpoints();
 
 await app.RunAsync();
 

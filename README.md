@@ -34,6 +34,11 @@ A React app in [`web/`](web) (Vite, TypeScript, Tailwind CSS, Lucide icons) is t
 - The admin can choose **Admin? Use an API key** in the Log in dialog. The key is kept for the browser tab, or on the device with **Remember on this device**, and gives access to every link.
 - Copy the result or download its QR code.
 - The **Links** page (`/links`) lists your links (every link for the admin) (a table on wide screens, cards on phones) with clicks, creation time and status (active, expiring, expired); page through them and delete them. Its address works directly, so you can bookmark it.
+- Admins get an **Admin** page (`/admin`):
+  - totals and clicks over the last 14 days
+  - the top links
+  - every user, with their links and clicks; an admin can suspend or restore a user
+  - every link, with its owner; filter by owner (anonymous, API key or one user), search, open its stats, or delete it
 - Open **Stats** on any link for its clicks per day over the last 7, 30 or 90 days, its top referrers, and the devices and browsers visitors used. Each click stores only the time, the referring site's name (no page path), and a device and browser category: no IP address or full user agent.
 
 Develop it with hot reload while the API runs on `:5080` (see above). Vite proxies `/api` calls to it:
@@ -102,6 +107,22 @@ How it works:
 - Requests that change data with the cookie must carry `X-Ovi-Request: 1`, which other sites can't add, so they can't act as a signed-in user (CSRF).
 - A cancelled or failed sign-in returns to `/?login=failed`, and the UI shows a message.
 
+## Admins
+
+There are two ways to be an admin:
+- **The API key** (`Auth__ApiKey`): for scripts, and as a fallback.
+- **Your own account:** sign in with Google or GitHub using an email listed in `Auth__AdminEmails` (comma-separated, e.g. `you@gmail.com`). The **Admin** item then appears in the header.
+
+How the role checks work:
+- **Server-side only.** The browser can't grant or claim it: a role header, a guessed key or a changed page gets nothing. The Admin item in the UI is only a shortcut.
+- **Verified emails only.** Admin rights need an email the provider confirmed. That's Google's `email_verified`, or GitHub's primary verified address. An account showing an unverified copy of an admin's email gets nothing.
+- **Checked on every request.** The session holds just an account id. Each `/api` request loads the account and checks it against the current `Auth__AdminEmails`, so removing an email (and redeploying) or suspending a user takes effect on their next request, not when their cookie expires.
+- **Guarded by one group.** Every `/api/admin` route is in a single route group behind an admin-only filter: 401 without credentials, 403 for signed-in non-admins. A test fails if any admin route is missing it.
+- **Suspended users:**
+  - They are signed out and refused on every API call, and can't sign in again.
+  - Their links return 410 until an admin restores them.
+  - Admins can't suspend themselves or another admin; take the email off the list first.
+
 ## Database (Neon)
 
 The production database is the `production` branch of a Neon project. Neon's config lives in [`neon.ts`](neon.ts); `neon deploy` applies it and pulls the branch's variables into `.env.local`.
@@ -118,6 +139,7 @@ Both accept Neon's `postgresql://…?sslmode=require&channel_binding=require` UR
 | `Auth:ApiKey` | `Auth__ApiKey` | none (`dev-key-change-me` in Development) | The admin key: full access to every link. If unset, admin access is off. |
 | `Auth:Google:ClientId` / `ClientSecret` | `Auth__Google__ClientId` / `Auth__Google__ClientSecret` | none | Turns on **Continue with Google** |
 | `Auth:GitHub:ClientId` / `ClientSecret` | `Auth__GitHub__ClientId` / `Auth__GitHub__ClientSecret` | none | Turns on **Continue with GitHub** |
+| `Auth:AdminEmails` | `Auth__AdminEmails` | none | Comma-separated verified emails that are admins when signed in (case-insensitive) |
 | `Links:BlockedHosts` | `Links__BlockedHosts` | none | Comma-separated sites that can't be shortened (their subdomains too), e.g. to stop spam |
 | `App:PublicBaseUrl` | `App__PublicBaseUrl` | none (`RENDER_EXTERNAL_URL` on Render) | **Set in production.** Base for short URLs and QR codes. If neither is set, they're built from the request's Host header, which clients control. |
 | — | `DATABASE_URL` | none | **Required in production.** Postgres URL or Npgsql connection string for app traffic (Neon: pooled endpoint) |
@@ -160,6 +182,10 @@ Redirects and QR codes are public.
 | `GET` | `/api/links/{code}` | user, key | Show one link's details and click count |
 | `GET` | `/api/links/{code}/stats?days=30` | user, key | Click analytics for the last 1–365 days (UTC): clicks per day, top referrers, devices and browsers |
 | `DELETE` | `/api/links/{code}` | user, key | Delete a link (soft delete: the row is kept with `DeletedAt` set, and the link disappears from every endpoint) |
+| `GET` | `/api/admin/overview` | admin | Totals, clicks and sign-ups per day for 14 days, top links |
+| `GET` | `/api/admin/users?page=1&pageSize=20&q=` | admin | Every user with link and click counts; `q` searches name and email |
+| `GET` | `/api/admin/links?page=1&pageSize=20&q=&owner=` | admin | Every link with its owner; `owner` is `anonymous`, `apikey` or a user id; `q` searches code and URL |
+| `POST` | `/api/admin/users/{id}/block` / `unblock` | admin | Suspend or restore a user (not yourself or another admin) |
 | `GET` | `/api/session` | anyone | Who's signed in, which sign-in providers are on, and how long anonymous links last |
 | `POST` | `/api/logout` | user | End the session |
 | `GET` | `/auth/login/{google\|github}?returnUrl=/links` | public | Start signing in; comes back to `returnUrl` (a path on this site only) |
@@ -173,7 +199,7 @@ Validation rules:
 - URLs are trimmed, then must be absolute `http` or `https` with a host and no spaces, at most 2048 characters.
 - A URL can't contain a user name or password (`https://bank.example@evil.example` is a phishing trick).
 - A URL can't point back at the shortener, or at a site in `Links:BlockedHosts`.
-- A custom code is 3 to 32 characters of letters, digits, `-` or `_`, and only for signed-in users and the admin. It can't be a reserved word (`api`, `auth`, `swagger`, `openapi`, `health`, `qr`, `assets`, `links`).
+- A custom code is 3 to 32 characters of letters, digits, `-` or `_`, and only for signed-in users and the admin. It can't be a reserved word (`api`, `auth`, `swagger`, `openapi`, `health`, `qr`, `assets`, `links`, `admin`).
 - `expiresAt` must be in the future and at most 10 years away. Anonymous links expire after 30 days by default, and can't be set to last longer.
 - Request bodies over 64 KB are refused.
 - A deleted link's code stays reserved, so an old short URL or printed QR code can never start pointing somewhere else.

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { App } from "./App";
 import { fakeApi, link } from "./test/fakeApi";
 
-const ada = { name: "Ada Lovelace", email: "ada@example.com", provider: "google" as const };
+const ada = { name: "Ada Lovelace", email: "ada@example.com", provider: "google" as const, isAdmin: false };
 
 /** The header's Log in / Sign out button (the page can have other "Log in" buttons). */
 const headerButton = (name: string) => within(screen.getByRole("banner")).getByRole("button", { name });

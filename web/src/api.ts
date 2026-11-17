@@ -38,14 +38,56 @@ export type Provider = "google" | "github";
 
 export interface Session {
   /** The signed-in account, or null. */
-  user: { name: string; email: string | null; provider: Provider } | null;
-  /** True when the request carried the admin API key. */
+  user: { name: string; email: string | null; provider: Provider; isAdmin: boolean } | null;
+  /** True for admins: the API key, or a signed-in user on the server's admin list. */
   admin: boolean;
   /** Sign-in providers turned on for this server. */
   providers: Provider[];
   /** How long links made without signing in last. */
   anonymousLinkDays: number;
 }
+
+export interface DailyCount {
+  date: string;
+  count: number;
+}
+
+export interface AdminOverview {
+  users: number;
+  blockedUsers: number;
+  links: number;
+  anonymousLinks: number;
+  expiredLinks: number;
+  deletedLinks: number;
+  totalClicks: number;
+  dailyClicks: DailyCount[];
+  dailySignups: DailyCount[];
+  topLinks: { code: string; shortUrl: string; url: string; clicks: number; ownerName: string | null }[];
+}
+
+export interface AdminUser {
+  id: number;
+  name: string;
+  email: string | null;
+  emailVerified: boolean;
+  provider: Provider;
+  isAdmin: boolean;
+  blockedAt: string | null;
+  createdAt: string;
+  lastLoginAt: string;
+  links: number;
+  clicks: number;
+}
+
+export interface AdminLink {
+  link: Link;
+  /** The account that made it; null for anonymous and API-key links. */
+  owner: { id: number; name: string; email: string | null } | null;
+  anonymous: boolean;
+}
+
+/** "anonymous", "apikey", a user id, or "" for every link. */
+export type OwnerFilter = string;
 
 export interface CreateLinkInput {
   url: string;
@@ -124,6 +166,24 @@ export class OviApi {
 
   logout(): Promise<void> {
     return this.request("/api/logout", { method: "POST" });
+  }
+
+  adminOverview(): Promise<AdminOverview> {
+    return this.request("/api/admin/overview");
+  }
+
+  adminUsers(page = 1, q = "", pageSize = 20): Promise<Page<AdminUser>> {
+    return this.request(`/api/admin/users?page=${page}&pageSize=${pageSize}&q=${encodeURIComponent(q)}`);
+  }
+
+  adminLinks(page = 1, q = "", owner: OwnerFilter = "", pageSize = 20): Promise<Page<AdminLink>> {
+    return this.request(
+      `/api/admin/links?page=${page}&pageSize=${pageSize}&q=${encodeURIComponent(q)}&owner=${encodeURIComponent(owner)}`,
+    );
+  }
+
+  setBlocked(userId: number, blocked: boolean): Promise<void> {
+    return this.request(`/api/admin/users/${userId}/${blocked ? "block" : "unblock"}`, { method: "POST" });
   }
 
   list(page = 1, pageSize = 20): Promise<Page<Link>> {

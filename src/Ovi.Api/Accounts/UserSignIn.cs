@@ -13,24 +13,31 @@ public static class UserSignIn
     public const int MaxNameLength = 100;
 
     /// <summary>Finds the account for this provider identity, creating it on first sign-in, and refreshes its name and email.</summary>
-    public static async Task<User> UpsertAsync(AppDbContext db, TimeProvider time, string provider, string providerKey, string? name, string? email)
+    public static async Task<User> UpsertAsync(
+        AppDbContext db, TimeProvider time, string provider, string providerKey, string? name, string? email, bool emailVerified)
     {
         var now = time.GetUtcNow().UtcDateTime;
         var displayName = Clean(name) ?? Clean(email?.Split('@')[0]) ?? "Ovi user";
         email = email?.Trim() is { Length: > 0 and <= 320 } e ? e : null;
+        emailVerified = emailVerified && email is not null;
 
         for (var attempt = 0; ; attempt++)
         {
             var user = await db.Users.FirstOrDefaultAsync(u => u.Provider == provider && u.ProviderKey == providerKey);
             if (user is null)
             {
-                user = new User { Provider = provider, ProviderKey = providerKey, Name = displayName, Email = email, CreatedAt = now };
+                user = new User
+                {
+                    Provider = provider, ProviderKey = providerKey, Name = displayName, Email = email, EmailVerified = emailVerified,
+                    CreatedAt = now,
+                };
                 db.Users.Add(user);
             }
             else
             {
                 user.Name = displayName;
                 user.Email = email;
+                user.EmailVerified = emailVerified;
             }
             user.LastLoginAt = now;
 

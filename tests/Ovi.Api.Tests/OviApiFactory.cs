@@ -34,10 +34,10 @@ public class OviApiFactory(Dictionary<string, string?>? settings = null, IPAddre
     /// A client signed in as a user (created on first use, like a first Google/GitHub sign-in), holding a real session
     /// cookie. It sends the X-Ovi-Request header the web UI sends, unless <paramref name="csrfHeader"/> is false.
     /// </summary>
-    public async Task<HttpClient> CreateUserClientAsync(string providerKey = "user-1", bool csrfHeader = true)
+    public async Task<HttpClient> CreateUserClientAsync(string providerKey = "user-1", bool csrfHeader = true, bool emailVerified = true)
     {
         var client = CreateUnauthedClient();
-        var res = await client.GetAsync($"{TestLoginPath}?key={Uri.EscapeDataString(providerKey)}");
+        var res = await client.GetAsync($"{TestLoginPath}?key={Uri.EscapeDataString(providerKey)}&verified={emailVerified}");
         res.EnsureSuccessStatusCode();
         if (csrfHeader) client.DefaultRequestHeaders.Add(CallerFilter.CsrfHeader, "1");
         return client;
@@ -85,7 +85,9 @@ public class OviApiFactory(Dictionary<string, string?>? settings = null, IPAddre
                 if (ctx.Request.Path != TestLoginPath) { await nxt(ctx); return; }
                 var key = ctx.Request.Query["key"].ToString();
                 var user = await UserSignIn.UpsertAsync(ctx.RequestServices.GetRequiredService<AppDbContext>(),
-                    ctx.RequestServices.GetRequiredService<TimeProvider>(), "github", key, "User " + key, key + "@example.com");
+                    ctx.RequestServices.GetRequiredService<TimeProvider>(), "github", key, "User " + key, key + "@example.com",
+                    emailVerified: ctx.Request.Query["verified"] != "False");
+                if (user.BlockedAt is not null) { ctx.Response.StatusCode = StatusCodes.Status403Forbidden; return; }
                 await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, UserSignIn.SessionPrincipal(user));
                 ctx.Response.StatusCode = StatusCodes.Status204NoContent;
             });

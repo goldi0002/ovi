@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { Link, LinkStats, Provider, Session } from "../api";
+import type { AdminUser, Link, LinkStats, Provider, Session } from "../api";
 
 export function link(overrides: Partial<Link> = {}): Link {
   const code = overrides.code ?? "abc1234";
@@ -55,17 +55,43 @@ interface FakeOptions {
   /** A signed-in user, as if the browser holds a session cookie (e.g. just back from Google). */
   user?: Session["user"];
   providers?: Provider[];
+  /** Accounts listed in the admin dashboard. */
+  users?: AdminUser[];
 }
 
-export function fakeApi({ apiKey = "good-key", links = [], user = null, providers = ["google", "github"] }: FakeOptions = {}) {
+export function adminUser(overrides: Partial<AdminUser> = {}): AdminUser {
+  return {
+    id: 1,
+    name: "Ada Lovelace",
+    email: "ada@example.com",
+    emailVerified: true,
+    provider: "google",
+    isAdmin: false,
+    blockedAt: null,
+    createdAt: "2026-11-01T10:00:00Z",
+    lastLoginAt: "2026-11-16T10:00:00Z",
+    links: 2,
+    clicks: 7,
+    ...overrides,
+  };
+}
+
+export function fakeApi({
+  apiKey = "good-key",
+  links = [],
+  user = null,
+  providers = ["google", "github"],
+  users = [],
+}: FakeOptions = {}) {
   const store = [...links];
+  const accounts = [...users];
   const state = { user };
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = new URL(String(input), "http://localhost");
     const headers = new Headers(init.headers);
     const key = headers.get("X-Api-Key");
     if (key !== null && key !== apiKey) return json(401, { title: "Missing or invalid API key." });
-    const admin = key !== null;
+    const admin = key !== null || state.user?.isAdmin === true;
     const signedIn = admin || state.user !== null;
 
     const method = init.method ?? "GET";
@@ -83,6 +109,42 @@ export function fakeApi({ apiKey = "good-key", links = [], user = null, provider
       return json(201, created);
     }
     if (!signedIn) return json(401, { title: "Sign in to see and manage your links." });
+
+    if (url.pathname.startsWith("/api/admin/")) {
+      if (!admin) return json(403, { title: "Admins only." });
+      const q = (url.searchParams.get("q") ?? "").toLowerCase();
+      const page = (items: unknown[]) => json(200, { items, page: 1, pageSize: 20, total: items.length });
+      if (url.pathname === "/api/admin/overview")
+        return json(200, {
+          users: accounts.length,
+          blockedUsers: accounts.filter((a) => a.blockedAt).length,
+          links: store.length,
+          anonymousLinks: 1,
+          expiredLinks: 0,
+          deletedLinks: 3,
+          totalClicks: 42,
+          dailyClicks: stats("x", 14).daily.map((d) => ({ date: d.date, count: d.clicks })),
+          dailySignups: stats("x", 14).daily.map((d) => ({ date: d.date, count: 0 })),
+          topLinks: store.slice(0, 5).map((l) => ({ code: l.code, shortUrl: l.shortUrl, url: l.url, clicks: l.clicks, ownerName: "Ada Lovelace" })),
+        });
+      if (url.pathname === "/api/admin/users")
+        return page(accounts.filter((a) => !q || a.name.toLowerCase().includes(q) || a.email?.toLowerCase().includes(q)));
+      if (url.pathname === "/api/admin/links") {
+        const owner = url.searchParams.get("owner") ?? "";
+        const rows = store
+          .filter((l) => !q || l.code.toLowerCase().includes(q) || l.url.toLowerCase().includes(q))
+          .map((l, i) => ({ link: l, owner: i === 0 ? { id: 1, name: "Ada Lovelace", email: "ada@example.com" } : null, anonymous: i !== 0 }))
+          .filter((r) => !owner || (owner === "anonymous" ? r.anonymous : owner === "apikey" ? false : r.owner?.id === Number(owner)));
+        return page(rows);
+      }
+      const block = url.pathname.match(/^\/api\/admin\/users\/(\d+)\/(block|unblock)$/);
+      if (method === "POST" && block) {
+        const account = accounts.find((a) => a.id === Number(block[1]));
+        if (!account) return json(404, { title: "Not Found" });
+        account.blockedAt = block[2] === "block" ? "2026-11-17T12:00:00Z" : null;
+        return json(204, undefined);
+      }
+    }
 
     if (method === "GET" && url.pathname === "/api/links") {
       const page = Number(url.searchParams.get("page") ?? 1);
@@ -115,5 +177,5 @@ export function fakeApi({ apiKey = "good-key", links = [], user = null, provider
     return json(404, { title: "Not Found" });
   });
   vi.stubGlobal("fetch", fetchMock);
-  return { fetchMock, store, state };
+  return { fetchMock, store, state, accounts };
 }

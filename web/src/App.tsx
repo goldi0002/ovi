@@ -4,18 +4,20 @@ import { Header } from "./components/Header";
 import { LinkResult } from "./components/LinkResult";
 import { LoginDialog } from "./components/LoginDialog";
 import { ShortenCard } from "./components/ShortenCard";
+import { AdminPage } from "./pages/AdminPage";
 import { LinksPage } from "./pages/LinksPage";
 import { scrollAfterNavigation, usePath } from "./router";
 import { clearApiKey, loadApiKey, saveApiKey } from "./storage";
 import { card, container, errorBox } from "./ui";
 
-/** A sign-in that came back from Google/GitHub unfinished lands on /?login=failed; read and drop the flag. */
-function takeLoginFailedFlag(): boolean {
+/** A sign-in that didn't work lands on /?login=failed (or =blocked); read and drop the flag. */
+function takeLoginFlag(): string | null {
   const url = new URL(window.location.href);
-  if (url.searchParams.get("login") !== "failed") return false;
+  const flag = url.searchParams.get("login");
+  if (flag === null) return null;
   url.searchParams.delete("login");
   window.history.replaceState(null, "", url);
-  return true;
+  return flag;
 }
 
 export function App() {
@@ -25,7 +27,9 @@ export function App() {
   const [session, setSession] = useState<Session | "offline" | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(() =>
-    takeLoginFailedFlag() ? "Sign-in didn't finish. Try again." : null,
+    ({ failed: "Sign-in didn't finish. Try again.", blocked: "This account is suspended." } as Record<string, string>)[
+      takeLoginFlag() ?? ""
+    ] ?? null,
   );
   const [created, setCreated] = useState<Link | null>(null);
   const path = usePath();
@@ -48,6 +52,10 @@ export function App() {
         // The saved API key stopped working: forget it and carry on without it.
         clearApiKey();
         setApiKey(null);
+      } else if (err instanceof ApiError && err.status === 403) {
+        // The account was suspended; the server has ended the session, so this reload comes back signed out.
+        setNotice("This account is suspended.");
+        setSession(await api.session().catch(() => "offline" as const));
       } else {
         setSession("offline");
       }
@@ -86,6 +94,7 @@ export function App() {
         <Header
           path={path}
           ready={session !== null}
+          isAdmin={current?.admin ?? false}
           accountName={accountName}
           onLogIn={openLogin}
           onSignOut={() => void signOut()}
@@ -102,7 +111,14 @@ export function App() {
           </div>
         )}
 
-        {path === "/links" ? (
+        {path === "/admin" ? (
+          <AdminPage
+            api={api}
+            state={session === null ? "loading" : current?.admin ? "admin" : signedIn ? "notAdmin" : "signedOut"}
+            onLogIn={openLogin}
+            onUnauthorized={onUnauthorized}
+          />
+        ) : path === "/links" ? (
           <LinksPage
             api={api}
             state={session === null ? "loading" : signedIn ? "signedIn" : "signedOut"}

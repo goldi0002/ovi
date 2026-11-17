@@ -5,6 +5,7 @@ import { button, container, focusRing } from "../ui";
 const NAV = [
   { href: "/", label: "Shorten" },
   { href: "/links", label: "Links" },
+  { href: "/admin", label: "Admin", adminOnly: true },
 ];
 
 interface Props {
@@ -12,6 +13,8 @@ interface Props {
   path: string;
   /** False until we know whether someone is signed in, so the button doesn't flicker. */
   ready: boolean;
+  /** Shows the Admin item. Only a convenience: the server checks admin rights on every request. */
+  isAdmin: boolean;
   /** The signed-in user's name ("Admin" for the API key), or null. */
   accountName: string | null;
   onLogIn: () => void;
@@ -19,22 +22,22 @@ interface Props {
 }
 
 /** A translucent toolbar, like a macOS window's: the app name, a segmented control for the pages, and sign-in. */
-export function Header({ path, ready, accountName, onLogIn, onSignOut }: Props) {
+export function Header({ path, ready, isAdmin, accountName, onLogIn, onSignOut }: Props) {
   return (
     <header className="sticky top-0 z-10 border-b border-line bg-white/75 backdrop-blur-xl backdrop-saturate-150">
-      <div className={`${container} grid h-14 grid-cols-[1fr_auto_1fr] items-center gap-3 max-sm:gap-2`}>
+      <div className={`${container} grid h-14 grid-cols-[1fr_auto_1fr] items-center gap-3 max-sm:grid-cols-[auto_minmax(0,1fr)_auto] max-sm:gap-1.5`}>
         <Brand href="/" />
         <nav
-          className="flex rounded-lg bg-black/[0.06] p-0.5"
+          className="flex justify-self-center rounded-lg bg-black/[0.06] p-0.5"
           aria-label="Main"
         >
-          {NAV.map((item) => {
+          {NAV.filter((item) => !item.adminOnly || isAdmin || path === item.href).map((item) => {
             const isActive = path === item.href;
             return (
               <AppLink
                 key={item.href}
                 href={item.href}
-                className={`rounded-md px-4 py-1 text-[0.8125rem] font-medium transition-colors max-sm:px-3 ${focusRing} ${
+                className={`rounded-md px-4 py-1 text-[0.8125rem] font-medium transition-colors max-sm:px-2.5 max-[360px]:px-2 max-[360px]:text-xs ${focusRing} ${
                   isActive ? "bg-white text-ink shadow-control" : "text-muted hover:text-ink"
                 }`}
                 aria-current={isActive ? "page" : undefined}
@@ -53,12 +56,12 @@ export function Header({ path, ready, accountName, onLogIn, onSignOut }: Props) 
               >
                 {accountName}
               </span>
-              <button type="button" className={button("default", "sm")} onClick={onSignOut}>
+              <button type="button" className={button("default", "sm", "max-[360px]:px-2")} onClick={onSignOut}>
                 Sign out
               </button>
             </>
           ) : (
-            <button type="button" className={button("primary", "sm")} onClick={onLogIn}>
+            <button type="button" className={button("primary", "sm", "max-[360px]:px-2")} onClick={onLogIn}>
               Log in
             </button>
           )}
