@@ -5,6 +5,8 @@ namespace Ovi.Api.Links;
 /// <summary>Turns request headers into the coarse categories stored for each click.</summary>
 public static partial class ClientInfo
 {
+    public const string BotDevice = "Bot";
+
     public const int MaxReferrerLength = 255;
 
     [GeneratedRegex(@"bot|crawl|spider|slurp|preview|facebookexternalhit|curl/|wget/|python|httpclient|okhttp|go-http|java/|headless",
@@ -14,7 +16,7 @@ public static partial class ClientInfo
     public static (string Device, string? Browser) ParseUserAgent(string? userAgent)
     {
         if (string.IsNullOrWhiteSpace(userAgent)) return ("Other", null);
-        if (BotPattern().IsMatch(userAgent)) return ("Bot", null);
+        if (BotPattern().IsMatch(userAgent)) return (BotDevice, null);
 
         bool Has(string s) => userAgent.Contains(s, StringComparison.OrdinalIgnoreCase);
 

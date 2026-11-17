@@ -15,9 +15,34 @@ public static class LinkRules
     /// Hosts that can't be shortened (configured as <c>Links:BlockedHosts</c>, comma-separated), e.g. to stop a spammer's
     /// domain. A blocked host also blocks its subdomains.
     /// </summary>
-    public static bool IsBlockedHost(string host, IConfiguration config) =>
-        (config["Links:BlockedHosts"] ?? "")
+    public static bool IsBlockedHost(string host, IConfiguration config)
+    {
+        var normalized = NormalizeHost(host);
+        return (config["Links:BlockedHosts"] ?? "")
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Any(b => host.Equals(b, StringComparison.OrdinalIgnoreCase) ||
-                      host.EndsWith("." + b, StringComparison.OrdinalIgnoreCase));
+            .Select(NormalizeHost)
+            .Any(b => b.Length > 0 && (normalized == b || normalized.EndsWith("." + b, StringComparison.Ordinal)));
+    }
+
+    /// <summary>True if the stored URL's host is blocked (also used at redirect time, so blocking applies to old links).</summary>
+    public static bool IsBlockedUrl(string url, IConfiguration config) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) && IsBlockedHost(uri.IdnHost, config);
+
+    /// <summary>
+    /// The form two names for the same site share: punycode, lowercase, without the trailing dot of a fully
+    /// qualified name ("Evil.COM." and "evil.com" are the same site to a browser).
+    /// </summary>
+    public static string NormalizeHost(string host)
+    {
+        var trimmed = host.Trim().TrimEnd('.');
+        if (trimmed.Length == 0) return "";
+        try
+        {
+            return new System.Globalization.IdnMapping().GetAscii(trimmed).ToLowerInvariant();
+        }
+        catch (ArgumentException)
+        {
+            return trimmed.ToLowerInvariant();
+        }
+    }
 }

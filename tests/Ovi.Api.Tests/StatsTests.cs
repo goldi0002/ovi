@@ -62,7 +62,7 @@ public sealed class StatsTests : IDisposable
         // Day one: two clicks from Hacker News on desktop Chrome.
         await VisitAsync("brk", ChromeDesktop, "https://news.ycombinator.com/item?id=1");
         await VisitAsync("brk", ChromeDesktop, "https://news.ycombinator.com/");
-        // Two days later (today): one direct visit from an iPhone, and a bot.
+        // Two days later (today): one direct visit from an iPhone, and a bot, which is redirected but not counted.
         _factory.Time.Advance(TimeSpan.FromDays(2));
         await VisitAsync("brk", SafariIphone);
         await VisitAsync("brk", "Googlebot/2.1 (+http://www.google.com/bot.html)");
@@ -72,19 +72,19 @@ public sealed class StatsTests : IDisposable
         var stats = (await StatsAsync("brk", days: 7))!;
 
         Assert.AreEqual("brk", stats.Code);
-        Assert.AreEqual(4, stats.TotalClicks);
+        Assert.AreEqual(3, stats.TotalClicks);
         Assert.AreEqual(7, stats.Days);
-        Assert.AreEqual(4, stats.ClicksInRange);
+        Assert.AreEqual(3, stats.ClicksInRange);
         var today = DateOnly.FromDateTime(_factory.Time.GetUtcNow().UtcDateTime);
         CollectionAssert.AreEqual(
             Enumerable.Range(0, 7).Select(i => today.AddDays(i - 6)).ToList(),
             stats.Daily.Select(d => d.Date).ToList());
-        CollectionAssert.AreEqual(new[] { 0, 0, 0, 0, 2, 0, 2 }, stats.Daily.Select(d => d.Clicks).ToArray());
+        CollectionAssert.AreEqual(new[] { 0, 0, 0, 0, 2, 0, 1 }, stats.Daily.Select(d => d.Clicks).ToArray());
         CollectionAssert.AreEqual(
-            new[] { new NamedCount("news.ycombinator.com", 2), new NamedCount("Direct", 2) },
+            new[] { new NamedCount("news.ycombinator.com", 2), new NamedCount("Direct", 1) },
             stats.Referrers.ToArray());
         CollectionAssert.AreEqual(
-            new[] { new NamedCount("Desktop", 2), new NamedCount("Bot", 1), new NamedCount("Mobile", 1) },
+            new[] { new NamedCount("Desktop", 2), new NamedCount("Mobile", 1) },
             stats.Devices.ToArray());
         CollectionAssert.AreEqual(
             new[] { new NamedCount("Chrome", 2), new NamedCount("Safari", 1) },

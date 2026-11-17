@@ -107,6 +107,13 @@ public sealed class AccountTests : IDisposable
     [DataRow("//evil.example/", "/")]
     [DataRow("/\\evil.example", "/")]
     [DataRow("links", "/")]
+    [DataRow("/\t/evil.example", "/")]
+    [DataRow("/\t\\evil.example", "/")]
+    [DataRow("/\n/evil.example", "/")]
+    [DataRow("/\r\n/evil.example", "/")]
+    [DataRow("/ /evil.example", "/")]
+    [DataRow("/links\\..\\x", "/")]
+    [DataRow("/links?tab=all#top", "/links?tab=all#top")]
     public void Return_urls_stay_on_this_site(string? given, string expected) =>
         Assert.AreEqual(expected, AuthEndpoints.SafeReturnUrl(given));
 

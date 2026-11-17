@@ -45,6 +45,16 @@ public class OviApiFactory(Dictionary<string, string?>? settings = null, IPAddre
 
     private const string TestLoginPath = "/test-only/login";
 
+    /// <summary>
+    /// Each factory has its own database, so its connection pool would otherwise keep idle connections open after the
+    /// test; with many factories that exhausts Postgres's connection limit. Close them when the factory goes away.
+    /// </summary>
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing) Npgsql.NpgsqlConnection.ClearAllPools();
+    }
+
     public HttpClient CreateUnauthedClient() =>
         CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
@@ -54,6 +64,9 @@ public class OviApiFactory(Dictionary<string, string?>? settings = null, IPAddre
         builder.UseSetting("Auth:ApiKey", ApiKey);
         builder.UseSetting("RateLimits:CreatePerMinute", "1000");
         builder.UseSetting("RateLimits:RedirectPerMinute", "1000");
+        builder.UseSetting("RateLimits:StatsPerMinute", "1000");
+        // Count every click, so tests can click a link repeatedly; ClickFloodTests turn this back on.
+        builder.UseSetting("Clicks:DedupeSeconds", "0");
         foreach (var (key, value) in settings ?? []) builder.UseSetting(key, value);
 
         builder.ConfigureServices(services =>

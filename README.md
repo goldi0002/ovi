@@ -148,6 +148,10 @@ Both accept Neon's `postgresql://…?sslmode=require&channel_binding=require` UR
 | `RateLimits:CreatePerMinute` | `RateLimits__CreatePerMinute` | `30` | Link creation per signed-in user (and per IP for the API key) |
 | `RateLimits:AnonymousCreatePerHour` | `RateLimits__AnonymousCreatePerHour` | `20` | Link creation per IP without signing in |
 | `RateLimits:AuthPerMinute` | `RateLimits__AuthPerMinute` | `20` | Sign-in starts per IP |
+| `RateLimits:StatsPerMinute` | `RateLimits__StatsPerMinute` | `60` | Stats requests per user (or per IP) |
+| `Clicks:DedupeSeconds` | `Clicks__DedupeSeconds` | `30` | Repeat visits from the same client to the same link within this window count once |
+| `Clicks:MaxRecordedPerMinute` | `Clicks__MaxRecordedPerMinute` | `1000` | Clicks recorded per minute across the whole site; beyond it, visitors are still redirected but not counted |
+| `Clicks:RetentionDays` | `Clicks__RetentionDays` | `400` | Click rows older than this are deleted every 6 hours (never below 366, so stats stay complete); `0` keeps them forever. All-time counts are kept on each link |
 | `RateLimits:RedirectPerMinute` | `RateLimits__RedirectPerMinute` | `300` | Per client IP, covers redirects and QR codes |
 | `ReverseProxy:KnownProxies` | `ReverseProxy__KnownProxies__0` | none | IPs of your reverse proxy / load balancer. Needed so rate limits see real client IPs |
 | `ReverseProxy:KnownNetworks` | `ReverseProxy__KnownNetworks__0` | none | Same, as CIDR ranges (e.g. `10.0.0.0/8`) |
@@ -202,6 +206,14 @@ Validation rules:
 - A custom code is 3 to 32 characters of letters, digits, `-` or `_`, and only for signed-in users and the admin. It can't be a reserved word (`api`, `auth`, `swagger`, `openapi`, `health`, `qr`, `assets`, `links`, `admin`).
 - `expiresAt` must be in the future and at most 10 years away. Anonymous links expire after 30 days by default, and can't be set to last longer.
 - Request bodies over 64 KB are refused.
+- Hosts are compared in one normal form (punycode, lowercase, no trailing dot), so `Evil.COM.` matches a block on `evil.com`. The blocklist also applies when a link is visited: links made before a site was blocked return 410.
+
+Click counting:
+- Bots are redirected but not counted.
+- A visitor hitting the same link again within 30 seconds counts once.
+- There's an overall cap on recorded clicks per minute.
+- A failed click write never stops the redirect.
+- Rate limits group IPv6 clients by their /64, so rotating addresses doesn't get around them.
 - A deleted link's code stays reserved, so an old short URL or printed QR code can never start pointing somewhere else.
 
 Errors use RFC 7807 problem JSON:
