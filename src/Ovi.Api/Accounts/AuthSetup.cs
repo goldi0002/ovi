@@ -1,5 +1,7 @@
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -17,6 +19,8 @@ namespace Ovi.Api.Accounts;
 public static class AuthSetup
 {
     public const string CookieName = "ovi.session";
+    public const string CertificatePathKey = "DataProtection:CertificatePath";
+    public const string CertificatePasswordKey = "DataProtection:CertificatePassword";
 
     /// <summary>Provider ids used in URLs (/auth/login/google) and stored on users, mapped to scheme names.</summary>
     public static readonly IReadOnlyDictionary<string, string> Schemes = new Dictionary<string, string>
@@ -28,7 +32,14 @@ public static class AuthSetup
     public static IServiceCollection AddOviAuth(this IServiceCollection services, IConfiguration config, IWebHostEnvironment env)
     {
         // Encrypts the session and OAuth state cookies. Stored in Postgres so every deploy can read cookies from the last one.
-        services.AddDataProtection().SetApplicationName("ovi").PersistKeysToDbContext<AppDbContext>();
+        var dataProtection = services.AddDataProtection().SetApplicationName("ovi").PersistKeysToDbContext<AppDbContext>();
+        if (LoadKeyProtectionCertificate(config) is { } keyCertificate)
+        {
+            // The key ring sits in the same database as the data, so it must not be readable with it alone: encrypt the
+            // keys with a certificate that only the app can see (e.g. a Render secret file), not a database value.
+            services.AddSingleton(keyCertificate);
+            dataProtection.ProtectKeysWithCertificate(keyCertificate);
+        }
 
         var auth = services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(o =>
@@ -92,6 +103,30 @@ public static class AuthSetup
 
         services.AddAuthorization();
         return services;
+    }
+
+    /// <summary>True when the key ring stored in the database is encrypted (a certificate is configured).</summary>
+    public static bool KeysAreEncrypted(IConfiguration config) =>
+        !string.IsNullOrWhiteSpace(config[CertificatePathKey]);
+
+    /// <summary>
+    /// The optional X.509 certificate that encrypts the data protection key ring at rest
+    /// (<c>DataProtection:CertificatePath</c> and <c>DataProtection:CertificatePassword</c>), or null when unset.
+    /// </summary>
+    public static X509Certificate2? LoadKeyProtectionCertificate(IConfiguration config)
+    {
+        var path = config[CertificatePathKey];
+        if (string.IsNullOrWhiteSpace(path)) return null;
+        if (!File.Exists(path))
+            throw new InvalidOperationException($"{CertificatePathKey} points at '{path}', which doesn't exist.");
+        try
+        {
+            return X509CertificateLoader.LoadPkcs12FromFile(path, config[CertificatePasswordKey], X509KeyStorageFlags.EphemeralKeySet);
+        }
+        catch (CryptographicException ex)
+        {
+            throw new InvalidOperationException($"Couldn't read the data protection certificate at '{path}'.", ex);
+        }
     }
 
     /// <summary>Which providers are turned on, as URL ids ("google", "github").</summary>

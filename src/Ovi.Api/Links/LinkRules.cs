@@ -29,6 +29,15 @@ public static class LinkRules
         Uri.TryCreate(url, UriKind.Absolute, out var uri) && IsBlockedHost(uri.IdnHost, config);
 
     /// <summary>
+    /// True when a URL contains control characters or bidi overrides. Browsers strip the control characters (so a stored
+    /// URL can point somewhere other than it looks) and Kestrel refuses to send a header containing them.
+    /// </summary>
+    public static bool HasUnsafeCharacters(string url) => url.Any(c => char.IsControl(c) || IsBidiControl(c));
+
+    private static bool IsBidiControl(char c) =>
+        c is '\u061C' or '\u200E' or '\u200F' or >= '\u202A' and <= '\u202E' or >= '\u2066' and <= '\u2069';
+
+    /// <summary>
     /// The form two names for the same site share: punycode, lowercase, without the trailing dot of a fully
     /// qualified name ("Evil.COM." and "evil.com" are the same site to a browser).
     /// </summary>

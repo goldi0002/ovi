@@ -1,12 +1,13 @@
 # syntax=docker/dockerfile:1
-FROM node:22-alpine AS web
+# Base images are pinned by digest as well as tag: a moved tag can't change what ships. Dependabot keeps them current.
+FROM node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a AS web
 WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
 RUN npm run build -- --outDir /web/dist
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb AS build
 WORKDIR /src
 COPY global.json Ovi.sln ./
 COPY src/Ovi.Api/Ovi.Api.csproj src/Ovi.Api/
@@ -14,7 +15,7 @@ RUN dotnet restore src/Ovi.Api/Ovi.Api.csproj
 COPY src/ src/
 RUN dotnet publish src/Ovi.Api/Ovi.Api.csproj -c Release -o /app --no-restore
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:bfd912c83295ce66d4b706ebb8541b9f14259b0e76fbb88b2751f58ce2399d2e AS runtime
 WORKDIR /app
 COPY --from=build /app .
 COPY --from=web /web/dist ./wwwroot

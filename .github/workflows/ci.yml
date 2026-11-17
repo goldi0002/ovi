@@ -23,9 +23,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           global-json-file: global.json
           cache: true
@@ -42,7 +42,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-results
           path: TestResults/*.trx
@@ -64,9 +64,9 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -86,44 +86,31 @@ jobs:
           node ../scripts/check-npm-licenses.mjs package-lock.json
           npm audit --audit-level=high
 
+  # Builds the image for every change and smoke-tests it, but holds no push permission.
   docker:
     name: Docker image
     needs: [test, web]
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    permissions:
-      contents: read
-      packages: write
-    env:
-      PUSH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        if: env.PUSH == 'true'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Image metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short
 
-      - name: Build${{ env.PUSH == 'true' && ' and push' || '' }}
-        uses: docker/build-push-action@v6
+      - name: Build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
-          load: ${{ env.PUSH != 'true' }}
-          push: ${{ env.PUSH == 'true' }}
+          load: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -132,7 +119,6 @@ jobs:
           cache-to: type=gha,mode=max,ignore-error=true
 
       - name: Smoke test image
-        if: env.PUSH != 'true'
         run: |
           set -euo pipefail
           image=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
@@ -141,11 +127,11 @@ jobs:
           for i in $(seq 30); do docker exec pg pg_isready -U postgres >/dev/null 2>&1 && break; sleep 1; done
           docker run -d --name ovi --network ovi-net -p 8080:8080 \
             -e DATABASE_URL=postgresql://postgres:postgres@pg:5432/ovi \
-            -e Auth__ApiKey=ci-key -e App__PublicBaseUrl=https://ovi.example "$image"
+            -e Auth__ApiKey=ci-smoke-key-0123456789abcdefghij -e App__PublicBaseUrl=https://ovi.example "$image"
           for i in $(seq 30); do curl -fsS localhost:8080/health >/dev/null 2>&1 && break; sleep 1; done
           curl -fsS localhost:8080/health
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/api/links)" = 401
-          code=$(curl -fsS -X POST localhost:8080/api/links -H 'X-Api-Key: ci-key' -H 'content-type: application/json' \
+          code=$(curl -fsS -X POST localhost:8080/api/links -H 'X-Api-Key: ci-smoke-key-0123456789abcdefghij' -H 'content-type: application/json' \
             -d '{"url":"https://example.com","customCode":"ci-smoke"}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["shortUrl"])')
           test "$code" = "https://ovi.example/ci-smoke"
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/ci-smoke)" = 302
@@ -156,3 +142,44 @@ jobs:
       - name: Container logs
         if: failure()
         run: docker logs ovi || true
+
+  # Pushes only from main, and only this job can write packages.
+  publish:
+    name: Publish image
+    needs: [test, web]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+
+      - name: Build and push
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max,ignore-error=true

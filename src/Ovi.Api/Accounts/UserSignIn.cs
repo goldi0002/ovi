@@ -10,7 +10,11 @@ namespace Ovi.Api.Accounts;
 public static class UserSignIn
 {
     public const string UserIdClaim = "ovi:uid";
+    public const string SecurityStampClaim = "ovi:stamp";
     public const int MaxNameLength = 100;
+
+    /// <summary>A fresh value for <see cref="User.SecurityStamp"/>.</summary>
+    public static string NewStamp() => Guid.NewGuid().ToString("N");
 
     /// <summary>Finds the account for this provider identity, creating it on first sign-in, and refreshes its name and email.</summary>
     public static async Task<User> UpsertAsync(
@@ -54,14 +58,21 @@ public static class UserSignIn
         }
     }
 
-    /// <summary>The session holds only the account id and display name; everything else is read from the database.</summary>
+    /// <summary>The session holds the account id, its security stamp and the display name; everything else is read from the database.</summary>
     public static ClaimsPrincipal SessionPrincipal(User user) =>
         new(new ClaimsIdentity(
-            [new Claim(UserIdClaim, user.Id.ToString(System.Globalization.CultureInfo.InvariantCulture)), new Claim(ClaimTypes.Name, user.Name)],
+            [
+                new Claim(UserIdClaim, user.Id.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                new Claim(SecurityStampClaim, user.SecurityStamp),
+                new Claim(ClaimTypes.Name, user.Name)
+            ],
             CookieAuthenticationDefaults.AuthenticationScheme));
 
     public static int? UserId(ClaimsPrincipal principal) =>
         int.TryParse(principal.FindFirstValue(UserIdClaim), out var id) ? id : null;
+
+    /// <summary>The session version the cookie was issued for, if it carries one (cookies from before this existed don't).</summary>
+    public static string? SecurityStamp(ClaimsPrincipal principal) => principal.FindFirstValue(SecurityStampClaim);
 
     private static string? Clean(string? value)
     {

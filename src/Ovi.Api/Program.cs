@@ -32,8 +32,13 @@ var app = builder.Build();
 
 // Fail fast on bad config, and warn about insecure defaults.
 var publicBaseUrl = ShortUrlBuilder.ParseBaseUrl(ShortUrlBuilder.ConfiguredValue(app.Configuration));
-if (string.IsNullOrEmpty(app.Configuration["Auth:ApiKey"]))
+var apiKey = app.Configuration["Auth:ApiKey"];
+if (ApiKeyRules.Problem(apiKey, app.Environment.IsDevelopment()) is { } apiKeyProblem)
+    throw new InvalidOperationException(apiKeyProblem);
+if (string.IsNullOrEmpty(apiKey))
     app.Logger.LogWarning("Auth:ApiKey is not set; admin access with an API key is turned off.");
+if (!AuthSetup.KeysAreEncrypted(app.Configuration) && !app.Environment.IsDevelopment())
+    app.Logger.LogWarning("DataProtection:CertificatePath is not set; the sign-in key ring is stored unencrypted in the database.");
 if (AuthSetup.EnabledProviders(app.Configuration).Count == 0)
     app.Logger.LogWarning("No sign-in provider is configured (Auth:Google / Auth:GitHub); only anonymous links can be made in the UI.");
 if (publicBaseUrl is null && !app.Environment.IsDevelopment())
