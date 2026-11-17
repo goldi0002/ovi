@@ -67,6 +67,7 @@ public static class LinkEndpoints
             var link = await db.Links.AsNoTracking().FirstOrDefaultAsync(l => l.Code == code);
             if (link is null) return Results.NotFound();
             if (link.IsExpired(now)) return Expired();
+            if (await OwnerSuspendedAsync(db, link)) return Disabled();
 
             await db.Links.Where(l => l.Id == link.Id)
                 .ExecuteUpdateAsync(s => s
@@ -95,6 +96,7 @@ public static class LinkEndpoints
             var link = await db.Links.AsNoTracking().FirstOrDefaultAsync(l => l.Code == code);
             if (link is null) return Results.NotFound();
             if (link.IsExpired(time.GetUtcNow().UtcDateTime)) return Expired();
+            if (await OwnerSuspendedAsync(db, link)) return Disabled();
 
             using var data = QRCodeGenerator.GenerateQrCode(urls.For(link.Code), QRCodeGenerator.ECCLevel.M);
             var png = new PngByteQRCode(data).GetGraphic(10);
@@ -108,6 +110,13 @@ public static class LinkEndpoints
 
     private static IResult SignInRequired() =>
         Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Sign in to see and manage your links.");
+
+    /// <summary>Links of a suspended account stop working, so an admin can stop abuse in one step.</summary>
+    private static Task<bool> OwnerSuspendedAsync(AppDbContext db, Link link) =>
+        link.OwnerId is { } owner ? db.Users.AnyAsync(u => u.Id == owner && u.BlockedAt != null) : Task.FromResult(false);
+
+    private static IResult Disabled() =>
+        Results.Problem(statusCode: StatusCodes.Status410Gone, title: "This link has been disabled.");
 
     private static IResult Expired() =>
         Results.Problem(statusCode: StatusCodes.Status410Gone, title: "This link has expired.");
@@ -274,7 +283,7 @@ public static class LinkEndpoints
             Url = uri!.ToString(),
             CreatedAt = now,
             ExpiresAt = expiresAt,
-            OwnerId = (caller as Caller.User)?.Id,
+            OwnerId = caller.AccountId,
             Anonymous = anonymous,
         };
         db.Links.Add(link);

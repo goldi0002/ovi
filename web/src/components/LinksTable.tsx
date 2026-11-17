@@ -20,7 +20,7 @@ const badge = "inline-flex items-center gap-1.5 text-[0.8125rem] whitespace-nowr
 const th = "border-b border-line px-3 py-2 text-left text-[0.6875rem] font-semibold text-muted";
 const td = "px-3 py-2 align-middle max-md:p-0";
 
-function Status({ link }: { link: Link }) {
+export function Status({ link }: { link: Link }) {
   if (isExpired(link)) return <span className={`${badge} text-muted before:bg-[#c7c7cc]`}>Expired</span>;
   if (link.expiresAt)
     return (

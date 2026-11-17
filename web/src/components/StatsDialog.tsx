@@ -142,7 +142,7 @@ export function StatsDialog({ api, link, onClose, onUnauthorized }: Props) {
   );
 }
 
-function ClicksChart({ daily }: { daily: LinkStats["daily"] }) {
+export function ClicksChart({ daily, title = "Clicks per day" }: { daily: LinkStats["daily"]; title?: string }) {
   const [active, setActive] = useState<number | null>(null);
   const [asTable, setAsTable] = useState(false);
   const max = niceMax(Math.max(0, ...daily.map((d) => d.clicks)));
@@ -174,7 +174,7 @@ function ClicksChart({ daily }: { daily: LinkStats["daily"] }) {
   return (
     <figure className="rounded-lg bg-subtle px-[1.1rem] pt-4 pb-3.5">
       <figcaption className="flex items-center justify-between gap-4">
-        <h3 className={subheading}>Clicks per day</h3>
+        <h3 className={subheading}>{title}</h3>
         <button
           type="button"
           className={button("default", "sm")}

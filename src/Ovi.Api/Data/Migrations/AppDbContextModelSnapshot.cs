@@ -132,12 +132,18 @@ namespace Ovi.Api.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("BlockedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Email")
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
+
+                    b.Property<bool>("EmailVerified")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime>("LastLoginAt")
                         .HasColumnType("timestamp with time zone");

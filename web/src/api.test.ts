@@ -13,7 +13,7 @@ describe("OviApi", () => {
   });
 
   it("sends the session cookie and the X-Ovi-Request header, and no API key when there is none", async () => {
-    const { fetchMock } = fakeApi({ user: { name: "Ada", email: null, provider: "github" } });
+    const { fetchMock } = fakeApi({ user: { name: "Ada", email: null, provider: "github", isAdmin: false } });
     await new OviApi().create({ url: "https://example.com" });
 
     const init = fetchMock.mock.calls[0][1]!;

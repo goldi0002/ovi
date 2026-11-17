@@ -51,7 +51,8 @@ public static class AuthSetup
                 o.ClientId = google.Id;
                 o.ClientSecret = google.Secret;
                 o.CallbackPath = "/auth/callback/google";
-                o.Events.OnCreatingTicket = ctx => CompleteSignIn(ctx, "google");
+                o.Events.OnCreatingTicket = ctx => CompleteSignIn(ctx, "google",
+                    emailVerified: ctx.User.TryGetProperty("email_verified", out var v) && v.ValueKind == JsonValueKind.True);
                 o.Events.OnRemoteFailure = LoginFailed;
             });
         }
@@ -75,18 +76,15 @@ public static class AuthSetup
                     var id = profile.GetProperty("id").GetRawText();
                     var name = profile.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() : null;
                     name ??= profile.GetProperty("login").GetString();
-                    var email = profile.TryGetProperty("email", out var e) && e.ValueKind == JsonValueKind.String ? e.GetString() : null;
-                    // A private email isn't in the profile; ask for the primary verified one.
-                    if (email is null)
-                    {
-                        try { email = PrimaryEmail(await GitHubGetAsync(ctx, "https://api.github.com/user/emails")); }
-                        catch (HttpRequestException) { /* The email scope wasn't granted; sign in without an email. */ }
-                    }
+                    // The profile's public email isn't necessarily verified; use the primary verified one instead.
+                    string? email = null;
+                    try { email = PrimaryEmail(await GitHubGetAsync(ctx, "https://api.github.com/user/emails")); }
+                    catch (HttpRequestException) { /* The email scope wasn't granted; sign in without an email. */ }
 
                     ctx.Identity!.AddClaim(new Claim(ClaimTypes.NameIdentifier, id));
                     if (name is not null) ctx.Identity.AddClaim(new Claim(ClaimTypes.Name, name));
                     if (email is not null) ctx.Identity.AddClaim(new Claim(ClaimTypes.Email, email));
-                    await CompleteSignIn(ctx, "github");
+                    await CompleteSignIn(ctx, "github", emailVerified: email is not null);
                 };
                 o.Events.OnRemoteFailure = LoginFailed;
             });
@@ -106,14 +104,15 @@ public static class AuthSetup
             : null;
 
     /// <summary>Creates or updates the account, then swaps the provider's claims for a small Ovi session.</summary>
-    private static async Task CompleteSignIn(OAuthCreatingTicketContext ctx, string provider)
+    private static async Task CompleteSignIn(OAuthCreatingTicketContext ctx, string provider, bool emailVerified)
     {
         var key = ctx.Identity?.FindFirst(ClaimTypes.NameIdentifier)?.Value
                   ?? throw new InvalidOperationException($"{provider} didn't return a user id.");
         var services = ctx.HttpContext.RequestServices;
         var user = await UserSignIn.UpsertAsync(
             services.GetRequiredService<AppDbContext>(), services.GetRequiredService<TimeProvider>(),
-            provider, key, ctx.Identity!.FindFirst(ClaimTypes.Name)?.Value, ctx.Identity.FindFirst(ClaimTypes.Email)?.Value);
+            provider, key, ctx.Identity!.FindFirst(ClaimTypes.Name)?.Value, ctx.Identity.FindFirst(ClaimTypes.Email)?.Value, emailVerified);
+        if (user.BlockedAt is not null) throw new AccountBlockedException();
         ctx.Principal = UserSignIn.SessionPrincipal(user);
     }
 
@@ -122,7 +121,7 @@ public static class AuthSetup
     {
         ctx.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("Ovi.Auth")
             .LogWarning(ctx.Failure, "Sign-in with {Scheme} failed", ctx.Scheme.Name);
-        ctx.Response.Redirect("/?login=failed");
+        ctx.Response.Redirect(ctx.Failure is AccountBlockedException ? "/?login=blocked" : "/?login=failed");
         ctx.HandleResponse();
         return Task.CompletedTask;
     }
@@ -148,3 +147,6 @@ public static class AuthSetup
                 .Select(e => e.GetProperty("email").GetString())
                 .FirstOrDefault();
 }
+
+/// <summary>A suspended account tried to sign in.</summary>
+public sealed class AccountBlockedException() : Exception("This account is suspended.");

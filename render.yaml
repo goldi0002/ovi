@@ -48,5 +48,8 @@ services:
         sync: false
       - key: Auth__GitHub__ClientSecret
         sync: false
+      # Comma-separated verified emails that get the Admin dashboard when signed in.
+      - key: Auth__AdminEmails
+        sync: false
       # Short URLs use RENDER_EXTERNAL_URL (set by Render) unless you set App__PublicBaseUrl,
       # e.g. to a custom domain.
