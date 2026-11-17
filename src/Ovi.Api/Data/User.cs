@@ -19,6 +19,12 @@ public class User
 
     /// <summary>Set when an admin suspends the account: it can't sign in or use the API, and its links stop redirecting.</summary>
     public DateTime? BlockedAt { get; set; }
+
+    /// <summary>
+    /// The version of this account's sessions. The session cookie carries it and every request compares the two, so
+    /// changing it (on logout) ends every session at once, including a cookie copied from the browser.
+    /// </summary>
+    public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("N");
     public DateTime CreatedAt { get; set; }
     public DateTime LastLoginAt { get; set; }
 }

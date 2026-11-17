@@ -18,6 +18,7 @@ public static class RateLimits
         var authLimit = config.GetValue("RateLimits:AuthPerMinute", 20);
         var statsLimit = config.GetValue("RateLimits:StatsPerMinute", 60);
 
+        services.AddSingleton<ApiKeyThrottle>();
         return services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;

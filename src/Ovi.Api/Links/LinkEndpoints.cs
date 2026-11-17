@@ -11,6 +11,7 @@ public static class LinkEndpoints
 {
     public const int MaxUrlLength = LinkRules.MaxUrlLength;
     public const int MaxPageSize = 100;
+    public const int MaxPage = 100_000;
     public const int MaxStatsDays = 365;
     public const int TopN = 8;
     public const string DirectReferrer = "Direct";
@@ -196,11 +197,11 @@ public static class LinkEndpoints
     {
         if (Caller.From(http) is not { SignedIn: true } caller) return SignInRequired();
 
-        if (page < 1 || pageSize < 1 || pageSize > MaxPageSize)
+        if (page < 1 || page > MaxPage || pageSize < 1 || pageSize > MaxPageSize)
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
             {
-                ["paging"] = [$"page must be >= 1 and pageSize between 1 and {MaxPageSize}."]
+                ["paging"] = [$"page must be between 1 and {MaxPage} and pageSize between 1 and {MaxPageSize}."]
             });
         }
 
@@ -240,6 +241,15 @@ public static class LinkEndpoints
                  string.IsNullOrEmpty(uri.Host) || rawUrl.Any(char.IsWhiteSpace))
         {
             errors["url"] = ["Enter a full web address starting with http:// or https://."];
+        }
+        else if (LinkRules.HasUnsafeCharacters(rawUrl))
+        {
+            errors["url"] = ["The URL contains characters that can't be shortened."];
+        }
+        else if (uri!.AbsoluteUri.Length > MaxUrlLength)
+        {
+            // Percent-encoding and punycode can make the stored form longer than what was typed.
+            errors["url"] = [$"The URL is too long once encoded; the limit is {MaxUrlLength} characters."];
         }
         else if (!string.IsNullOrEmpty(uri.UserInfo))
         {
@@ -296,7 +306,9 @@ public static class LinkEndpoints
         var link = new Link
         {
             Code = code,
-            Url = uri!.ToString(),
+            // AbsoluteUri stays ASCII: punycode hosts and percent-encoded paths. ToString() decodes them, and Kestrel
+            // refuses to send a non-ASCII Location header, so such links would 500 on every visit.
+            Url = uri!.AbsoluteUri,
             CreatedAt = now,
             ExpiresAt = expiresAt,
             OwnerId = caller.AccountId,

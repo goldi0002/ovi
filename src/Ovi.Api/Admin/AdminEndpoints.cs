@@ -188,10 +188,10 @@ public static class AdminEndpoints
     }
 
     private static IResult? PagingProblem(int page, int pageSize) =>
-        page < 1 || pageSize < 1 || pageSize > LinkEndpoints.MaxPageSize
+        page < 1 || page > LinkEndpoints.MaxPage || pageSize < 1 || pageSize > LinkEndpoints.MaxPageSize
             ? Results.ValidationProblem(new Dictionary<string, string[]>
             {
-                ["paging"] = [$"page must be >= 1 and pageSize between 1 and {LinkEndpoints.MaxPageSize}."]
+                ["paging"] = [$"page must be between 1 and {LinkEndpoints.MaxPage} and pageSize between 1 and {LinkEndpoints.MaxPageSize}."]
             })
             : null;
 

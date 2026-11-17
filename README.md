@@ -103,7 +103,8 @@ For local development, register separate apps with `http://localhost:5080` as th
 How it works:
 - After the provider sends the person back, Ovi creates or updates their account. It stores only the provider, the provider's id, a name and an email.
 - Ovi then sets an HttpOnly, `SameSite=Lax`, `Secure` session cookie that lasts 30 days and renews while in use.
-- The keys that encrypt the cookie are stored in Postgres, so deploys and restarts don't sign anyone out.
+- The cookie carries a security stamp that is checked against the account on every request. Logging out changes it, so a copied cookie stops working too (that ends every session for the account, on every device).
+- The keys that encrypt the cookie are stored in Postgres, so deploys and restarts don't sign anyone out. Set `DataProtection:CertificatePath` to encrypt that key ring with a certificate: without it, anyone who can read the database can read the keys.
 - Requests that change data with the cookie must carry `X-Ovi-Request: 1`, which other sites can't add, so they can't act as a signed-in user (CSRF).
 - A cancelled or failed sign-in returns to `/?login=failed`, and the UI shows a message.
 
@@ -149,6 +150,7 @@ Both accept Neon's `postgresql://…?sslmode=require&channel_binding=require` UR
 | `RateLimits:AnonymousCreatePerHour` | `RateLimits__AnonymousCreatePerHour` | `20` | Link creation per IP without signing in |
 | `RateLimits:AuthPerMinute` | `RateLimits__AuthPerMinute` | `20` | Sign-in starts per IP |
 | `RateLimits:StatsPerMinute` | `RateLimits__StatsPerMinute` | `60` | Stats requests per user (or per IP) |
+| `RateLimits:ApiKeyFailuresPerMinute` | `RateLimits__ApiKeyFailuresPerMinute` | `10` | Wrong `X-Api-Key` attempts per client per minute before 429, so a key can't be guessed online |
 | `Clicks:DedupeSeconds` | `Clicks__DedupeSeconds` | `30` | Repeat visits from the same client to the same link within this window count once |
 | `Clicks:MaxRecordedPerMinute` | `Clicks__MaxRecordedPerMinute` | `1000` | Clicks recorded per minute across the whole site; beyond it, visitors are still redirected but not counted |
 | `Clicks:RetentionDays` | `Clicks__RetentionDays` | `400` | Click rows older than this are deleted every 6 hours (never below 366, so stats stay complete); `0` keeps them forever. All-time counts are kept on each link |
@@ -161,6 +163,21 @@ Both accept Neon's `postgresql://…?sslmode=require&channel_binding=require` UR
 | `KeepAlive:IntervalMinutes` | `KeepAlive__IntervalMinutes` | `10` | Time between pings; keep it under the host's idle timeout |
 | `KeepAlive:Url` | `KeepAlive__Url` | public base URL + `/health/live` | URL to ping. It must go through the host's proxy, so not `localhost` |
 | `Swagger:Enabled` | `Swagger__Enabled` | `true` in Development, else `false` | Serves `/openapi/v1.json` and `/swagger` |
+| `DataProtection:CertificatePath` | `DataProtection__CertificatePath` | none | PFX file whose certificate encrypts the sign-in key ring stored in the database. **Set in production** |
+| `DataProtection:CertificatePassword` | `DataProtection__CertificatePassword` | none | Password for that PFX file |
+
+In production `Auth:ApiKey` must be at least 32 characters and can't be the development key (`dev-key-change-me`); the app refuses to start otherwise. `appsettings.Development.json` is left out of published images.
+
+### Encrypting the sign-in key ring
+
+The keys that encrypt session cookies live in the `DataProtectionKeys` table, so whoever can read the database could forge a session. Encrypt them with a certificate kept outside the database, e.g. a Render secret file:
+
+```bash
+openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -keyout dp-key.pem -out dp-cert.pem -subj "/CN=ovi-dataprotection"
+openssl pkcs12 -export -out dp.pfx -inkey dp-key.pem -in dp-cert.pem -passout pass:"$DP_PASSWORD"
+```
+
+Set `DataProtection__CertificatePath` to the PFX file's path and `DataProtection__CertificatePassword` to its password. Keep the file for the life of the deployment: the stored keys are encrypted with it, and replacing it makes them unreadable, so everyone signs in again.
 
 ### Deploying behind a reverse proxy
 
@@ -182,7 +199,7 @@ Redirects and QR codes are public.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `POST` | `/api/links` | anyone | Create a link. Body: `{ "url": "https://...", "customCode": "optional", "expiresAt": "optional, e.g. 2030-01-01T00:00:00Z" }` |
-| `GET` | `/api/links?page=1&pageSize=50` | user, key | List links, newest first. Returns `{ items, page, pageSize, total }`; `pageSize` max 100 |
+| `GET` | `/api/links?page=1&pageSize=50` | user, key | List links, newest first. Returns `{ items, page, pageSize, total }`; `pageSize` max 100, `page` max 100000 |
 | `GET` | `/api/links/{code}` | user, key | Show one link's details and click count |
 | `GET` | `/api/links/{code}/stats?days=30` | user, key | Click analytics for the last 1–365 days (UTC): clicks per day, top referrers, devices and browsers |
 | `DELETE` | `/api/links/{code}` | user, key | Delete a link (soft delete: the row is kept with `DeletedAt` set, and the link disappears from every endpoint) |
@@ -191,7 +208,7 @@ Redirects and QR codes are public.
 | `GET` | `/api/admin/links?page=1&pageSize=20&q=&owner=` | admin | Every link with its owner; `owner` is `anonymous`, `apikey` or a user id; `q` searches code and URL |
 | `POST` | `/api/admin/users/{id}/block` / `unblock` | admin | Suspend or restore a user (not yourself or another admin) |
 | `GET` | `/api/session` | anyone | Who's signed in, which sign-in providers are on, and how long anonymous links last |
-| `POST` | `/api/logout` | user | End the session |
+| `POST` | `/api/logout` | user | End every session for the account, on every device (a copied cookie stops working) |
 | `GET` | `/auth/login/{google\|github}?returnUrl=/links` | public | Start signing in; comes back to `returnUrl` (a path on this site only) |
 | `GET` | `/{code}` | public | 302 redirect and count the click. Returns 410 Gone if expired |
 | `GET` | `/{code}/qr` | public | PNG QR code for the short URL |
@@ -200,7 +217,8 @@ Redirects and QR codes are public.
 | `GET` | `/` | public | The web UI, when it has been built into `wwwroot` |
 
 Validation rules:
-- URLs are trimmed, then must be absolute `http` or `https` with a host and no spaces, at most 2048 characters.
+- URLs are trimmed, then must be absolute `http` or `https` with a host and no spaces, at most 2048 characters (also after encoding).
+- The stored URL is the ASCII form: punycode host, percent-encoded path, so it is always safe to send in a `Location` header. Control characters and bidi overrides are refused.
 - A URL can't contain a user name or password (`https://bank.example@evil.example` is a phishing trick).
 - A URL can't point back at the shortener, or at a site in `Links:BlockedHosts`.
 - A custom code is 3 to 32 characters of letters, digits, `-` or `_`, and only for signed-in users and the admin. It can't be a reserved word (`api`, `auth`, `swagger`, `openapi`, `health`, `qr`, `assets`, `links`, `admin`).
@@ -254,8 +272,8 @@ Tests use MSTest and `WebApplicationFactory` with a fake clock (`FakeTimeProvide
 1. Builds in Release mode and runs the tests. Results are uploaded as a `test-results` artifact.
 2. Checks every NuGet package, including transitive ones, for a disallowed license or a known vulnerability (`scripts/check-packages.py`).
 3. Fails if the EF model has changed without a migration.
-4. Type-checks, tests and builds the web UI, checks npm licenses, and runs `npm audit`.
-5. Builds the Docker image. On pull requests it starts the container with a Postgres next to it and smoke-tests the API and UI. On `main` it pushes the image to GitHub Container Registry:
+4. Type-checks, tests and builds the web UI, checks npm licenses, and fails on high or critical npm advisories (`scripts/check-npm-audit.mjs`, which prints any advisory it accepts because it has no fix and can't reach shipped code).
+5. Builds the Docker image for every change and smoke-tests it against a Postgres next to it. A separate job pushes the image to GitHub Container Registry, only from `main`, so the build and smoke-test jobs never hold push permission. Actions are pinned to commit SHAs and the Docker base images to digests, so a moved tag can't change what runs or ships:
 
 ```bash
 docker pull ghcr.io/goldi0002/ovi:latest   # or :sha-<short commit>

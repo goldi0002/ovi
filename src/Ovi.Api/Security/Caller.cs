@@ -49,7 +49,7 @@ public sealed class AcceptsApiKey;
 /// cookie). Requests that change data with a session cookie must carry <c>X-Ovi-Request</c>: other sites can't add that
 /// header without a CORS preflight, which Ovi never allows, so a cross-site form or fetch can't act as the user.
 /// </summary>
-public class CallerFilter(IConfiguration config) : IEndpointFilter
+public class CallerFilter(IConfiguration config, ApiKeyThrottle apiKeyThrottle) : IEndpointFilter
 {
     public const string ApiKeyHeader = "X-Api-Key";
     public const string CsrfHeader = "X-Ovi-Request";
@@ -57,7 +57,7 @@ public class CallerFilter(IConfiguration config) : IEndpointFilter
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         var http = context.HttpContext;
-        var (caller, problem) = await ResolveAsync(http, config);
+        var (caller, problem) = await ResolveAsync(http, config, apiKeyThrottle);
         if (problem is not null) return problem;
 
         // Cookies are sent by the browser automatically, so cookie-based changes need proof they came from Ovi's UI.
@@ -73,21 +73,30 @@ public class CallerFilter(IConfiguration config) : IEndpointFilter
     /// Works out the caller. A session is checked against the database on every request, so a suspended or deleted
     /// account, or an email taken off the admin list, loses access immediately rather than when the cookie expires.
     /// </summary>
-    public static async Task<(Caller? Caller, IResult? Problem)> ResolveAsync(HttpContext http, IConfiguration config)
+    public static async Task<(Caller? Caller, IResult? Problem)> ResolveAsync(
+        HttpContext http, IConfiguration config, ApiKeyThrottle apiKeyThrottle)
     {
         if (http.Request.Headers.TryGetValue(ApiKeyHeader, out var provided))
         {
+            // Wrong keys are counted per client, so a short or human-chosen key can't be guessed online.
+            var client = ClientKey.For(http.Connection.RemoteIpAddress);
+            if (apiKeyThrottle.TooManyFailures(client))
+                return (null, Results.Problem(statusCode: StatusCodes.Status429TooManyRequests,
+                    title: "Too many wrong API keys; try again in a minute."));
+
             var expected = config["Auth:ApiKey"];
-            return !string.IsNullOrEmpty(expected) && KeysMatch(expected, provided.ToString())
-                ? (new Caller.Admin(null), null)
-                : (null, Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Missing or invalid API key."));
+            if (!string.IsNullOrEmpty(expected) && KeysMatch(expected, provided.ToString()))
+                return (new Caller.Admin(null), null);
+
+            apiKeyThrottle.RecordFailure(client);
+            return (null, Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Missing or invalid API key."));
         }
 
         if (UserSignIn.UserId(http.User) is not { } id) return (new Caller.Anonymous(), null);
 
         var db = http.RequestServices.GetRequiredService<AppDbContext>();
         var account = await db.Users.AsNoTracking().Where(u => u.Id == id)
-            .Select(u => new { u.Email, u.EmailVerified, u.BlockedAt }).FirstOrDefaultAsync();
+            .Select(u => new { u.Email, u.EmailVerified, u.BlockedAt, u.SecurityStamp }).FirstOrDefaultAsync();
         if (account is null)
         {
             // The account was deleted: end the session and carry on as a visitor.
@@ -98,6 +107,12 @@ public class CallerFilter(IConfiguration config) : IEndpointFilter
         {
             await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return (null, Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "This account is suspended."));
+        }
+        if (!string.Equals(account.SecurityStamp, UserSignIn.SecurityStamp(http.User), StringComparison.Ordinal))
+        {
+            // Logging out bumps the stamp, so a cookie copied before it is no longer a session.
+            await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return (new Caller.Anonymous(), null);
         }
         return (AdminAccess.IsAdmin(account.Email, account.EmailVerified, config) ? new Caller.Admin(id) : new Caller.User(id), null);
     }

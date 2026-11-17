@@ -20,23 +20,36 @@ public class ShortUrlBuilder(IConfiguration config, IHttpContextAccessor http)
 
     public string For(string code) => $"{BaseUrl}/{code}";
 
-    /// <summary>True if the URL points back at this shortener, which would create a redirect loop.</summary>
-    public bool IsSelf(Uri target)
+    /// <summary>
+    /// True if the URL points back at this shortener, which would create a redirect loop. Every hostname the app answers
+    /// on counts: a custom domain doesn't stop the platform's own hostname (or the request's) from reaching it.
+    /// </summary>
+    public bool IsSelf(Uri target) =>
+        SelfHosts().Contains(Ovi.Api.Links.LinkRules.NormalizeHost(target.IdnHost));
+
+    private IEnumerable<string> SelfHosts()
     {
-        var self = new Uri(BaseUrl);
-        return target.Port == self.Port &&
-               Ovi.Api.Links.LinkRules.NormalizeHost(target.IdnHost) == Ovi.Api.Links.LinkRules.NormalizeHost(self.IdnHost);
+        if (ConfiguredBaseUrl is not null)
+            yield return Ovi.Api.Links.LinkRules.NormalizeHost(ConfiguredBaseUrl.IdnHost);
+
+        if (TryParseBaseUrl(config["RENDER_EXTERNAL_URL"]) is { } render)
+            yield return Ovi.Api.Links.LinkRules.NormalizeHost(render.IdnHost);
+
+        if (http.HttpContext?.Request.Host.Host is { Length: > 0 } requestHost)
+            yield return Ovi.Api.Links.LinkRules.NormalizeHost(requestHost);
     }
 
     /// <summary>App:PublicBaseUrl wins; RENDER_EXTERNAL_URL is set automatically by Render.</summary>
     public static string? ConfiguredValue(IConfiguration config) =>
         config["App:PublicBaseUrl"] is { Length: > 0 } explicitUrl ? explicitUrl : config["RENDER_EXTERNAL_URL"];
 
-    public static Uri? ParseBaseUrl(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return null;
-        if (Uri.TryCreate(value, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
-            return uri;
-        throw new InvalidOperationException($"App:PublicBaseUrl '{value}' must be an absolute http or https URL.");
-    }
+    public static Uri? ParseBaseUrl(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? null
+            : TryParseBaseUrl(value) ?? throw new InvalidOperationException($"App:PublicBaseUrl '{value}' must be an absolute http or https URL.");
+
+    private static Uri? TryParseBaseUrl(string? value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+            ? uri
+            : null;
 }

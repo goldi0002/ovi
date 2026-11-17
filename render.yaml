@@ -51,5 +51,11 @@ services:
       # Comma-separated verified emails that get the Admin dashboard when signed in.
       - key: Auth__AdminEmails
         sync: false
+      # Encrypt the sign-in key ring stored in the database: add a secret file in the Render dashboard and set
+      # these to its path (e.g. /etc/secrets/dp.pfx) and password. Without them the keys are stored unencrypted.
+      # - key: DataProtection__CertificatePath
+      #   sync: false
+      # - key: DataProtection__CertificatePassword
+      #   sync: false
       # Short URLs use RENDER_EXTERNAL_URL (set by Render) unless you set App__PublicBaseUrl,
       # e.g. to a custom domain.

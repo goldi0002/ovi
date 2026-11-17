@@ -43,8 +43,13 @@ public static class AuthEndpoints
         })
         .Produces<SessionResponse>();
 
-        api.MapPost("/logout", async (HttpContext http) =>
+        // A session is a self-contained cookie, so clearing the browser's copy isn't enough: a copied cookie would keep
+        // working. Bumping the account's stamp ends every session for this user, on every device.
+        api.MapPost("/logout", async (HttpContext http, AppDbContext db) =>
         {
+            if (UserSignIn.UserId(http.User) is { } id)
+                await db.Users.Where(u => u.Id == id)
+                    .ExecuteUpdateAsync(s => s.SetProperty(u => u.SecurityStamp, UserSignIn.NewStamp()));
             await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return Results.NoContent();
         })
