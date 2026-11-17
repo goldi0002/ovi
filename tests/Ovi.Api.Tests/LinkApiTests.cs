@@ -189,18 +189,31 @@ public sealed class LinkApiTests : IDisposable
     // ---- API key ----
 
     [TestMethod]
-    [DataRow(null)]
     [DataRow("wrong-key")]
     [DataRow("test-key-but-longer")]
-    public async Task Management_endpoints_require_api_key(string? key)
+    public async Task A_wrong_api_key_is_rejected_everywhere(string key)
     {
         var client = _factory.CreateUnauthedClient();
-        if (key is not null) client.DefaultRequestHeaders.Add("X-Api-Key", key);
+        client.DefaultRequestHeaders.Add("X-Api-Key", key);
 
         Assert.AreEqual(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/links")).StatusCode);
         Assert.AreEqual(HttpStatusCode.Unauthorized,
             (await client.PostAsJsonAsync("/api/links", new CreateLinkRequest("https://example.com"))).StatusCode);
         Assert.AreEqual(HttpStatusCode.Unauthorized, (await client.DeleteAsync("/api/links/abc")).StatusCode);
+    }
+
+    [TestMethod]
+    public async Task Without_signing_in_links_can_be_made_but_not_listed_or_managed()
+    {
+        var anon = _factory.CreateUnauthedClient();
+        await CreateAsync("https://example.com", "admins");
+
+        Assert.AreEqual(HttpStatusCode.Unauthorized, (await anon.GetAsync("/api/links")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, (await anon.GetAsync("/api/links/admins")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, (await anon.GetAsync("/api/links/admins/stats")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, (await anon.DeleteAsync("/api/links/admins")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.Created,
+            (await anon.PostAsJsonAsync("/api/links", new CreateLinkRequest("https://example.com"))).StatusCode);
     }
 
     [TestMethod]

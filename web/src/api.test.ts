@@ -12,6 +12,17 @@ describe("OviApi", () => {
     expect(headers.get("X-Api-Key")).toBe("good-key");
   });
 
+  it("sends the session cookie and the X-Ovi-Request header, and no API key when there is none", async () => {
+    const { fetchMock } = fakeApi({ user: { name: "Ada", email: null, provider: "github" } });
+    await new OviApi().create({ url: "https://example.com" });
+
+    const init = fetchMock.mock.calls[0][1]!;
+    expect(init.credentials).toBe("same-origin");
+    const headers = new Headers(init.headers);
+    expect(headers.get("X-Ovi-Request")).toBe("1");
+    expect(headers.has("X-Api-Key")).toBe(false);
+  });
+
   it("turns validation problems into a readable ApiError", async () => {
     fakeApi();
     const err = await new OviApi("good-key").create({ url: "ftp://nope" }).catch((e: unknown) => e);

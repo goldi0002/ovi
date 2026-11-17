@@ -10,13 +10,16 @@ const NAV = [
 interface Props {
   /** The current page path, to mark the active nav item. */
   path: string;
-  signedIn: boolean;
-  onSignIn: () => void;
+  /** False until we know whether someone is signed in, so the button doesn't flicker. */
+  ready: boolean;
+  /** The signed-in user's name ("Admin" for the API key), or null. */
+  accountName: string | null;
+  onLogIn: () => void;
   onSignOut: () => void;
 }
 
 /** A translucent toolbar, like a macOS window's: the app name, a segmented control for the pages, and sign-in. */
-export function Header({ path, signedIn, onSignIn, onSignOut }: Props) {
+export function Header({ path, ready, accountName, onLogIn, onSignOut }: Props) {
   return (
     <header className="sticky top-0 z-10 border-b border-line bg-white/75 backdrop-blur-xl backdrop-saturate-150">
       <div className={`${container} grid h-14 grid-cols-[1fr_auto_1fr] items-center gap-3 max-sm:gap-2`}>
@@ -41,14 +44,22 @@ export function Header({ path, signedIn, onSignIn, onSignOut }: Props) {
             );
           })}
         </nav>
-        <div className="flex justify-end">
-          {signedIn ? (
-            <button type="button" className={button("default", "sm")} onClick={onSignOut}>
-              Sign out
-            </button>
+        <div className="flex min-w-0 items-center justify-end gap-2">
+          {!ready ? null : accountName ? (
+            <>
+              <span
+                className="min-w-0 truncate text-[0.8125rem] text-muted max-md:hidden"
+                title={accountName}
+              >
+                {accountName}
+              </span>
+              <button type="button" className={button("default", "sm")} onClick={onSignOut}>
+                Sign out
+              </button>
+            </>
           ) : (
-            <button type="button" className={button("primary", "sm")} onClick={onSignIn}>
-              Sign in
+            <button type="button" className={button("primary", "sm")} onClick={onLogIn}>
+              Log in
             </button>
           )}
         </div>

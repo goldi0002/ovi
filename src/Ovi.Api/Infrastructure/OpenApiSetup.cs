@@ -19,15 +19,15 @@ public static class OpenApiSetup
                 {
                     Type = SecuritySchemeType.ApiKey,
                     In = ParameterLocation.Header,
-                    Name = ApiKeyFilter.HeaderName,
-                    Description = "API key for the management endpoints."
+                    Name = CallerFilter.ApiKeyHeader,
+                    Description = "Admin API key: full access to every link. Without it, the API acts as the signed-in user (session cookie) or anonymously."
                 };
                 return Task.CompletedTask;
             });
 
             options.AddOperationTransformer((op, ctx, _) =>
             {
-                if (!ctx.Description.ActionDescriptor.EndpointMetadata.OfType<RequiresApiKey>().Any())
+                if (!ctx.Description.ActionDescriptor.EndpointMetadata.OfType<AcceptsApiKey>().Any())
                     return Task.CompletedTask;
 
                 op.Security ??= [];
@@ -36,7 +36,7 @@ public static class OpenApiSetup
                     [new OpenApiSecuritySchemeReference(SchemeId, ctx.Document)] = []
                 });
                 op.Responses ??= new OpenApiResponses();
-                op.Responses.TryAdd("401", new OpenApiResponse { Description = "Missing or invalid API key" });
+                op.Responses.TryAdd("401", new OpenApiResponse { Description = "Invalid API key, or not signed in" });
                 return Task.CompletedTask;
             });
         });
