@@ -1,8 +1,16 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
-import { button } from "../ui";
+import { button, iconButton } from "../ui";
 
-export function CopyButton({ text, label = "Copy", primary = false }: { text: string; label?: string; primary?: boolean }) {
+interface Props {
+  text: string;
+  label?: string;
+  primary?: boolean;
+  /** Show just the icon (the label stays as the accessible name and tooltip). */
+  iconOnly?: boolean;
+}
+
+export function CopyButton({ text, label = "Copy", primary = false, iconOnly = false }: Props) {
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -18,12 +26,13 @@ export function CopyButton({ text, label = "Copy", primary = false }: { text: st
   return (
     <button
       type="button"
-      className={button(primary ? "primary" : "default", "sm")}
+      className={iconOnly ? iconButton : button(primary ? "primary" : "default", "sm")}
       onClick={copy}
       aria-label={`${label} ${text}`}
+      title={iconOnly ? (copied ? "Copied!" : label) : undefined}
     >
       {copied ? <Check /> : <Copy />}
-      {copied ? "Copied!" : label}
+      {!iconOnly && (copied ? "Copied!" : label)}
     </button>
   );
 }

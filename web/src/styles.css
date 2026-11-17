@@ -1,64 +1,26 @@
 @import "tailwindcss";
 
-/* Dark mode follows the data-theme attribute set by theme.ts (system default, or the toggle). */
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
-
-/* Ovi's design tokens. Each colour becomes utilities such as bg-surface, text-muted and border-line. */
+/* Ovi's design tokens, after macOS in its Graphite accent: black text on white, system greys,
+   hairline borders and soft shadows. Each colour becomes utilities such as bg-subtle and text-muted. */
 @theme {
-  --font-sans: Inter, "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
 
-  --color-page: #f8f7fd;
+  --color-page: #ffffff;
   --color-surface: #ffffff;
-  --color-ink: #13111c;
-  --color-muted: #5c5a70;
-  --color-line: #e7e4f2;
-  --color-line-strong: #d6d2e6;
-  --color-accent: #5b2be0;
-  --color-accent-hover: #4b20c4;
-  --color-accent-ink: #4a1fc7;
-  --color-accent-soft: #efebfd;
-  --color-danger: #c62828;
-  --color-error-bg: #fdecec;
-  --color-ok-bg: #e7f6ec;
-  --color-ok-ink: #1b6b3a;
-  --color-warn-bg: #fff4e0;
-  --color-warn-ink: #8a5300;
-  --color-off-bg: #eeedf4;
+  --color-ink: #1d1d1f;
+  --color-muted: #6e6e73;
+  --color-line: rgb(0 0 0 / 10%);
+  --color-line-strong: rgb(0 0 0 / 22%);
+  --color-subtle: #f5f5f7;
+  --color-ink-hover: #3a3a3c;
+  --color-danger: #c41e1e;
+  --color-error-bg: #fff2f2;
 
-  --shadow-card: 0 1px 2px rgb(40 24 110 / 5%), 0 10px 30px -12px rgb(40 24 110 / 18%);
-  --shadow-btn: 0 8px 20px -8px rgb(91 43 224 / 55%);
-}
-
-[data-theme="dark"] {
-  color-scheme: dark;
-  --color-page: #0f0d18;
-  --color-surface: #17152a;
-  --color-ink: #edecf6;
-  --color-muted: #a4a1bb;
-  --color-line: #2a2741;
-  --color-line-strong: #3a3656;
-  --color-accent: #7350f0;
-  --color-accent-hover: #8466f5;
-  --color-accent-ink: #a993ff;
-  --color-accent-soft: #241f44;
-  --color-danger: #ff7b7b;
-  --color-error-bg: #3a1a1f;
-  --color-ok-bg: #12301f;
-  --color-ok-ink: #7ddc9f;
-  --color-warn-bg: #3a2a0c;
-  --color-warn-ink: #f4c46b;
-  --color-off-bg: #24213a;
-
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 35%), 0 10px 30px -12px rgb(0 0 0 / 45%);
-  --shadow-btn: 0 8px 20px -8px rgb(115 80 240 / 60%);
-}
-
-@layer base {
-  html {
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  ::selection {
-    background-color: var(--color-accent-soft);
-  }
+  /* A window: a hairline outline plus a soft drop shadow. */
+  --shadow-window: 0 0 0 0.5px rgb(0 0 0 / 12%), 0 1px 3px rgb(0 0 0 / 5%), 0 8px 24px rgb(0 0 0 / 5%);
+  /* A sheet or popover floating above the window. */
+  --shadow-sheet: 0 0 0 0.5px rgb(0 0 0 / 15%), 0 24px 64px rgb(0 0 0 / 22%);
+  /* A push button: a hairline and a 1px drop, like AppKit's bezel. */
+  --shadow-control: 0 0 0 0.5px rgb(0 0 0 / 14%), 0 0.5px 1.5px rgb(0 0 0 / 14%);
 }
