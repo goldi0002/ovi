@@ -24,3 +24,14 @@
   /* A push button: a hairline and a 1px drop, like AppKit's bezel. */
   --shadow-control: 0 0 0 0.5px rgb(0 0 0 / 14%), 0 0.5px 1.5px rgb(0 0 0 / 14%);
 }
+
+@layer base {
+  /* No grey flash when tapping links and buttons on phones; selection in the system grey. */
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  ::selection {
+    background-color: rgb(0 0 0 / 12%);
+  }
+}
