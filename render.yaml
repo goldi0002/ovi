@@ -37,5 +37,16 @@ services:
       # Direct host, used only to run migrations at startup:
       - key: DATABASE_URL_UNPOOLED
         sync: false
+      # Sign-in. Create the OAuth apps as described in the README ("Sign-in with Google and GitHub"),
+      # with callback URLs <site>/auth/callback/google and <site>/auth/callback/github.
+      # A provider stays off until both of its values are set.
+      - key: Auth__Google__ClientId
+        sync: false
+      - key: Auth__Google__ClientSecret
+        sync: false
+      - key: Auth__GitHub__ClientId
+        sync: false
+      - key: Auth__GitHub__ClientSecret
+        sync: false
       # Short URLs use RENDER_EXTERNAL_URL (set by Render) unless you set App__PublicBaseUrl,
       # e.g. to a custom domain.

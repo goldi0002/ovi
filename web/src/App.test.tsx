@@ -3,9 +3,24 @@ import userEvent from "@testing-library/user-event";
 import { App } from "./App";
 import { fakeApi, link } from "./test/fakeApi";
 
-async function signIn(key = "good-key", remember = false) {
-  const user = userEvent.setup();
-  await user.click(screen.getByRole("button", { name: "Get Started" }));
+const ada = { name: "Ada Lovelace", email: "ada@example.com", provider: "google" as const };
+
+/** The header's Log in / Sign out button (the page can have other "Log in" buttons). */
+const headerButton = (name: string) => within(screen.getByRole("banner")).getByRole("button", { name });
+const findHeaderButton = async (name: string) => within(await screen.findByRole("banner")).findByRole("button", { name });
+
+/** Renders the app and waits until it knows who is signed in. */
+async function renderApp() {
+  render(<App />);
+  await within(screen.getByRole("banner")).findByRole("button", { name: /^(Log in|Sign out)$/ });
+  return userEvent.setup();
+}
+
+/** Signs in as the admin with the API key from the Log in dialog. */
+async function adminSignIn(key = "good-key", remember = false) {
+  const user = await renderApp();
+  await user.click(headerButton("Log in"));
+  await user.click(screen.getByRole("button", { name: "Admin? Use an API key" }));
   await user.type(screen.getByLabelText("API key"), key);
   if (remember) await user.click(screen.getByLabelText("Remember on this device"));
   await user.click(screen.getByRole("button", { name: "Continue" }));
@@ -21,17 +36,16 @@ async function openLinks(user: ReturnType<typeof userEvent.setup>) {
 describe("App", () => {
   it("rejects a wrong API key", async () => {
     fakeApi();
-    render(<App />);
-    await signIn("wrong-key");
+    await adminSignIn("wrong-key");
 
     expect(await screen.findByRole("alert")).toHaveTextContent("That API key was rejected.");
     expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
   });
 
-  it("signs in, lists links and keeps the key for this tab only by default", async () => {
+  it("signs the admin in, lists links and keeps the key for this tab only by default", async () => {
     fakeApi({ links: [link({ code: "docs", clicks: 3 })] });
-    render(<App />);
-    const user = await signIn();
+    const user = await adminSignIn();
+    expect(await findHeaderButton("Sign out")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument(); // the home page has no list
     await openLinks(user);
 
@@ -45,18 +59,17 @@ describe("App", () => {
 
   it("remembers the key on this device when asked", async () => {
     fakeApi();
-    render(<App />);
-    const user = await signIn("good-key", true);
+    const user = await adminSignIn("good-key", true);
     await openLinks(user);
 
     await screen.findByText(/No links yet/);
     expect(localStorage.getItem("ovi.apiKey")).toBe("good-key");
   });
 
-  it("creates a link, shows the result and finds it on the Links page", async () => {
-    fakeApi();
-    render(<App />);
-    const user = await signIn();
+  it("creates a link with a custom code when signed in, and finds it on the Links page", async () => {
+    fakeApi({ user: ada });
+    const user = await renderApp();
+    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
 
     await user.type(screen.getByLabelText("Long URL"), "https://example.com/new");
     await user.click(screen.getByRole("button", { name: "Custom code and expiry" }));
@@ -64,7 +77,7 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Shorten URL" }));
 
     const result = await screen.findByRole("region", { name: "New short link" });
-    expect(within(result).getByRole("link", { name: "https://ovi.test/fresh" })).toBeInTheDocument();
+    expect(within(result).getByRole("link", { name: "ovi.test/fresh" })).toBeInTheDocument();
     expect(within(result).getByRole("img")).toHaveAttribute("src", "https://ovi.test/fresh/qr");
     expect(screen.getByLabelText("Long URL")).toHaveValue("");
 
@@ -73,9 +86,8 @@ describe("App", () => {
   });
 
   it("shows the API's error when a code is taken", async () => {
-    fakeApi({ links: [link({ code: "taken" })] });
-    render(<App />);
-    const user = await signIn();
+    fakeApi({ links: [link({ code: "taken" })], user: ada });
+    const user = await renderApp();
 
     await user.type(screen.getByLabelText("Long URL"), "https://example.com");
     await user.click(screen.getByRole("button", { name: "Custom code and expiry" }));
@@ -86,10 +98,9 @@ describe("App", () => {
   });
 
   it("deletes a link after confirming", async () => {
-    const { store } = fakeApi({ links: [link({ code: "gone" })] });
+    const { store } = fakeApi({ links: [link({ code: "gone" })], user: ada });
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    render(<App />);
-    const user = await signIn();
+    const user = await renderApp();
     await openLinks(user);
 
     await user.click(await screen.findByRole("button", { name: "Delete /gone" }));
@@ -99,9 +110,8 @@ describe("App", () => {
   });
 
   it("shows a link's stats and switches the date range", async () => {
-    const { fetchMock } = fakeApi({ links: [link({ code: "docs" })] });
-    render(<App />);
-    const user = await signIn();
+    const { fetchMock } = fakeApi({ links: [link({ code: "docs" })], user: ada });
+    const user = await renderApp();
     await openLinks(user);
 
     await user.click(await screen.findByRole("button", { name: "Stats for /docs" }));
@@ -129,9 +139,8 @@ describe("App", () => {
   });
 
   it("reads out a day's clicks from the keyboard", async () => {
-    fakeApi({ links: [link({ code: "docs" })] });
-    render(<App />);
-    const user = await signIn();
+    fakeApi({ links: [link({ code: "docs" })], user: ada });
+    const user = await renderApp();
     await openLinks(user);
 
     await user.click(await screen.findByRole("button", { name: "Stats for /docs" }));
@@ -144,76 +153,106 @@ describe("App", () => {
   });
 
   it("marks expired links", async () => {
-    fakeApi({ links: [link({ code: "old", expiresAt: "2020-01-01T00:00:00Z" })] });
-    render(<App />);
-    await openLinks(await signIn());
+    fakeApi({ links: [link({ code: "old", expiresAt: "2020-01-01T00:00:00Z" })], user: ada });
+    await openLinks(await renderApp());
 
     expect(await screen.findByText("Expired")).toBeInTheDocument();
   });
 
-  it("signs out when the saved key stops working", async () => {
+  it("forgets a saved API key that stops working", async () => {
     sessionStorage.setItem("ovi.apiKey", "revoked-key");
     window.history.replaceState(null, "", "/links");
     fakeApi();
-    render(<App />);
+    await renderApp();
 
-    expect(await screen.findByRole("button", { name: "Get Started" })).toBeInTheDocument();
+    expect(headerButton("Log in")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Sign in to see your links" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Log in to see your links" })).toBeInTheDocument();
     expect(sessionStorage.getItem("ovi.apiKey")).toBeNull();
   });
 
-  it("asks for the API key when shortening while signed out, then creates the link", async () => {
-    fakeApi();
-    render(<App />);
-    const user = userEvent.setup();
+  it("shortens without an account: random code, 30-day expiry, no custom code", async () => {
+    const { fetchMock } = fakeApi();
+    const user = await renderApp();
+
+    await user.click(screen.getByRole("button", { name: "Custom code and expiry" }));
+    expect(screen.getByLabelText(/Custom code/)).toBeDisabled();
+    expect(screen.getByText("Log in to choose your own code.")).toBeInTheDocument();
+    expect(screen.getByText(/Without an account, links expire after 30 days/)).toBeInTheDocument();
 
     await user.type(screen.getByLabelText("Long URL"), "https://example.com/later");
     await user.click(screen.getByRole("button", { name: "Shorten URL" }));
-    const dialog = screen.getByRole("dialog", { name: "Sign in to Ovi" });
-    await user.type(within(dialog).getByLabelText("API key"), "good-key");
-    await user.click(within(dialog).getByRole("button", { name: "Continue" }));
 
     const result = await screen.findByRole("region", { name: "New short link" });
-    expect(within(result).getByRole("link", { name: "https://ovi.test/gen1234" })).toBeInTheDocument();
+    expect(within(result).getByRole("link", { name: "ovi.test/anon123" })).toBeInTheDocument();
+    expect(within(result).getByText(/^Expires /)).toBeInTheDocument();
+    expect(within(result).queryByRole("link", { name: "All links" })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+    const body = JSON.parse(String(fetchMock.mock.calls.find(([u]) => u === "/api/links")![1]!.body));
+    expect(body.customCode).toBeUndefined();
   });
 
-  it("does nothing when sign-in is cancelled", async () => {
-    const { fetchMock } = fakeApi();
-    render(<App />);
-    const user = userEvent.setup();
-
-    await user.type(screen.getByLabelText("Long URL"), "https://example.com/later");
-    await user.click(screen.getByRole("button", { name: "Shorten URL" }));
-    await user.keyboard("{Escape}");
-
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Long URL")).toHaveValue("https://example.com/later");
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("opens the Links page from a direct URL and signs in there", async () => {
+  it("offers Google and GitHub sign-in that comes back to the current page", async () => {
     window.history.replaceState(null, "", "/links");
-    fakeApi({ links: [link({ code: "deep" })] });
-    render(<App />);
-    const user = userEvent.setup();
+    fakeApi();
+    const user = await renderApp();
+
+    await user.click(headerButton("Log in"));
+    const dialog = screen.getByRole("dialog", { name: "Log in or sign up" });
+    expect(within(dialog).getByRole("link", { name: "Continue with Google" })).toHaveAttribute(
+      "href",
+      "/auth/login/google?returnUrl=%2Flinks",
+    );
+    expect(within(dialog).getByRole("link", { name: "Continue with GitHub" })).toHaveAttribute(
+      "href",
+      "/auth/login/github?returnUrl=%2Flinks",
+    );
+  });
+
+  it("only shows the providers the server has turned on", async () => {
+    fakeApi({ providers: [] });
+    const user = await renderApp();
+
+    await user.click(headerButton("Log in"));
+    expect(screen.getByText("Sign-in isn't set up on this server yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Continue with/ })).not.toBeInTheDocument();
+  });
+
+  it("signs a user out", async () => {
+    const { state } = fakeApi({ user: ada });
+    const user = await renderApp();
+
+    await user.click(headerButton("Sign out"));
+    expect(await findHeaderButton("Log in")).toBeInTheDocument();
+    expect(state.user).toBeNull();
+    expect(screen.queryByText("Ada Lovelace")).not.toBeInTheDocument();
+  });
+
+  it("says so when a sign-in didn't finish", async () => {
+    window.history.replaceState(null, "", "/?login=failed");
+    fakeApi();
+    const user = await renderApp();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Sign-in didn't finish. Try again.");
+    expect(window.location.search).toBe("");
+    await user.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("opens the Links page from a direct URL and lists the user's links", async () => {
+    window.history.replaceState(null, "", "/links");
+    fakeApi({ links: [link({ code: "deep" })], user: ada });
+    await renderApp();
 
     expect(screen.getByRole("heading", { level: 1, name: "Your links" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Links" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByLabelText("Long URL")).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Sign in" }));
-    await user.type(screen.getByLabelText("API key"), "good-key");
-    await user.click(screen.getByRole("button", { name: "Continue" }));
     expect(await within(await screen.findByRole("table")).findByRole("link", { name: "/deep" })).toBeInTheDocument();
   });
 
   it("goes back to the home page with the browser's back button", async () => {
-    fakeApi();
-    render(<App />);
-    const user = await signIn();
+    fakeApi({ user: ada });
+    const user = await renderApp();
     await openLinks(user);
 
     window.history.back();
@@ -223,17 +262,6 @@ describe("App", () => {
     await user.click(screen.getByRole("link", { name: "Links" }));
     await user.click(screen.getByRole("link", { name: "New link" }));
     expect(await screen.findByLabelText("Long URL")).toBeInTheDocument();
-    expect(window.location.hash).toBe("#shorten");
-  });
-
-  it("toggles dark mode and remembers it", async () => {
-    render(<App />);
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole("button", { name: "Switch to dark mode" }));
-
-    expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(localStorage.getItem("ovi.theme")).toBe("dark");
-    expect(screen.getByRole("button", { name: "Switch to light mode" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
   });
 });

@@ -1,47 +1,55 @@
-// Shared Tailwind class lists, so buttons, cards and inputs look the same everywhere.
+// Shared Tailwind class lists, so controls look the same everywhere. They follow macOS:
+// push buttons with a hairline bezel, a soft focus glow, rounded "window" panels and sheets.
 
-export const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+export const focusRing =
+  "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ink/30";
 
 type Variant = "default" | "primary" | "ghost" | "danger";
-type Size = "sm" | "md" | "lg";
+type Size = "sm" | "md";
 
 const variants: Record<Variant, string> = {
-  default: "border-line bg-surface text-ink hover:not-disabled:border-line-strong hover:not-disabled:bg-accent-soft/40",
-  primary: "border-accent bg-accent text-white hover:not-disabled:border-accent-hover hover:not-disabled:bg-accent-hover",
-  ghost: "border-transparent bg-transparent text-ink hover:not-disabled:bg-accent-soft",
-  danger: "border-line bg-surface text-danger hover:not-disabled:border-danger/60 hover:not-disabled:bg-error-bg",
+  default: "bg-surface text-ink shadow-control hover:not-disabled:bg-subtle active:not-disabled:bg-[#ebebed]",
+  primary:
+    "bg-ink text-white shadow-[0_0.5px_1.5px_rgb(0_0_0/30%)] bg-linear-to-b from-[#48484a] to-ink hover:not-disabled:from-[#5a5a5c] active:not-disabled:from-ink",
+  ghost: "bg-transparent text-ink hover:not-disabled:bg-black/5 active:not-disabled:bg-black/10",
+  danger: "bg-surface text-danger shadow-control hover:not-disabled:bg-error-bg",
 };
 
 const sizes: Record<Size, string> = {
-  sm: "gap-1.5 rounded-lg px-2.5 py-1.5 text-[0.82rem] [&_svg]:size-4",
-  md: "gap-2 rounded-xl px-4 py-2.5 text-[0.95rem] sm:px-5 [&_svg]:size-[1.15rem]",
-  lg: "gap-2.5 min-h-14 rounded-xl px-6 text-base sm:text-lg [&_svg]:size-5",
+  sm: "h-8 gap-1.5 rounded-md px-3 text-[0.8125rem] [&_svg]:size-3.5",
+  md: "h-10 gap-2 rounded-lg px-4 text-[0.9375rem] [&_svg]:size-4",
 };
 
 export function button(variant: Variant = "default", size: Size = "md", extra = ""): string {
   return [
-    "inline-flex cursor-pointer items-center justify-center border font-semibold whitespace-nowrap no-underline",
-    "transition-[background-color,border-color,color,box-shadow] duration-150 disabled:cursor-not-allowed disabled:opacity-60",
+    "inline-flex shrink-0 cursor-pointer items-center justify-center font-medium whitespace-nowrap no-underline select-none",
+    "transition-colors disabled:cursor-not-allowed disabled:opacity-45",
     focusRing,
     variants[variant],
     sizes[size],
-    variant === "primary" && size !== "sm" ? "shadow-btn" : "",
     extra,
   ].join(" ");
 }
 
-export const iconButton = `inline-grid size-11 shrink-0 cursor-pointer place-items-center rounded-full border border-line bg-surface text-ink shadow-card transition-colors hover:border-line-strong hover:bg-accent-soft/50 ${focusRing}`;
+/** A borderless toolbar-style button holding only an icon; give it an aria-label. */
+export const iconButton = `inline-grid size-8 shrink-0 cursor-pointer place-items-center rounded-md text-ink hover:bg-black/5 active:bg-black/10 [&_svg]:size-4 ${focusRing}`;
 
-export const card = "rounded-2xl border border-line bg-surface shadow-card";
+/** A content panel that reads like a macOS window. */
+export const card = "rounded-xl bg-surface shadow-window";
 
 export const input =
-  "w-full rounded-xl border-[1.5px] border-line-strong bg-surface px-3.5 py-2.5 font-normal text-ink placeholder:text-muted transition-colors focus:border-accent focus:ring-4 focus:ring-accent-soft focus:outline-none";
+  "h-10 w-full min-w-0 rounded-lg bg-surface px-3 text-[0.9375rem] text-ink shadow-[inset_0_0_0_0.5px_rgb(0_0_0/22%),inset_0_0.5px_1px_rgb(0_0_0/8%)] placeholder:text-[#a1a1a6] transition-shadow focus:shadow-[inset_0_0_0_1px_var(--color-ink)] focus:ring-[3px] focus:ring-ink/20 focus:outline-none";
 
-export const field = "grid min-w-0 gap-1.5 text-left text-sm font-semibold";
+export const field = "grid min-w-0 content-start gap-1.5 text-left text-[0.8125rem] font-medium";
 
-export const errorBox = "rounded-xl bg-error-bg px-3.5 py-2.5 text-[0.9rem] text-danger";
+export const errorBox = "rounded-lg bg-error-bg px-3 py-2 text-[0.8125rem] text-danger shadow-[inset_0_0_0_0.5px_rgb(196_30_30/25%)]";
 
-export const iconBubble = "inline-grid shrink-0 place-items-center rounded-2xl bg-accent-soft text-accent";
-
+/** Behind a sheet: a light dim, and the sheet sits near the top like a macOS sheet. */
 export const backdrop =
-  "fixed inset-0 z-50 grid place-items-center bg-[rgb(15_10_35/45%)] p-3 backdrop-blur-sm sm:p-4";
+  "fixed inset-0 z-20 grid items-start justify-items-center overflow-y-auto bg-black/25 p-4 pt-[8vh] max-sm:pt-4";
+
+/** A dialog panel. */
+export const sheet = "rounded-xl bg-surface shadow-sheet";
+
+/** Page width and side padding, shared by the header, pages and footer. */
+export const container = "mx-auto w-full max-w-5xl px-4 sm:px-6";

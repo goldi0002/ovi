@@ -2,13 +2,13 @@ import { BarChart3, Table2, X } from "lucide-react";
 import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import { ApiError, type Link, type LinkStats, type NamedCount, type OviApi } from "../api";
 import { formatDay, niceMax } from "../format";
-import { backdrop, button, card, errorBox, focusRing, iconButton } from "../ui";
+import { backdrop, button, errorBox, focusRing, iconButton, sheet } from "../ui";
 import { useModal } from "./useModal";
 
-const tile = "min-w-0 rounded-2xl border border-line bg-page/60 px-4 py-3";
-const tileLabel = "text-[0.75rem] leading-tight text-muted";
-const tileValue = "mt-1 text-[1.5rem] leading-tight font-bold tabular-nums";
-const subheading = "text-[0.9rem] font-bold tracking-tight";
+const tile = "min-w-0 rounded-lg bg-subtle px-4 py-3.5";
+const tileLabel = "text-[0.8rem] text-muted";
+const tileValue = "mt-1 text-2xl leading-tight font-semibold tabular-nums";
+const subheading = "text-sm font-semibold";
 
 const RANGES = [7, 30, 90] as const;
 const numbers = new Intl.NumberFormat();
@@ -48,29 +48,25 @@ export function StatsDialog({ api, link, onClose, onUnauthorized }: Props) {
   const topReferrer = stats?.referrers[0];
 
   return (
-    // On phones the dialog is a bottom sheet; from sm up it's a centred card.
-    <div
-      className={`${backdrop} max-sm:items-end max-sm:p-0`}
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
-    >
+    <div className={backdrop} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <section
-        className={`${card} grid max-h-[92dvh] w-full max-w-[820px] gap-4 overflow-y-auto rounded-3xl p-5 sm:max-h-[calc(100dvh-32px)] sm:gap-5 sm:p-7 max-sm:rounded-b-none max-sm:border-b-0`}
+        className={`${sheet} grid grid-cols-[minmax(0,1fr)] max-h-[calc(100dvh-10vh-16px)] w-full max-w-3xl gap-5 overflow-y-auto p-6 max-sm:max-h-[calc(100dvh-32px)] max-sm:p-4`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="stats-title"
       >
         <header className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 id="stats-title" className="text-[1.2rem] font-bold tracking-tight sm:text-[1.35rem]">
+            <h2 id="stats-title" className="text-lg font-semibold">
               Stats for /{link.code}
             </h2>
-            <p className="truncate text-[0.82rem] text-muted" title={link.url}>
+            <p className="truncate text-sm text-muted" title={link.url}>
               {link.url}
             </p>
           </div>
           <button
             type="button"
-            className={`${iconButton} size-10 shadow-none sm:size-11`}
+            className={`${iconButton} -mt-1 -mr-1`}
             onClick={onClose}
             aria-label="Close stats"
             autoFocus
@@ -80,7 +76,7 @@ export function StatsDialog({ api, link, onClose, onUnauthorized }: Props) {
         </header>
 
         <div
-          className="flex w-full gap-1 rounded-full bg-off-bg p-1 sm:w-fit"
+          className="flex w-fit max-w-full rounded-lg bg-black/[0.06] p-0.5 max-sm:w-full"
           role="group"
           aria-label="Date range"
         >
@@ -88,8 +84,8 @@ export function StatsDialog({ api, link, onClose, onUnauthorized }: Props) {
             <button
               key={r}
               type="button"
-              className={`flex-1 cursor-pointer rounded-full px-2 py-1.5 text-[0.82rem] whitespace-nowrap sm:flex-none sm:px-3.5 sm:text-sm ${focusRing} ${
-                days === r ? "bg-surface font-semibold text-ink shadow-sm" : "text-muted hover:text-ink"
+              className={`cursor-pointer rounded-md px-3 py-1 text-[0.8125rem] font-medium whitespace-nowrap max-sm:flex-1 max-sm:px-2 ${focusRing} ${
+                days === r ? "bg-white text-ink shadow-control" : "text-muted hover:text-ink"
               }`}
               aria-pressed={days === r}
               onClick={() => setDays(r)}
@@ -109,8 +105,8 @@ export function StatsDialog({ api, link, onClose, onUnauthorized }: Props) {
 
         {stats && (
           // Keep the previous numbers on screen, dimmed, while a new range loads.
-          <div className={`grid gap-4 transition-opacity sm:gap-5 ${loading ? "opacity-55" : ""}`} aria-busy={loading}>
-            <dl className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
+          <div className={`grid gap-5 transition-opacity ${loading ? "opacity-55" : ""}`} aria-busy={loading}>
+            <dl className="grid grid-cols-3 gap-3 max-sm:grid-cols-2">
               <div className={tile}>
                 <dt className={tileLabel}>Clicks, last {stats.days} days</dt>
                 <dd className={tileValue}>{numbers.format(stats.clicksInRange)}</dd>
@@ -119,12 +115,9 @@ export function StatsDialog({ api, link, onClose, onUnauthorized }: Props) {
                 <dt className={tileLabel}>All-time clicks</dt>
                 <dd className={tileValue}>{numbers.format(stats.totalClicks)}</dd>
               </div>
-              <div className={`${tile} col-span-2 sm:col-span-1`}>
+              <div className={`${tile} max-sm:col-span-2`}>
                 <dt className={tileLabel}>Top referrer</dt>
-                <dd
-                  className="mt-1 truncate text-base leading-[2rem] font-semibold sm:text-lg"
-                  title={topReferrer?.name}
-                >
+                <dd className="mt-1 truncate text-lg leading-[2.2rem] font-semibold" title={topReferrer?.name}>
                   {topReferrer ? topReferrer.name : "—"}
                 </dd>
               </div>
@@ -132,13 +125,13 @@ export function StatsDialog({ api, link, onClose, onUnauthorized }: Props) {
 
             <ClicksChart daily={stats.daily} />
 
-            <div className="grid gap-5 sm:grid-cols-3 sm:gap-6">
+            <div className="grid grid-cols-3 gap-6 max-sm:grid-cols-1">
               <Breakdown title="Referrers" items={stats.referrers} total={stats.clicksInRange} />
               <Breakdown title="Devices" items={stats.devices} total={stats.clicksInRange} />
               <Breakdown title="Browsers" items={stats.browsers} total={stats.clicksInRange} />
             </div>
 
-            <p className="text-[0.75rem] text-muted text-pretty">
+            <p className="text-[0.8rem] text-muted">
               Days are in UTC. Referrers show only the site, never the full page address. Clicks from before stats were
               added count toward the all-time total only.
             </p>
@@ -179,8 +172,8 @@ function ClicksChart({ daily }: { daily: LinkStats["daily"] }) {
   }
 
   return (
-    <figure className="min-w-0 rounded-2xl border border-line px-3.5 pt-3.5 pb-3 sm:px-[1.1rem] sm:pt-4">
-      <figcaption className="flex items-center justify-between gap-3">
+    <figure className="rounded-lg bg-subtle px-[1.1rem] pt-4 pb-3.5">
+      <figcaption className="flex items-center justify-between gap-4">
         <h3 className={subheading}>Clicks per day</h3>
         <button
           type="button"
@@ -195,13 +188,13 @@ function ClicksChart({ daily }: { daily: LinkStats["daily"] }) {
 
       {asTable ? (
         <div className="mt-3 max-h-64 overflow-y-auto">
-          <table className="w-full border-collapse text-[0.9rem]">
+          <table className="w-full border-collapse text-[0.95rem]">
             <thead>
               <tr>
-                <th className="border-b border-line p-2 text-left text-[0.68rem] font-bold tracking-[0.08em] text-muted uppercase">
+                <th className="border-b border-line p-2 text-left text-xs font-semibold tracking-[0.04em] text-muted uppercase">
                   Day
                 </th>
-                <th className="border-b border-line p-2 text-right text-[0.68rem] font-bold tracking-[0.08em] text-muted uppercase">
+                <th className="border-b border-line p-2 text-right text-xs font-semibold tracking-[0.04em] text-muted uppercase">
                   Clicks
                 </th>
               </tr>
@@ -218,16 +211,14 @@ function ClicksChart({ daily }: { daily: LinkStats["daily"] }) {
         </div>
       ) : (
         <>
-          <div className="mt-2 mb-3 min-h-6 text-[0.85rem]" aria-live="polite">
+          <div className="mt-2 mb-3 min-h-6 text-sm" aria-live="polite">
             {shown ? (
               <>
                 <strong>{numbers.format(shown.clicks)}</strong> {shown.clicks === 1 ? "click" : "clicks"} on{" "}
                 {formatDay(shown.date, true)}
               </>
             ) : (
-              <span className="text-muted">
-                {total === 0 ? "No clicks in this range yet." : "Hover or tap a day to see its clicks."}
-              </span>
+              <span className="text-muted">{total === 0 ? "No clicks in this range yet." : "Hover or tap a day to see its clicks."}</span>
             )}
           </div>
           <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2.5">
@@ -253,13 +244,13 @@ function ClicksChart({ daily }: { daily: LinkStats["daily"] }) {
                 <div
                   key={d.date}
                   className={`group flex h-full min-w-0 flex-1 items-end justify-center rounded-t ${
-                    i === active ? "is-active bg-accent-soft" : ""
+                    i === active ? "is-active bg-black/5" : ""
                   }`}
                   onMouseEnter={() => setActive(i)}
                 >
                   {d.clicks > 0 && (
                     <span
-                      className="w-full max-w-6 min-h-[3px] rounded-t bg-accent group-[.is-active]:bg-accent-hover"
+                      className="w-full max-w-6 min-h-[3px] rounded-t bg-ink group-[.is-active]:bg-ink-hover"
                       style={{ height: `${(d.clicks / max) * 100}%` }}
                     />
                   )}
@@ -267,7 +258,7 @@ function ClicksChart({ daily }: { daily: LinkStats["daily"] }) {
               ))}
             </div>
             {/* Labels can be wider than a column, so they spill evenly to both sides (the end ones inwards). */}
-            <div className="col-start-2 mt-1.5 flex gap-0.5 text-[0.7rem] text-muted" aria-hidden="true">
+            <div className="col-start-2 mt-1.5 flex gap-0.5 text-xs text-muted" aria-hidden="true">
               {daily.map((d, i) => {
                 const last = daily.length - 1;
                 // Every few days, but not so close to the last label that they collide.
@@ -296,16 +287,16 @@ function ClicksChart({ daily }: { daily: LinkStats["daily"] }) {
 function Breakdown({ title, items, total }: { title: string; items: NamedCount[]; total: number }) {
   return (
     <section aria-label={title}>
-      <h3 className={`${subheading} mb-2.5`}>{title}</h3>
+      <h3 className={`${subheading} mb-3`}>{title}</h3>
       {items.length === 0 ? (
         <p className="text-[0.8rem] text-muted">No data yet.</p>
       ) : (
-        <ul className="grid gap-2.5">
+        <ul className="grid gap-3">
           {items.map((item) => {
             const share = total > 0 ? Math.round((item.clicks / total) * 100) : 0;
             return (
               <li key={item.name}>
-                <div className="flex justify-between gap-2 text-[0.85rem]">
+                <div className="flex justify-between gap-2 text-sm">
                   <span className="truncate" title={item.name}>
                     {item.name}
                   </span>
@@ -313,8 +304,8 @@ function Breakdown({ title, items, total }: { title: string; items: NamedCount[]
                     {numbers.format(item.clicks)} <span className="text-muted">· {share}%</span>
                   </span>
                 </div>
-                <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-accent-soft" aria-hidden="true">
-                  <span className="block h-full rounded-full bg-accent" style={{ width: `${share}%` }} />
+                <span className="mt-1.5 block h-2 overflow-hidden rounded-full bg-subtle" aria-hidden="true">
+                  <span className="block h-full rounded-full bg-ink" style={{ width: `${share}%` }} />
                 </span>
               </li>
             );

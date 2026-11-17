@@ -6,6 +6,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Time.Testing;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http;
+using Ovi.Api.Accounts;
+using Ovi.Api.Data;
 using Ovi.Api.Security;
 
 namespace Ovi.Api.Tests;
@@ -21,9 +26,24 @@ public class OviApiFactory(Dictionary<string, string?>? settings = null, IPAddre
     public HttpClient CreateAuthedClient()
     {
         var client = CreateUnauthedClient();
-        client.DefaultRequestHeaders.Add(ApiKeyFilter.HeaderName, ApiKey);
+        client.DefaultRequestHeaders.Add(CallerFilter.ApiKeyHeader, ApiKey);
         return client;
     }
+
+    /// <summary>
+    /// A client signed in as a user (created on first use, like a first Google/GitHub sign-in), holding a real session
+    /// cookie. It sends the X-Ovi-Request header the web UI sends, unless <paramref name="csrfHeader"/> is false.
+    /// </summary>
+    public async Task<HttpClient> CreateUserClientAsync(string providerKey = "user-1", bool csrfHeader = true)
+    {
+        var client = CreateUnauthedClient();
+        var res = await client.GetAsync($"{TestLoginPath}?key={Uri.EscapeDataString(providerKey)}");
+        res.EnsureSuccessStatusCode();
+        if (csrfHeader) client.DefaultRequestHeaders.Add(CallerFilter.CsrfHeader, "1");
+        return client;
+    }
+
+    private const string TestLoginPath = "/test-only/login";
 
     public HttpClient CreateUnauthedClient() =>
         CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
@@ -51,7 +71,26 @@ public class OviApiFactory(Dictionary<string, string?>? settings = null, IPAddre
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Time);
             if (remoteIp is not null) services.AddSingleton<IStartupFilter>(new RemoteIpStartupFilter(remoteIp));
+            services.AddSingleton<IStartupFilter>(new TestLoginStartupFilter());
         });
+    }
+
+    /// <summary>Signs in the way the OAuth callback does (same account upsert, same cookie), minus the provider round trip.</summary>
+    private sealed class TestLoginStartupFilter : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use(async (ctx, nxt) =>
+            {
+                if (ctx.Request.Path != TestLoginPath) { await nxt(ctx); return; }
+                var key = ctx.Request.Query["key"].ToString();
+                var user = await UserSignIn.UpsertAsync(ctx.RequestServices.GetRequiredService<AppDbContext>(),
+                    ctx.RequestServices.GetRequiredService<TimeProvider>(), "github", key, "User " + key, key + "@example.com");
+                await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, UserSignIn.SessionPrincipal(user));
+                ctx.Response.StatusCode = StatusCodes.Status204NoContent;
+            });
+            next(app);
+        };
     }
 
     /// <summary>TestServer has no client IP; this simulates every request arriving from one address (e.g. a proxy).</summary>

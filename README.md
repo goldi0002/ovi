@@ -27,10 +27,13 @@ The schema is created and migrated automatically on startup.
 
 A React app in [`web/`](web) (Vite, TypeScript, Tailwind CSS, Lucide icons) is the UI for the API. It's served by the API itself at `/`, so there's one address and no CORS setup.
 
-- A landing page with the shortener front and center, plus features, pricing and about sections, and a light/dark toggle (it follows the system until you pick one).
-- Sign in with the API key from **Get Started**, or just paste a URL and press **Shorten URL**: you're asked for the key first. It's kept for the browser tab, or on the device if you tick **Remember on this device**.
-- Shorten links with an optional custom code and expiry, then copy the result or download its QR code.
-- The **Links** page (`/links`) lists all links with clicks, creation time and status (active, expiring, expired); page through them and delete them. Its address works directly, so you can bookmark it.
+- A simple design after macOS: black text on white, the system font, a translucent toolbar with a Shorten / Links segmented control, and sheet-style dialogs. It works from 320px phones up, and long URLs and codes are cut off or wrapped instead of stretching the page.
+- The home page is just the shortener.
+- Anyone can paste a URL and press **Shorten URL**, no account needed. Those links get a random code and expire after 30 days.
+- **Log in** with Google or GitHub. The first sign-in creates the account, so there's no separate sign-up. Signed-in users can pick a custom code and expiry (or none), and see their links and stats.
+- The admin can choose **Admin? Use an API key** in the Log in dialog. The key is kept for the browser tab, or on the device with **Remember on this device**, and gives access to every link.
+- Copy the result or download its QR code.
+- The **Links** page (`/links`) lists your links (every link for the admin) (a table on wide screens, cards on phones) with clicks, creation time and status (active, expiring, expired); page through them and delete them. Its address works directly, so you can bookmark it.
 - Open **Stats** on any link for its clicks per day over the last 7, 30 or 90 days, its top referrers, and the devices and browsers visitors used. Each click stores only the time, the referring site's name (no page path), and a device and browser category: no IP address or full user agent.
 
 Develop it with hot reload while the API runs on `:5080` (see above). Vite proxies `/api` calls to it:
@@ -69,10 +72,35 @@ One-time setup:
 
 1. In the [Render dashboard](https://dashboard.render.com), choose **New → Blueprint** and connect this repository. Render reads `render.yaml` and creates the `ovi` service.
 2. Render asks for `DATABASE_URL` and `DATABASE_URL_UNPOOLED`. Copy them from `neon env pull` (`.env.local`) or the Neon Console's **Connect** dialog: the pooled string (host ends in `-pooler`) for `DATABASE_URL`, the direct one for `DATABASE_URL_UNPOOLED`. For a service created before these were added, set them in the service's **Environment** tab.
-3. Render generates a random `Auth__ApiKey`. Copy it from the service's **Environment** tab. This is the key for `/api/links`.
-4. The service is live at its `https://<name>.onrender.com` URL. Short URLs use that address automatically through `RENDER_EXTERNAL_URL`. To use a custom domain, add it in Render and set `App__PublicBaseUrl`.
+3. Render generates a random `Auth__ApiKey`. Copy it from the service's **Environment** tab. This is the admin key: it sees and manages every link.
+4. Turn on sign-in (see [Sign-in with Google and GitHub](#sign-in-with-google-and-github)). Without it, the site still works, but only for anonymous links and the admin.
+5. The service is live at its `https://<name>.onrender.com` URL. Short URLs use that address automatically through `RENDER_EXTERNAL_URL`. To use a custom domain, add it in Render and set `App__PublicBaseUrl`.
 
 On the free plan a service sleeps after about 15 minutes without traffic, and the next request takes up to a minute to wake it. To avoid that, `render.yaml` turns on `KeepAlive__Enabled`: a background service pings the app's own public URL (`/health/live`) every 10 minutes, through Render's proxy, so it never goes idle. That keeps one instance up all month, about 744 of the workspace's 750 free instance hours, so turn it off if you run other free services. `/health/live` doesn't touch the database, so the pings don't keep Neon awake. Links are kept in Neon, so they survive restarts and deploys.
+
+## Sign-in with Google and GitHub
+
+Each provider turns on when both its client id and secret are set. Use the site's public address (e.g. `https://ovi.onrender.com`) in place of `<site>` below.
+
+**Google**
+1. In the [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create a project, set up the **OAuth consent screen** (External, app name "Ovi", scopes `openid`, `email`, `profile`), then **Create credentials → OAuth client ID → Web application**.
+2. Add the authorized redirect URI `<site>/auth/callback/google`.
+3. In Render, set `Auth__Google__ClientId` and `Auth__Google__ClientSecret`.
+4. Publish the consent screen (**Publishing status → In production**); until then only test users you list can sign in.
+
+**GitHub**
+1. Go to **GitHub → Settings → Developer settings → [OAuth Apps](https://github.com/settings/developers) → New OAuth App**.
+2. Set the homepage URL to `<site>` and the authorization callback URL to `<site>/auth/callback/github`.
+3. Generate a client secret, then set `Auth__GitHub__ClientId` and `Auth__GitHub__ClientSecret` in Render.
+
+For local development, register separate apps with `http://localhost:5080` as the site, and put their values in [user secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets) (`dotnet user-secrets set Auth:GitHub:ClientId …` in `src/Ovi.Api`).
+
+How it works:
+- After the provider sends the person back, Ovi creates or updates their account. It stores only the provider, the provider's id, a name and an email.
+- Ovi then sets an HttpOnly, `SameSite=Lax`, `Secure` session cookie that lasts 30 days and renews while in use.
+- The keys that encrypt the cookie are stored in Postgres, so deploys and restarts don't sign anyone out.
+- Requests that change data with the cookie must carry `X-Ovi-Request: 1`, which other sites can't add, so they can't act as a signed-in user (CSRF).
+- A cancelled or failed sign-in returns to `/?login=failed`, and the UI shows a message.
 
 ## Database (Neon)
 
@@ -87,12 +115,17 @@ Both accept Neon's `postgresql://…?sslmode=require&channel_binding=require` UR
 
 | Setting | Env var | Default | Notes |
 |---|---|---|---|
-| `Auth:ApiKey` | `Auth__ApiKey` | none (`dev-key-change-me` in Development) | **Required.** Protects `/api/links/*`. If unset, those endpoints reject every request. |
+| `Auth:ApiKey` | `Auth__ApiKey` | none (`dev-key-change-me` in Development) | The admin key: full access to every link. If unset, admin access is off. |
+| `Auth:Google:ClientId` / `ClientSecret` | `Auth__Google__ClientId` / `Auth__Google__ClientSecret` | none | Turns on **Continue with Google** |
+| `Auth:GitHub:ClientId` / `ClientSecret` | `Auth__GitHub__ClientId` / `Auth__GitHub__ClientSecret` | none | Turns on **Continue with GitHub** |
+| `Links:BlockedHosts` | `Links__BlockedHosts` | none | Comma-separated sites that can't be shortened (their subdomains too), e.g. to stop spam |
 | `App:PublicBaseUrl` | `App__PublicBaseUrl` | none (`RENDER_EXTERNAL_URL` on Render) | **Set in production.** Base for short URLs and QR codes. If neither is set, they're built from the request's Host header, which clients control. |
 | — | `DATABASE_URL` | none | **Required in production.** Postgres URL or Npgsql connection string for app traffic (Neon: pooled endpoint) |
 | — | `DATABASE_URL_UNPOOLED` | `DATABASE_URL` | Connection used to run migrations (Neon: direct endpoint) |
 | `ConnectionStrings:Default` | `ConnectionStrings__Default` | none (local Postgres in Development) | Fallback when `DATABASE_URL` isn't set |
-| `RateLimits:CreatePerMinute` | `RateLimits__CreatePerMinute` | `30` | Per client IP |
+| `RateLimits:CreatePerMinute` | `RateLimits__CreatePerMinute` | `30` | Link creation per signed-in user (and per IP for the API key) |
+| `RateLimits:AnonymousCreatePerHour` | `RateLimits__AnonymousCreatePerHour` | `20` | Link creation per IP without signing in |
+| `RateLimits:AuthPerMinute` | `RateLimits__AuthPerMinute` | `20` | Sign-in starts per IP |
 | `RateLimits:RedirectPerMinute` | `RateLimits__RedirectPerMinute` | `300` | Per client IP, covers redirects and QR codes |
 | `ReverseProxy:KnownProxies` | `ReverseProxy__KnownProxies__0` | none | IPs of your reverse proxy / load balancer. Needed so rate limits see real client IPs |
 | `ReverseProxy:KnownNetworks` | `ReverseProxy__KnownNetworks__0` | none | Same, as CIDR ranges (e.g. `10.0.0.0/8`) |
@@ -113,15 +146,23 @@ The app keeps no local state, so you can run several instances against the same 
 
 ## Endpoints
 
-Management endpoints need the `X-Api-Key` header. Redirects and QR codes are public.
+Each `/api` request acts as one of three callers:
+- **Admin:** sends the `X-Api-Key` header. A wrong key is always a 401, with no fallback to the cookie. The admin sees every link.
+- **User:** has the session cookie from signing in, and sees only their own links.
+- **Anonymous:** neither. Can only create links, with no custom code, and they expire within 30 days.
+
+Redirects and QR codes are public.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/api/links` | key | Create a link. Body: `{ "url": "https://...", "customCode": "optional", "expiresAt": "optional, e.g. 2030-01-01T00:00:00Z" }` |
-| `GET` | `/api/links?page=1&pageSize=50` | key | List links, newest first. Returns `{ items, page, pageSize, total }`; `pageSize` max 100 |
-| `GET` | `/api/links/{code}` | key | Show one link's details and click count |
-| `GET` | `/api/links/{code}/stats?days=30` | key | Click analytics for the last 1–365 days (UTC): clicks per day, top referrers, devices and browsers |
-| `DELETE` | `/api/links/{code}` | key | Delete a link (soft delete: the row is kept with `DeletedAt` set, and the link disappears from every endpoint) |
+| `POST` | `/api/links` | anyone | Create a link. Body: `{ "url": "https://...", "customCode": "optional", "expiresAt": "optional, e.g. 2030-01-01T00:00:00Z" }` |
+| `GET` | `/api/links?page=1&pageSize=50` | user, key | List links, newest first. Returns `{ items, page, pageSize, total }`; `pageSize` max 100 |
+| `GET` | `/api/links/{code}` | user, key | Show one link's details and click count |
+| `GET` | `/api/links/{code}/stats?days=30` | user, key | Click analytics for the last 1–365 days (UTC): clicks per day, top referrers, devices and browsers |
+| `DELETE` | `/api/links/{code}` | user, key | Delete a link (soft delete: the row is kept with `DeletedAt` set, and the link disappears from every endpoint) |
+| `GET` | `/api/session` | anyone | Who's signed in, which sign-in providers are on, and how long anonymous links last |
+| `POST` | `/api/logout` | user | End the session |
+| `GET` | `/auth/login/{google\|github}?returnUrl=/links` | public | Start signing in; comes back to `returnUrl` (a path on this site only) |
 | `GET` | `/{code}` | public | 302 redirect and count the click. Returns 410 Gone if expired |
 | `GET` | `/{code}/qr` | public | PNG QR code for the short URL |
 | `GET` | `/health` | public | Health check, including the database connection (503 if the database is unavailable) |
@@ -129,14 +170,18 @@ Management endpoints need the `X-Api-Key` header. Redirects and QR codes are pub
 | `GET` | `/` | public | The web UI, when it has been built into `wwwroot` |
 
 Validation rules:
-- URLs must be absolute `http` or `https`, at most 2048 characters, and can't point back at the shortener.
-- A custom code is 3 to 32 characters of letters, digits, `-` or `_`. It can't be a reserved word (`api`, `swagger`, `openapi`, `health`, `qr`, `assets`).
-- `expiresAt` must be in the future.
+- URLs are trimmed, then must be absolute `http` or `https` with a host and no spaces, at most 2048 characters.
+- A URL can't contain a user name or password (`https://bank.example@evil.example` is a phishing trick).
+- A URL can't point back at the shortener, or at a site in `Links:BlockedHosts`.
+- A custom code is 3 to 32 characters of letters, digits, `-` or `_`, and only for signed-in users and the admin. It can't be a reserved word (`api`, `auth`, `swagger`, `openapi`, `health`, `qr`, `assets`, `links`).
+- `expiresAt` must be in the future and at most 10 years away. Anonymous links expire after 30 days by default, and can't be set to last longer.
+- Request bodies over 64 KB are refused.
 - A deleted link's code stays reserved, so an old short URL or printed QR code can never start pointing somewhere else.
 
 Errors use RFC 7807 problem JSON:
 - 400: validation failed.
-- 401: the API key is missing or wrong.
+- 401: the API key is wrong, or the endpoint needs you to sign in.
+- 403: a cookie request that changes data is missing `X-Ovi-Request`.
 - 409: the code is already taken.
 - 429: the client is over its rate limit.
 

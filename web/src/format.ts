@@ -45,3 +45,8 @@ export function niceMax(value: number): number {
   }
   return 10 * magnitude;
 }
+
+/** A URL without its scheme, for display: "https://ovi.app/abc" → "ovi.app/abc". */
+export function displayUrl(url: string): string {
+  return url.replace(/^https?:\/\//, "");
+}
