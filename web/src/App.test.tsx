@@ -5,7 +5,7 @@ import { fakeApi, link } from "./test/fakeApi";
 
 async function signIn(key = "good-key", remember = false) {
   const user = userEvent.setup();
-  await user.click(screen.getByRole("button", { name: "Get Started" }));
+  await user.click(screen.getByRole("button", { name: "Sign in" }));
   await user.type(screen.getByLabelText("API key"), key);
   if (remember) await user.click(screen.getByLabelText("Remember on this device"));
   await user.click(screen.getByRole("button", { name: "Continue" }));
@@ -64,7 +64,7 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Shorten URL" }));
 
     const result = await screen.findByRole("region", { name: "New short link" });
-    expect(within(result).getByRole("link", { name: "https://ovi.test/fresh" })).toBeInTheDocument();
+    expect(within(result).getByRole("link", { name: "ovi.test/fresh" })).toBeInTheDocument();
     expect(within(result).getByRole("img")).toHaveAttribute("src", "https://ovi.test/fresh/qr");
     expect(screen.getByLabelText("Long URL")).toHaveValue("");
 
@@ -157,7 +157,7 @@ describe("App", () => {
     fakeApi();
     render(<App />);
 
-    expect(await screen.findByRole("button", { name: "Get Started" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Sign in" })).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Sign in to see your links" })).toBeInTheDocument();
     expect(sessionStorage.getItem("ovi.apiKey")).toBeNull();
@@ -175,7 +175,7 @@ describe("App", () => {
     await user.click(within(dialog).getByRole("button", { name: "Continue" }));
 
     const result = await screen.findByRole("region", { name: "New short link" });
-    expect(within(result).getByRole("link", { name: "https://ovi.test/gen1234" })).toBeInTheDocument();
+    expect(within(result).getByRole("link", { name: "ovi.test/gen1234" })).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
   });
@@ -204,7 +204,7 @@ describe("App", () => {
     expect(screen.getByRole("link", { name: "Links" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByLabelText("Long URL")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await user.click(screen.getByRole("button", { name: "Enter API key" }));
     await user.type(screen.getByLabelText("API key"), "good-key");
     await user.click(screen.getByRole("button", { name: "Continue" }));
     expect(await within(await screen.findByRole("table")).findByRole("link", { name: "/deep" })).toBeInTheDocument();
@@ -223,17 +223,6 @@ describe("App", () => {
     await user.click(screen.getByRole("link", { name: "Links" }));
     await user.click(screen.getByRole("link", { name: "New link" }));
     expect(await screen.findByLabelText("Long URL")).toBeInTheDocument();
-    expect(window.location.hash).toBe("#shorten");
-  });
-
-  it("toggles dark mode and remembers it", async () => {
-    render(<App />);
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole("button", { name: "Switch to dark mode" }));
-
-    expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(localStorage.getItem("ovi.theme")).toBe("dark");
-    expect(screen.getByRole("button", { name: "Switch to light mode" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
   });
 });

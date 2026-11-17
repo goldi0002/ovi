@@ -4,7 +4,7 @@ import { ApiError, isExpired, type Link, type OviApi, type Page } from "../api";
 import { formatDateTime, formatRelative } from "../format";
 import { CopyButton } from "./CopyButton";
 import { StatsDialog } from "./StatsDialog";
-import { button, card, errorBox } from "../ui";
+import { button, card, errorBox, iconButton } from "../ui";
 
 const PAGE_SIZE = 20;
 
@@ -13,23 +13,22 @@ interface Props {
   onUnauthorized: () => void;
 }
 
-const badge = "inline-block rounded-full px-2.5 py-0.5 text-[0.78rem] font-semibold whitespace-nowrap";
+const badge = "inline-flex items-center gap-1.5 text-[0.8125rem] whitespace-nowrap before:size-2 before:rounded-full";
 
-// On phones each row becomes a card: cells stack, each labelled from its data-label.
-const th = "border-b border-line p-2.5 text-left text-xs font-semibold tracking-[0.04em] text-muted uppercase";
-const td =
-  "px-2.5 py-3 align-middle max-sm:flex max-sm:w-full max-sm:justify-between max-sm:gap-4 max-sm:px-0 max-sm:py-1 " +
-  "max-sm:before:shrink-0 max-sm:before:text-[0.8rem] max-sm:before:text-muted max-sm:before:content-[attr(data-label)]";
+// A fixed-layout table from md up, so long URLs are cut off instead of widening the page.
+// Below md each row becomes a small card: code and clicks, then the destination, then status and actions.
+const th = "border-b border-line px-3 py-2 text-left text-[0.6875rem] font-semibold text-muted";
+const td = "px-3 py-2 align-middle max-md:p-0";
 
 function Status({ link }: { link: Link }) {
-  if (isExpired(link)) return <span className={`${badge} bg-off-bg text-muted`}>Expired</span>;
+  if (isExpired(link)) return <span className={`${badge} text-muted before:bg-[#c7c7cc]`}>Expired</span>;
   if (link.expiresAt)
     return (
-      <span className={`${badge} bg-warn-bg text-warn-ink`} title={formatDateTime(link.expiresAt)}>
+      <span className={`${badge} text-ink before:border-[1.5px] before:border-ink`} title={formatDateTime(link.expiresAt)}>
         Expires {formatRelative(link.expiresAt)}
       </span>
     );
-  return <span className={`${badge} bg-ok-bg text-ok-ink`}>Active</span>;
+  return <span className={`${badge} text-ink before:bg-ink`}>Active</span>;
 }
 
 export function LinksTable({ api, onUnauthorized }: Props) {
@@ -76,104 +75,110 @@ export function LinksTable({ api, onUnauthorized }: Props) {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
   return (
-    <section className={`${card} p-7 max-sm:p-5`} aria-label="Your links">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-2xl font-bold tracking-tight">
-          All links {data && <span className="ml-1 font-medium text-muted">{data.total}</span>}
+    <section aria-label="Your links">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-[0.9375rem] font-semibold">
+          All links {data && <span className="ml-1 font-normal text-muted">{data.total}</span>}
         </h2>
-        <button type="button" className={button("default", "sm")} onClick={() => void load()} disabled={loading}>
+        <button type="button" className={button("ghost", "sm")} onClick={() => void load()} disabled={loading}>
           <RefreshCw className={loading ? "animate-spin motion-reduce:animate-none" : undefined} />
           {loading ? "Loading…" : "Refresh"}
         </button>
       </div>
 
       {error && (
-        <p className={errorBox} role="alert">
+        <p className={`${errorBox} mb-3`} role="alert">
           {error}
         </p>
       )}
 
       {data && data.items.length === 0 && !loading && (
-        <p className="py-8 text-center text-muted">No links yet. Create one on the home page.</p>
+        <p className={`${card} px-6 py-12 text-center text-[0.8125rem] text-muted`}>No links yet. Create one on the home page.</p>
       )}
 
       {data && data.items.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-[0.95rem] max-sm:block">
-            <thead className="max-sm:hidden">
+        <div className={`${card} overflow-hidden max-md:rounded-none max-md:bg-transparent max-md:shadow-none`}>
+          <table className="w-full table-fixed border-collapse text-sm max-md:block">
+            <thead className="max-md:hidden">
               <tr>
-                <th className={th}>Short link</th>
+                <th className={`${th} w-40`}>Short link</th>
                 <th className={th}>Destination</th>
-                <th className={`${th} text-right`}>Clicks</th>
-                <th className={th}>Created</th>
-                <th className={th}>Status</th>
-                <th className={th}>
+                <th className={`${th} w-16 text-right`}>Clicks</th>
+                <th className={`${th} w-36 max-lg:hidden`}>Created</th>
+                <th className={`${th} w-32`}>Status</th>
+                <th className={`${th} w-40`}>
                   <span className="sr-only">Actions</span>
                 </th>
               </tr>
             </thead>
-            <tbody className="max-sm:block">
+            <tbody className="max-md:grid max-md:gap-3">
               {data.items.map((link) => {
-                const dim = isExpired(link) ? "opacity-60" : "";
+                const dim = isExpired(link) ? "text-muted" : "";
                 return (
-                  <tr key={link.code} className="border-b border-line last:border-b-0 max-sm:block max-sm:py-3">
-                    <td data-label="Short link" className={td}>
+                  <tr
+                    key={link.code}
+                    className="md:even:bg-subtle max-md:grid max-md:grid-cols-[minmax(0,1fr)_auto] max-md:gap-x-3 max-md:gap-y-1.5 max-md:rounded-xl max-md:bg-surface max-md:px-4 max-md:pt-3.5 max-md:pb-2.5 max-md:shadow-window"
+                  >
+                    <td className={`${td} truncate max-md:col-start-1 max-md:row-start-1`}>
                       <a
                         href={link.shortUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className={`font-mono font-semibold text-accent-ink hover:underline ${dim}`}
+                        className={`font-mono font-semibold underline-offset-4 hover:underline ${dim}`}
+                        title={link.shortUrl}
                       >
                         /{link.code}
                       </a>
                     </td>
                     <td
-                      data-label="Destination"
-                      className={`${td} max-w-80 truncate text-muted max-sm:max-w-none ${dim}`}
+                      className={`${td} truncate text-muted max-md:col-span-2 max-md:row-start-2`}
                       title={link.url}
                     >
                       {link.url}
                     </td>
-                    <td data-label="Clicks" className={`${td} text-right tabular-nums`}>
-                      {link.clicks}
+                    <td
+                      className={`${td} text-right tabular-nums max-md:col-start-2 max-md:row-start-1 max-md:text-muted`}
+                    >
+                      <span>{link.clicks}</span>
+                      <span className="md:hidden"> {link.clicks === 1 ? "click" : "clicks"}</span>
                     </td>
-                    <td data-label="Created" className={td} title={formatDateTime(link.createdAt)}>
+                    <td className={`${td} whitespace-nowrap text-muted max-lg:hidden`} title={formatDateTime(link.createdAt)}>
                       {formatRelative(link.createdAt)}
                     </td>
-                    <td data-label="Status" className={td}>
+                    <td className={`${td} max-md:col-start-1 max-md:row-start-3 max-md:self-center`}>
                       <Status link={link} />
                     </td>
-                    <td className="w-[1%] px-2.5 py-3 align-middle max-sm:block max-sm:w-full max-sm:px-0 max-sm:pt-2 max-sm:pb-0">
-                      <div className="flex justify-end gap-1.5 max-sm:flex-wrap max-sm:justify-start">
-                        <CopyButton text={link.shortUrl} />
+                    <td className={`${td} max-md:col-start-2 max-md:row-start-3`}>
+                      <div className="flex justify-end gap-1">
+                        <CopyButton text={link.shortUrl} iconOnly />
                         <button
                           type="button"
-                          className={button("default", "sm")}
+                          className={iconButton}
                           onClick={() => setStatsFor(link)}
                           aria-label={`Stats for /${link.code}`}
+                          title="Stats"
                         >
                           <ChartColumn />
-                          Stats
                         </button>
                         <a
-                          className={button("default", "sm")}
+                          className={iconButton}
                           href={link.qrCodeUrl}
                           target="_blank"
                           rel="noreferrer"
                           aria-label={`QR code for /${link.code}`}
+                          title="QR code"
                         >
                           <QrCode />
-                          QR
                         </a>
                         <button
                           type="button"
-                          className={button("danger", "sm")}
+                          className={`${iconButton} text-danger disabled:opacity-45`}
                           onClick={() => void remove(link.code)}
                           disabled={deleting === link.code}
                           aria-label={`Delete /${link.code}`}
+                          title="Delete"
                         >
                           <Trash2 />
-                          {deleting === link.code ? "…" : "Delete"}
                         </button>
                       </div>
                     </td>

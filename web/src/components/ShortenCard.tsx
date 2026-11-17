@@ -1,8 +1,8 @@
-import { Link as LinkIcon, Minus, Plus, Scissors } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { ApiError, type Link, type OviApi } from "../api";
 import { localInputToIso } from "../format";
-import { button, card, errorBox, field, focusRing, input } from "../ui";
+import { button, errorBox, field, focusRing, input } from "../ui";
 
 interface Props {
   /** Returns a signed-in client, asking for the API key first if needed; null if the user cancels. */
@@ -48,88 +48,77 @@ export function ShortenCard({ getApi, onCreated, onUnauthorized }: Props) {
   }
 
   return (
-    <section
-      id="shorten"
-      className={`${card} w-full max-w-[1100px] justify-self-center rounded-3xl px-10 py-9 max-sm:px-5 max-sm:py-6`}
-      aria-labelledby="shorten-title"
-    >
-      <h2
-        id="shorten-title"
-        className="mb-6 flex items-center gap-4 text-[clamp(1.5rem,3vw,2rem)] font-bold tracking-tight"
+    <form id="shorten" onSubmit={submit} aria-label="Create a short link" className="grid gap-3">
+      <div className="flex gap-2 max-sm:flex-col">
+        <label className="min-w-0 flex-1">
+          <span className="sr-only">Long URL</span>
+          <input
+            type="url"
+            inputMode="url"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="https://example.com/a/very/long/link"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            required
+            maxLength={2048}
+            className={`${input} text-ellipsis`}
+          />
+        </label>
+        <button className={button("primary", "md", "px-5")} type="submit" disabled={saving}>
+          {saving ? "Shortening…" : "Shorten URL"}
+        </button>
+      </div>
+
+      <button
+        type="button"
+        className={`inline-flex cursor-pointer items-center gap-1 justify-self-start rounded py-0.5 text-[0.8125rem] text-muted hover:text-ink ${focusRing}`}
+        aria-expanded={showOptions}
+        aria-controls="shorten-options"
+        onClick={() => setShowOptions((v) => !v)}
       >
-        <LinkIcon className="size-12 shrink-0 text-accent max-sm:size-9" strokeWidth={2.3} />
-        Shorten a URL
-      </h2>
-      <form onSubmit={submit} aria-label="Create a short link" className="grid gap-3.5">
-        <div className="flex gap-5 max-sm:flex-col max-sm:gap-3">
-          <label className="relative min-w-0 flex-1">
-            <span className="sr-only">Long URL</span>
-            <LinkIcon className="pointer-events-none absolute top-1/2 left-5 size-6 -translate-y-1/2 text-muted" />
+        Custom code and expiry
+        <ChevronDown className={`size-4 transition-transform ${showOptions ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>
+
+      {showOptions && (
+        <div id="shorten-options" className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+          <label className={field}>
+            <span>
+              Custom code <span className="font-normal text-muted">(optional)</span>
+            </span>
             <input
-              type="url"
-              inputMode="url"
-              placeholder="Paste your long URL here..."
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              required
-              maxLength={2048}
-              className={`${input} min-h-16 rounded-xl pl-[3.6rem] text-xl max-sm:min-h-14 max-sm:text-[1.05rem]`}
+              type="text"
+              placeholder="my-link"
+              value={customCode}
+              onChange={(e) => setCustomCode(e.target.value)}
+              pattern="[A-Za-z0-9_\-]{3,32}"
+              title="3–32 letters, digits, - or _"
+              maxLength={32}
+              autoComplete="off"
+              spellCheck={false}
+              className={input}
             />
           </label>
-          <button className={button("primary", "lg")} type="submit" disabled={saving}>
-            <Scissors />
-            {saving ? "Shortening…" : "Shorten URL"}
-          </button>
+          <label className={field}>
+            <span>
+              Expires <span className="font-normal text-muted">(optional)</span>
+            </span>
+            <input
+              type="datetime-local"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+              className={input}
+            />
+          </label>
         </div>
+      )}
 
-        <button
-          type="button"
-          className={`inline-flex cursor-pointer items-center gap-1 justify-self-start rounded py-1 text-[0.95rem] font-medium text-accent-ink hover:underline ${focusRing}`}
-          aria-expanded={showOptions}
-          aria-controls="shorten-options"
-          onClick={() => setShowOptions((v) => !v)}
-        >
-          {showOptions ? <Minus className="size-4" /> : <Plus className="size-4" />}
-          {showOptions ? "Hide options" : "Custom code and expiry"}
-        </button>
-
-        {showOptions && (
-          <div id="shorten-options" className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-            <label className={field}>
-              <span>
-                Custom code <em className="font-normal text-muted not-italic">(optional)</em>
-              </span>
-              <input
-                type="text"
-                placeholder="my-link"
-                value={customCode}
-                onChange={(e) => setCustomCode(e.target.value)}
-                pattern="[A-Za-z0-9_\-]{3,32}"
-                title="3–32 letters, digits, - or _"
-                maxLength={32}
-                className={input}
-              />
-            </label>
-            <label className={field}>
-              <span>
-                Expires <em className="font-normal text-muted not-italic">(optional)</em>
-              </span>
-              <input
-                type="datetime-local"
-                value={expiresAt}
-                onChange={(e) => setExpiresAt(e.target.value)}
-                className={input}
-              />
-            </label>
-          </div>
-        )}
-
-        {error && (
-          <p className={errorBox} role="alert">
-            {error}
-          </p>
-        )}
-      </form>
-    </section>
+      {error && (
+        <p className={errorBox} role="alert">
+          {error}
+        </p>
+      )}
+    </form>
   );
 }

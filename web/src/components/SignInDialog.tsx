@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { ApiError, OviApi } from "../api";
-import { KeyRound } from "lucide-react";
-import { backdrop, button, card, errorBox, field, iconBubble, input } from "../ui";
+import { backdrop, button, errorBox, field, input, sheet } from "../ui";
 import { useModal } from "./useModal";
 
 interface Props {
@@ -39,19 +38,16 @@ export function SignInDialog({ onSignedIn, onCancel }: Props) {
   return (
     <div className={backdrop} onMouseDown={(e) => e.target === e.currentTarget && onCancel()}>
       <form
-        className={`${card} grid w-full max-w-[420px] gap-4 rounded-3xl p-8 text-center`}
+        className={`${sheet} grid w-full max-w-sm gap-4 p-5`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="sign-in-title"
         onSubmit={submit}
       >
-        <span className={`${iconBubble} size-16 justify-self-center`}>
-          <KeyRound className="size-8" />
-        </span>
-        <h2 id="sign-in-title" className="text-xl font-bold tracking-tight">
+        <h2 id="sign-in-title" className="text-[0.9375rem] font-semibold">
           Sign in to Ovi
         </h2>
-        <p className="text-muted">Enter your API key to create and manage short links.</p>
+        <p className="-mt-3 text-[0.8125rem] text-muted">Enter your API key to create and manage short links.</p>
         <label className={field}>
           <span>API key</span>
           <input
@@ -64,25 +60,25 @@ export function SignInDialog({ onSignedIn, onCancel }: Props) {
             className={input}
           />
         </label>
-        <label className="flex items-center gap-2 text-left text-[0.95rem]">
+        <label className="flex items-center gap-2 text-[0.8125rem]">
           <input
             type="checkbox"
             checked={remember}
             onChange={(e) => setRemember(e.target.checked)}
-            className="size-4 accent-accent"
+            className="size-4 accent-ink"
           />
           Remember on this device
         </label>
         {error && (
-          <p className={`${errorBox} text-left`} role="alert">
+          <p className={errorBox} role="alert">
             {error}
           </p>
         )}
-        <div className="grid grid-cols-2 gap-3">
-          <button type="button" className={button()} onClick={onCancel}>
+        <div className="flex justify-end gap-2 max-sm:grid max-sm:grid-cols-2">
+          <button type="button" className={button("default", "sm")} onClick={onCancel}>
             Cancel
           </button>
-          <button className={button("primary")} type="submit" disabled={checking || !key.trim()}>
+          <button className={button("primary", "sm")} type="submit" disabled={checking || !key.trim()}>
             {checking ? "Checking…" : "Continue"}
           </button>
         </div>

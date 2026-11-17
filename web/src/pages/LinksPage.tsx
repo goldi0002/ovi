@@ -1,9 +1,9 @@
-import { KeyRound, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useEffect } from "react";
 import type { OviApi } from "../api";
 import { LinksTable } from "../components/LinksTable";
 import { AppLink } from "../router";
-import { button, card, iconBubble } from "../ui";
+import { button, card, container } from "../ui";
 
 interface Props {
   api: OviApi | null;
@@ -21,13 +21,10 @@ export function LinksPage({ api, onSignIn, onUnauthorized }: Props) {
   }, []);
 
   return (
-    <main className="mx-auto grid max-w-[1200px] gap-6 px-4 pt-6 pb-16 max-sm:pt-3">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-[clamp(2rem,5vw,3rem)] leading-tight font-extrabold tracking-[-0.03em]">Your links</h1>
-          <p className="text-lg text-muted">Every short link, with its clicks, status and stats.</p>
-        </div>
-        <AppLink href="/#shorten" className={button("primary")}>
+    <main className={`${container} flex-1 py-8 sm:py-12`}>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Your links</h1>
+        <AppLink href="/" className={button("primary", "sm")}>
           <Plus />
           New link
         </AppLink>
@@ -36,14 +33,11 @@ export function LinksPage({ api, onSignIn, onUnauthorized }: Props) {
       {api ? (
         <LinksTable api={api} onUnauthorized={onUnauthorized} />
       ) : (
-        <section className={`${card} grid justify-items-center gap-3 px-6 py-14 text-center`}>
-          <span className={`${iconBubble} size-16`}>
-            <KeyRound className="size-8" />
-          </span>
-          <h2 className="text-xl font-bold tracking-tight">Sign in to see your links</h2>
-          <p className="max-w-md text-muted">Your links are protected by your API key.</p>
-          <button type="button" className={button("primary", "md", "mt-2")} onClick={onSignIn}>
-            Sign in
+        <section className={`${card} grid justify-items-center gap-2 px-6 py-12 text-center`}>
+          <h2 className="text-[0.9375rem] font-semibold">Sign in to see your links</h2>
+          <p className="max-w-sm text-[0.8125rem] text-muted">Your links are protected by your API key.</p>
+          <button type="button" className={button("primary", "md", "mt-3")} onClick={onSignIn}>
+            Enter API key
           </button>
         </section>
       )}

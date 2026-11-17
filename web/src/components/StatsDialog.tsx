@@ -2,13 +2,13 @@ import { BarChart3, Table2, X } from "lucide-react";
 import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import { ApiError, type Link, type LinkStats, type NamedCount, type OviApi } from "../api";
 import { formatDay, niceMax } from "../format";
-import { backdrop, button, card, errorBox, focusRing, iconButton } from "../ui";
+import { backdrop, button, errorBox, focusRing, iconButton, sheet } from "../ui";
 import { useModal } from "./useModal";
 
-const tile = "min-w-0 rounded-2xl border border-line px-4 py-3.5";
+const tile = "min-w-0 rounded-lg bg-subtle px-4 py-3.5";
 const tileLabel = "text-[0.8rem] text-muted";
-const tileValue = "mt-1 text-[1.6rem] leading-tight font-semibold";
-const subheading = "text-[0.95rem] font-bold tracking-tight";
+const tileValue = "mt-1 text-2xl leading-tight font-semibold tabular-nums";
+const subheading = "text-sm font-semibold";
 
 const RANGES = [7, 30, 90] as const;
 const numbers = new Intl.NumberFormat();
@@ -50,14 +50,14 @@ export function StatsDialog({ api, link, onClose, onUnauthorized }: Props) {
   return (
     <div className={backdrop} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <section
-        className={`${card} grid max-h-[calc(100dvh-32px)] w-full max-w-[780px] gap-5 overflow-y-auto rounded-3xl p-7 max-sm:p-5`}
+        className={`${sheet} grid grid-cols-[minmax(0,1fr)] max-h-[calc(100dvh-10vh-16px)] w-full max-w-3xl gap-5 overflow-y-auto p-6 max-sm:max-h-[calc(100dvh-32px)] max-sm:p-4`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="stats-title"
       >
         <header className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 id="stats-title" className="text-[1.35rem] font-bold tracking-tight">
+            <h2 id="stats-title" className="text-lg font-semibold">
               Stats for /{link.code}
             </h2>
             <p className="truncate text-sm text-muted" title={link.url}>
@@ -66,7 +66,7 @@ export function StatsDialog({ api, link, onClose, onUnauthorized }: Props) {
           </div>
           <button
             type="button"
-            className={`${iconButton} size-11 shadow-none`}
+            className={`${iconButton} -mt-1 -mr-1`}
             onClick={onClose}
             aria-label="Close stats"
             autoFocus
@@ -76,7 +76,7 @@ export function StatsDialog({ api, link, onClose, onUnauthorized }: Props) {
         </header>
 
         <div
-          className="flex w-fit max-w-full gap-1 rounded-full bg-off-bg p-1 max-sm:w-full"
+          className="flex w-fit max-w-full rounded-lg bg-black/[0.06] p-0.5 max-sm:w-full"
           role="group"
           aria-label="Date range"
         >
@@ -84,8 +84,8 @@ export function StatsDialog({ api, link, onClose, onUnauthorized }: Props) {
             <button
               key={r}
               type="button"
-              className={`cursor-pointer rounded-full px-3.5 py-1.5 text-sm whitespace-nowrap max-sm:flex-1 max-sm:px-2 ${focusRing} ${
-                days === r ? "bg-surface font-semibold text-ink shadow-sm" : "text-muted hover:text-ink"
+              className={`cursor-pointer rounded-md px-3 py-1 text-[0.8125rem] font-medium whitespace-nowrap max-sm:flex-1 max-sm:px-2 ${focusRing} ${
+                days === r ? "bg-white text-ink shadow-control" : "text-muted hover:text-ink"
               }`}
               aria-pressed={days === r}
               onClick={() => setDays(r)}
@@ -172,7 +172,7 @@ function ClicksChart({ daily }: { daily: LinkStats["daily"] }) {
   }
 
   return (
-    <figure className="rounded-2xl border border-line px-[1.1rem] pt-4 pb-3.5">
+    <figure className="rounded-lg bg-subtle px-[1.1rem] pt-4 pb-3.5">
       <figcaption className="flex items-center justify-between gap-4">
         <h3 className={subheading}>Clicks per day</h3>
         <button
@@ -244,13 +244,13 @@ function ClicksChart({ daily }: { daily: LinkStats["daily"] }) {
                 <div
                   key={d.date}
                   className={`group flex h-full min-w-0 flex-1 items-end justify-center rounded-t ${
-                    i === active ? "is-active bg-accent-soft" : ""
+                    i === active ? "is-active bg-black/5" : ""
                   }`}
                   onMouseEnter={() => setActive(i)}
                 >
                   {d.clicks > 0 && (
                     <span
-                      className="w-full max-w-6 min-h-[3px] rounded-t bg-accent group-[.is-active]:bg-accent-hover"
+                      className="w-full max-w-6 min-h-[3px] rounded-t bg-ink group-[.is-active]:bg-ink-hover"
                       style={{ height: `${(d.clicks / max) * 100}%` }}
                     />
                   )}
@@ -304,8 +304,8 @@ function Breakdown({ title, items, total }: { title: string; items: NamedCount[]
                     {numbers.format(item.clicks)} <span className="text-muted">· {share}%</span>
                   </span>
                 </div>
-                <span className="mt-1.5 block h-2 overflow-hidden rounded-full bg-accent-soft" aria-hidden="true">
-                  <span className="block h-full rounded-full bg-accent" style={{ width: `${share}%` }} />
+                <span className="mt-1.5 block h-2 overflow-hidden rounded-full bg-subtle" aria-hidden="true">
+                  <span className="block h-full rounded-full bg-ink" style={{ width: `${share}%` }} />
                 </span>
               </li>
             );
