@@ -5,13 +5,23 @@ import { localInputToIso } from "../format";
 import { button, errorBox, field, focusRing, input } from "../ui";
 
 interface Props {
-  /** Returns a signed-in client, asking for the API key first if needed; null if the user cancels. */
-  getApi: () => Promise<OviApi | null>;
+  api: OviApi;
+  signedIn: boolean;
+  /** How long links made without signing in last. */
+  anonymousLinkDays: number;
+  onLogIn: () => void;
   onCreated: (link: Link) => void;
   onUnauthorized: () => void;
 }
 
-export function ShortenCard({ getApi, onCreated, onUnauthorized }: Props) {
+/** The latest expiry the server accepts without an account, as a datetime-local value. */
+function anonymousMaxExpiry(days: number): string {
+  const d = new Date(Date.now() + days * 86_400_000);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
+export function ShortenCard({ api, signedIn, anonymousLinkDays, onLogIn, onCreated, onUnauthorized }: Props) {
   const [url, setUrl] = useState("");
   const [showOptions, setShowOptions] = useState(false);
   const [customCode, setCustomCode] = useState("");
@@ -22,13 +32,11 @@ export function ShortenCard({ getApi, onCreated, onUnauthorized }: Props) {
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    const api = await getApi();
-    if (!api) return;
     setSaving(true);
     try {
       const link = await api.create({
         url: url.trim(),
-        customCode: (showOptions && customCode.trim()) || undefined,
+        customCode: (showOptions && signedIn && customCode.trim()) || undefined,
         expiresAt: showOptions ? localInputToIso(expiresAt) : undefined,
       });
       setUrl("");
@@ -38,7 +46,7 @@ export function ShortenCard({ getApi, onCreated, onUnauthorized }: Props) {
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         onUnauthorized();
-        setError("Your API key was rejected. Sign in again.");
+        setError("You were signed out. Log in again, or shorten without an account.");
       } else {
         setError(err instanceof ApiError ? err.message : "Couldn't create the link. Try again.");
       }
@@ -93,12 +101,19 @@ export function ShortenCard({ getApi, onCreated, onUnauthorized }: Props) {
               value={customCode}
               onChange={(e) => setCustomCode(e.target.value)}
               pattern="[A-Za-z0-9_\-]{3,32}"
+              disabled={!signedIn}
+              aria-describedby={signedIn ? undefined : "custom-code-note"}
               title="3–32 letters, digits, - or _"
               maxLength={32}
               autoComplete="off"
               spellCheck={false}
-              className={input}
+              className={`${input} disabled:cursor-not-allowed disabled:bg-subtle`}
             />
+            {!signedIn && (
+              <span id="custom-code-note" className="text-xs font-normal text-muted">
+                Log in to choose your own code.
+              </span>
+            )}
           </label>
           <label className={field}>
             <span>
@@ -108,6 +123,7 @@ export function ShortenCard({ getApi, onCreated, onUnauthorized }: Props) {
               type="datetime-local"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
+              max={signedIn ? undefined : anonymousMaxExpiry(anonymousLinkDays)}
               className={input}
             />
           </label>
@@ -117,6 +133,16 @@ export function ShortenCard({ getApi, onCreated, onUnauthorized }: Props) {
       {error && (
         <p className={errorBox} role="alert">
           {error}
+        </p>
+      )}
+
+      {!signedIn && (
+        <p className="border-t border-line pt-3 text-[0.8125rem] text-muted">
+          Without an account, links expire after {anonymousLinkDays} days.{" "}
+          <button type="button" className={`rounded font-medium text-ink underline underline-offset-2 ${focusRing}`} onClick={onLogIn}>
+            Log in
+          </button>{" "}
+          to keep links, pick custom codes and see click stats.
         </p>
       )}
     </form>

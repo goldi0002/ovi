@@ -1,13 +1,13 @@
 import { Download, X } from "lucide-react";
 import type { Link } from "../api";
-import { displayUrl } from "../format";
+import { displayUrl, formatDateTime } from "../format";
 import { AppLink } from "../router";
 import { button, card, iconButton } from "../ui";
 import { CopyButton } from "./CopyButton";
 
 // Desktop: QR | link details, with the actions underneath. Phone: link details, then the QR, then
 // the actions, so a long link gets the full width. Close sits in the corner either way.
-export function LinkResult({ link, onDismiss }: { link: Link; onDismiss: () => void }) {
+export function LinkResult({ link, signedIn, onDismiss }: { link: Link; signedIn: boolean; onDismiss: () => void }) {
   return (
     <section
       className={`${card} relative grid gap-4 p-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:p-5`}
@@ -36,6 +36,7 @@ export function LinkResult({ link, onDismiss }: { link: Link; onDismiss: () => v
         <p className="line-clamp-2 text-[0.8125rem] break-all text-muted" title={link.url}>
           {link.url}
         </p>
+        {link.expiresAt && <p className="text-xs text-muted">Expires {formatDateTime(link.expiresAt)}</p>}
       </div>
       <button
         type="button"
@@ -51,9 +52,11 @@ export function LinkResult({ link, onDismiss }: { link: Link; onDismiss: () => v
           <Download />
           QR code
         </a>
-        <AppLink className={button("default", "sm", "max-sm:col-span-2")} href="/links">
-          All links
-        </AppLink>
+        {signedIn && (
+          <AppLink className={button("default", "sm", "max-sm:col-span-2")} href="/links">
+            All links
+          </AppLink>
+        )}
       </div>
     </section>
   );

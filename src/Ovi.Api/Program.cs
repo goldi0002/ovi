@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Ovi.Api.Accounts;
 using Ovi.Api.Data;
 using Ovi.Api.Infrastructure;
 using Ovi.Api.Links;
@@ -12,6 +13,9 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ShortUrlBuilder>();
 builder.Services.AddOviRateLimits(builder.Configuration);
+builder.Services.AddOviAuth(builder.Configuration, builder.Environment);
+// Requests are small JSON bodies; refuse anything big before reading it.
+builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = 64 * 1024);
 builder.Services.AddProblemDetails();
 builder.Services.AddOviOpenApi();
 var behindProxy = builder.Services.ConfigureReverseProxy(builder.Configuration);
@@ -26,7 +30,9 @@ var app = builder.Build();
 // Fail fast on bad config, and warn about insecure defaults.
 var publicBaseUrl = ShortUrlBuilder.ParseBaseUrl(ShortUrlBuilder.ConfiguredValue(app.Configuration));
 if (string.IsNullOrEmpty(app.Configuration["Auth:ApiKey"]))
-    app.Logger.LogWarning("Auth:ApiKey is not set; all /api/links requests will be rejected.");
+    app.Logger.LogWarning("Auth:ApiKey is not set; admin access with an API key is turned off.");
+if (AuthSetup.EnabledProviders(app.Configuration).Count == 0)
+    app.Logger.LogWarning("No sign-in provider is configured (Auth:Google / Auth:GitHub); only anonymous links can be made in the UI.");
 if (publicBaseUrl is null && !app.Environment.IsDevelopment())
     app.Logger.LogWarning("App:PublicBaseUrl is not set; short URLs will be built from the request Host header.");
 
@@ -38,10 +44,20 @@ await using (var migrationDb = new AppDbContext(new DbContextOptionsBuilder<AppD
 }
 
 if (behindProxy) app.UseForwardedHeaders();
+// Baseline headers on every response (the UI's HTML adds a Content-Security-Policy on top).
+app.Use((ctx, next) =>
+{
+    ctx.Response.Headers.XContentTypeOptions = "nosniff";
+    ctx.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    ctx.Response.Headers.XFrameOptions = "DENY";
+    return next(ctx);
+});
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 if (!app.Environment.IsDevelopment()) app.UseHsts();
 app.UseOviWebUi();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseRateLimiter();
 
 if (app.Configuration.GetValue("Swagger:Enabled", app.Environment.IsDevelopment()))
@@ -57,6 +73,7 @@ app.MapGet("/health", async (AppDbContext db) =>
     .WithTags("Health");
 // Liveness only: answers without touching the database, so keep-alive pings don't wake Neon.
 app.MapGet("/health/live", () => Results.Ok(new { status = "ok" })).WithTags("Health");
+app.MapAuthEndpoints();
 app.MapLinkEndpoints();
 
 await app.RunAsync();

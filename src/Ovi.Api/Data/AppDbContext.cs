@@ -1,9 +1,15 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Ovi.Api.Data;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options), IDataProtectionKeyContext
 {
+    public DbSet<User> Users => Set<User>();
+
+    /// <summary>Keys that encrypt sign-in cookies, kept in the database so restarts and deploys don't sign everyone out.</summary>
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+
     public DbSet<Link> Links => Set<Link>();
     public DbSet<Click> Clicks => Set<Click>();
 
@@ -22,6 +28,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         // Soft delete: every query skips deleted links unless it calls IgnoreQueryFilters().
         // The unique index on Code still covers them, so a deleted code is never handed out again.
         link.HasQueryFilter(l => l.DeletedAt == null);
+        link.HasOne<User>().WithMany().HasForeignKey(l => l.OwnerId).OnDelete(DeleteBehavior.SetNull);
+        // The Links page lists one owner's links, newest first.
+        link.HasIndex(l => new { l.OwnerId, l.CreatedAt });
+
+        var user = modelBuilder.Entity<User>();
+        user.HasIndex(u => new { u.Provider, u.ProviderKey }).IsUnique();
+        user.Property(u => u.Provider).HasMaxLength(16);
+        user.Property(u => u.ProviderKey).HasMaxLength(64);
+        user.Property(u => u.Name).HasMaxLength(Ovi.Api.Accounts.UserSignIn.MaxNameLength);
+        user.Property(u => u.Email).HasMaxLength(320);
 
         var click = modelBuilder.Entity<Click>();
         click.HasOne<Link>().WithMany().HasForeignKey(c => c.LinkId).OnDelete(DeleteBehavior.Cascade);

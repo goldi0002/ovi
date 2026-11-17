@@ -1,23 +1,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { OviApi, type Link } from "./api";
+import { ApiError, OviApi, type Link, type Session } from "./api";
 import { Header } from "./components/Header";
 import { LinkResult } from "./components/LinkResult";
+import { LoginDialog } from "./components/LoginDialog";
 import { ShortenCard } from "./components/ShortenCard";
-import { SignInDialog } from "./components/SignInDialog";
 import { LinksPage } from "./pages/LinksPage";
 import { scrollAfterNavigation, usePath } from "./router";
 import { clearApiKey, loadApiKey, saveApiKey } from "./storage";
-import { card, container } from "./ui";
+import { card, container, errorBox } from "./ui";
+
+/** A sign-in that came back from Google/GitHub unfinished lands on /?login=failed; read and drop the flag. */
+function takeLoginFailedFlag(): boolean {
+  const url = new URL(window.location.href);
+  if (url.searchParams.get("login") !== "failed") return false;
+  url.searchParams.delete("login");
+  window.history.replaceState(null, "", url);
+  return true;
+}
 
 export function App() {
   const [apiKey, setApiKey] = useState<string | null>(() => loadApiKey());
-  const [signInOpen, setSignInOpen] = useState(false);
+  const api = useMemo(() => new OviApi(apiKey), [apiKey]);
+  // null while loading; "offline" when the server couldn't be reached.
+  const [session, setSession] = useState<Session | "offline" | null>(null);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(() =>
+    takeLoginFailedFlag() ? "Sign-in didn't finish. Try again." : null,
+  );
   const [created, setCreated] = useState<Link | null>(null);
   const path = usePath();
   const firstRender = useRef(true);
-  const api = useMemo(() => (apiKey ? new OviApi(apiKey) : null), [apiKey]);
-  // Resolves a pending "shorten" once the user signs in (or cancels) in the dialog.
-  const pendingSignIn = useRef<((api: OviApi | null) => void) | null>(null);
 
   // The browser handles the anchor on first load; after that, every page change scrolls here.
   useEffect(() => {
@@ -28,49 +40,91 @@ export function App() {
     scrollAfterNavigation();
   }, [path]);
 
-  const signOut = useCallback(() => {
-    clearApiKey();
-    setApiKey(null);
+  const refreshSession = useCallback(async () => {
+    try {
+      setSession(await api.session());
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401 && api.isAdmin) {
+        // The saved API key stopped working: forget it and carry on without it.
+        clearApiKey();
+        setApiKey(null);
+      } else {
+        setSession("offline");
+      }
+    }
+  }, [api]);
+
+  useEffect(() => {
+    void refreshSession();
+  }, [refreshSession]);
+
+  const current = session === "offline" ? null : session;
+  const signedIn = current !== null && (current.admin || current.user !== null);
+  const accountName = current?.user?.name ?? (current?.admin ? "Admin" : null);
+
+  const signOut = useCallback(async () => {
     setCreated(null);
-  }, []);
+    if (api.isAdmin) {
+      clearApiKey();
+      setApiKey(null);
+      return;
+    }
+    try {
+      await api.logout();
+    } finally {
+      await refreshSession();
+    }
+  }, [api, refreshSession]);
 
-  const closeSignIn = useCallback((result: OviApi | null) => {
-    setSignInOpen(false);
-    pendingSignIn.current?.(result);
-    pendingSignIn.current = null;
-  }, []);
-
-  const cancelSignIn = useCallback(() => closeSignIn(null), [closeSignIn]);
-
-  const getApi = useCallback(
-    () =>
-      api
-        ? Promise.resolve(api)
-        : new Promise<OviApi | null>((resolve) => {
-            pendingSignIn.current = resolve;
-            setSignInOpen(true);
-          }),
-    [api],
-  );
+  // A list or stats call came back 401: the session ended (expired, or signed out in another tab).
+  const onUnauthorized = useCallback(() => void refreshSession(), [refreshSession]);
+  const openLogin = useCallback(() => setLoginOpen(true), []);
 
   return (
     <>
       <div className="flex min-h-dvh flex-col">
-        <Header path={path} signedIn={api !== null} onSignIn={() => setSignInOpen(true)} onSignOut={signOut} />
+        <Header
+          path={path}
+          ready={session !== null}
+          accountName={accountName}
+          onLogIn={openLogin}
+          onSignOut={() => void signOut()}
+        />
+
+        {notice && (
+          <div className={`${container} pt-4`}>
+            <p className={`${errorBox} flex items-center justify-between gap-3`} role="alert">
+              {notice}
+              <button type="button" className="font-medium underline" onClick={() => setNotice(null)}>
+                Dismiss
+              </button>
+            </p>
+          </div>
+        )}
 
         {path === "/links" ? (
-          <LinksPage api={api} onSignIn={() => setSignInOpen(true)} onUnauthorized={signOut} />
+          <LinksPage
+            api={api}
+            state={session === null ? "loading" : signedIn ? "signedIn" : "signedOut"}
+            onLogIn={openLogin}
+            onUnauthorized={onUnauthorized}
+          />
         ) : (
           <main className={`${container} max-w-2xl flex-1 py-12 sm:py-20`}>
             <h1 className="text-center text-3xl font-semibold tracking-tight sm:text-[2.5rem]">Shorten a long link</h1>
-            <p className="mt-2 mb-8 text-center text-muted">
-              Paste a URL to get a short link, a QR code and click stats.
-            </p>
+            <p className="mt-2 mb-8 text-center text-muted">Paste a URL to get a short link and a QR code. No account needed.</p>
             <div className="grid gap-6">
               <div className={`${card} p-4 sm:p-5`}>
-                <ShortenCard getApi={getApi} onUnauthorized={signOut} onCreated={setCreated} />
+                <ShortenCard
+                  api={api}
+                  signedIn={signedIn}
+                  anonymousLinkDays={current?.anonymousLinkDays ?? 30}
+                  onLogIn={openLogin}
+                  onCreated={setCreated}
+                  onUnauthorized={onUnauthorized}
+                />
               </div>
-              {created && <LinkResult link={created} onDismiss={() => setCreated(null)} />}
+              {created && <LinkResult link={created} signedIn={signedIn} onDismiss={() => setCreated(null)} />}
             </div>
           </main>
         )}
@@ -83,13 +137,15 @@ export function App() {
         </footer>
       </div>
 
-      {signInOpen && (
-        <SignInDialog
-          onCancel={cancelSignIn}
-          onSignedIn={(key, remember) => {
+      {loginOpen && (
+        <LoginDialog
+          providers={current?.providers ?? []}
+          returnTo={window.location.pathname}
+          onCancel={() => setLoginOpen(false)}
+          onApiKey={(key, remember) => {
             saveApiKey(key, remember);
             setApiKey(key);
-            closeSignIn(new OviApi(key));
+            setLoginOpen(false);
           }}
         />
       )}

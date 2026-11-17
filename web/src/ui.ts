@@ -40,7 +40,7 @@ export const card = "rounded-xl bg-surface shadow-window";
 export const input =
   "h-10 w-full min-w-0 rounded-lg bg-surface px-3 text-[0.9375rem] text-ink shadow-[inset_0_0_0_0.5px_rgb(0_0_0/22%),inset_0_0.5px_1px_rgb(0_0_0/8%)] placeholder:text-[#a1a1a6] transition-shadow focus:shadow-[inset_0_0_0_1px_var(--color-ink)] focus:ring-[3px] focus:ring-ink/20 focus:outline-none";
 
-export const field = "grid min-w-0 gap-1.5 text-left text-[0.8125rem] font-medium";
+export const field = "grid min-w-0 content-start gap-1.5 text-left text-[0.8125rem] font-medium";
 
 export const errorBox = "rounded-lg bg-error-bg px-3 py-2 text-[0.8125rem] text-danger shadow-[inset_0_0_0_0.5px_rgb(196_30_30/25%)]";
 

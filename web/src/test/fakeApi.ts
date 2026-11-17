@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { Link, LinkStats } from "../api";
+import type { Link, LinkStats, Provider, Session } from "../api";
 
 export function link(overrides: Partial<Link> = {}): Link {
   const code = overrides.code ?? "abc1234";
@@ -48,14 +48,42 @@ export function stats(code: string, days = 30, overrides: Partial<LinkStats> = {
   };
 }
 
-export function fakeApi({ apiKey = "good-key", links = [] as Link[] } = {}) {
+interface FakeOptions {
+  /** The admin API key the fake accepts. */
+  apiKey?: string;
+  links?: Link[];
+  /** A signed-in user, as if the browser holds a session cookie (e.g. just back from Google). */
+  user?: Session["user"];
+  providers?: Provider[];
+}
+
+export function fakeApi({ apiKey = "good-key", links = [], user = null, providers = ["google", "github"] }: FakeOptions = {}) {
   const store = [...links];
+  const state = { user };
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = new URL(String(input), "http://localhost");
     const headers = new Headers(init.headers);
-    if (headers.get("X-Api-Key") !== apiKey) return json(401, { title: "Missing or invalid API key." });
+    const key = headers.get("X-Api-Key");
+    if (key !== null && key !== apiKey) return json(401, { title: "Missing or invalid API key." });
+    const admin = key !== null;
+    const signedIn = admin || state.user !== null;
 
     const method = init.method ?? "GET";
+    if (url.pathname === "/api/session")
+      return json(200, { user: state.user, admin, providers, anonymousLinkDays: 30 } satisfies Session);
+    if (method === "POST" && url.pathname === "/api/logout") {
+      state.user = null;
+      return json(204, undefined);
+    }
+    if (method === "POST" && url.pathname === "/api/links" && !signedIn) {
+      const body = JSON.parse(String(init.body)) as { url: string; customCode?: string };
+      if (body.customCode) return json(400, { errors: { customCode: ["Sign in to choose a custom code."] } });
+      const created = link({ code: "anon123", url: body.url, expiresAt: "2026-12-17T12:00:00Z" });
+      store.unshift(created);
+      return json(201, created);
+    }
+    if (!signedIn) return json(401, { title: "Sign in to see and manage your links." });
+
     if (method === "GET" && url.pathname === "/api/links") {
       const page = Number(url.searchParams.get("page") ?? 1);
       const size = Number(url.searchParams.get("pageSize") ?? 50);
@@ -87,5 +115,5 @@ export function fakeApi({ apiKey = "good-key", links = [] as Link[] } = {}) {
     return json(404, { title: "Not Found" });
   });
   vi.stubGlobal("fetch", fetchMock);
-  return { fetchMock, store };
+  return { fetchMock, store, state };
 }

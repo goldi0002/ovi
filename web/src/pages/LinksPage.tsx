@@ -6,13 +6,14 @@ import { AppLink } from "../router";
 import { button, card, container } from "../ui";
 
 interface Props {
-  api: OviApi | null;
-  onSignIn: () => void;
+  api: OviApi;
+  state: "loading" | "signedIn" | "signedOut";
+  onLogIn: () => void;
   onUnauthorized: () => void;
 }
 
 /** Every short link, with clicks, status and stats. */
-export function LinksPage({ api, onSignIn, onUnauthorized }: Props) {
+export function LinksPage({ api, state, onLogIn, onUnauthorized }: Props) {
   useEffect(() => {
     document.title = "Your links · Ovi";
     return () => {
@@ -30,14 +31,18 @@ export function LinksPage({ api, onSignIn, onUnauthorized }: Props) {
         </AppLink>
       </div>
 
-      {api ? (
+      {state === "loading" ? (
+        <p className="text-[0.8125rem] text-muted">Loading…</p>
+      ) : state === "signedIn" ? (
         <LinksTable api={api} onUnauthorized={onUnauthorized} />
       ) : (
         <section className={`${card} grid justify-items-center gap-2 px-6 py-12 text-center`}>
-          <h2 className="text-[0.9375rem] font-semibold">Sign in to see your links</h2>
-          <p className="max-w-sm text-[0.8125rem] text-muted">Your links are protected by your API key.</p>
-          <button type="button" className={button("primary", "md", "mt-3")} onClick={onSignIn}>
-            Enter API key
+          <h2 className="text-[0.9375rem] font-semibold">Log in to see your links</h2>
+          <p className="max-w-sm text-[0.8125rem] text-muted">
+            Sign in with Google or GitHub to keep your links, use custom codes and see click stats.
+          </p>
+          <button type="button" className={button("primary", "md", "mt-3")} onClick={onLogIn}>
+            Log in
           </button>
         </section>
       )}

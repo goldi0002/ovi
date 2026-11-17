@@ -34,6 +34,19 @@ export interface LinkStats {
   browsers: NamedCount[];
 }
 
+export type Provider = "google" | "github";
+
+export interface Session {
+  /** The signed-in account, or null. */
+  user: { name: string; email: string | null; provider: Provider } | null;
+  /** True when the request carried the admin API key. */
+  admin: boolean;
+  /** Sign-in providers turned on for this server. */
+  providers: Provider[];
+  /** How long links made without signing in last. */
+  anonymousLinkDays: number;
+}
+
 export interface CreateLinkInput {
   url: string;
   customCode?: string;
@@ -75,23 +88,42 @@ async function toError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, message, fieldErrors);
 }
 
+/**
+ * The Ovi API. Requests carry the session cookie (signed-in users) and, for the admin, the API key.
+ * X-Ovi-Request tells the server the request came from this app, not a form on another site.
+ */
 export class OviApi {
   constructor(
-    private readonly apiKey: string,
+    private readonly apiKey: string | null = null,
     private readonly baseUrl = "",
   ) {}
+
+  /** Whether this client acts as the admin. */
+  get isAdmin(): boolean {
+    return this.apiKey !== null;
+  }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const res = await fetch(`${this.baseUrl}${path}`, {
       ...init,
+      credentials: "same-origin",
       headers: {
-        "X-Api-Key": this.apiKey,
+        "X-Ovi-Request": "1",
+        ...(this.apiKey ? { "X-Api-Key": this.apiKey } : {}),
         ...(init.body ? { "Content-Type": "application/json" } : {}),
         ...init.headers,
       },
     });
     if (!res.ok) throw await toError(res);
     return (res.status === 204 ? undefined : await res.json()) as T;
+  }
+
+  session(): Promise<Session> {
+    return this.request("/api/session");
+  }
+
+  logout(): Promise<void> {
+    return this.request("/api/logout", { method: "POST" });
   }
 
   list(page = 1, pageSize = 20): Promise<Page<Link>> {
@@ -109,6 +141,11 @@ export class OviApi {
   remove(code: string): Promise<void> {
     return this.request(`/api/links/${encodeURIComponent(code)}`, { method: "DELETE" });
   }
+}
+
+/** Where the browser goes to sign in with a provider; it comes back to `returnTo` afterwards. */
+export function loginUrl(provider: Provider, returnTo: string): string {
+  return `/auth/login/${provider}?returnUrl=${encodeURIComponent(returnTo)}`;
 }
 
 export function isExpired(link: Link, now = new Date()): boolean {

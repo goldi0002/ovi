@@ -9,7 +9,7 @@ namespace Ovi.Api.Links;
 
 public static class LinkEndpoints
 {
-    public const int MaxUrlLength = 2048;
+    public const int MaxUrlLength = LinkRules.MaxUrlLength;
     public const int MaxPageSize = 100;
     public const int MaxStatsDays = 365;
     public const int TopN = 8;
@@ -22,8 +22,8 @@ public static class LinkEndpoints
     {
         var api = app.MapGroup("/api/links")
             .WithTags("Links")
-            .WithMetadata(new RequiresApiKey())
-            .AddEndpointFilter<ApiKeyFilter>();
+            .WithMetadata(new AcceptsApiKey())
+            .AddEndpointFilter<CallerFilter>();
 
         api.MapPost("/", CreateLink)
             .RequireRateLimiting(RateLimits.Create)
@@ -36,8 +36,9 @@ public static class LinkEndpoints
             .Produces<PagedResponse<LinkResponse>>()
             .ProducesValidationProblem();
 
-        api.MapGet("/{code}", async (string code, AppDbContext db, ShortUrlBuilder urls) =>
-            await db.Links.AsNoTracking().FirstOrDefaultAsync(l => l.Code == code) is { } link
+        api.MapGet("/{code}", async (string code, HttpContext http, AppDbContext db, ShortUrlBuilder urls) =>
+            Caller.From(http) is not { SignedIn: true } caller ? SignInRequired()
+            : await db.Links.AsNoTracking().VisibleTo(caller).FirstOrDefaultAsync(l => l.Code == code) is { } link
                 ? Results.Ok(LinkResponse.From(link, urls))
                 : Results.NotFound())
             .Produces<LinkResponse>()
@@ -49,8 +50,9 @@ public static class LinkEndpoints
             .Produces(StatusCodes.Status404NotFound);
 
         // Soft delete: the row stays, marked deleted, and disappears from every other endpoint.
-        api.MapDelete("/{code}", async (string code, AppDbContext db, TimeProvider time) =>
-            await db.Links.Where(l => l.Code == code)
+        api.MapDelete("/{code}", async (string code, HttpContext http, AppDbContext db, TimeProvider time) =>
+            Caller.From(http) is not { SignedIn: true } caller ? SignInRequired()
+            : await db.Links.VisibleTo(caller).Where(l => l.Code == code)
                 .ExecuteUpdateAsync(s => s.SetProperty(l => l.DeletedAt, time.GetUtcNow().UtcDateTime)) > 0
                 ? Results.NoContent()
                 : Results.NotFound())
@@ -104,11 +106,16 @@ public static class LinkEndpoints
         .Produces(StatusCodes.Status429TooManyRequests);
     }
 
+    private static IResult SignInRequired() =>
+        Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Sign in to see and manage your links.");
+
     private static IResult Expired() =>
         Results.Problem(statusCode: StatusCodes.Status410Gone, title: "This link has expired.");
 
-    private static async Task<IResult> LinkStats(string code, AppDbContext db, TimeProvider time, int days = 30)
+    private static async Task<IResult> LinkStats(string code, HttpContext http, AppDbContext db, TimeProvider time, int days = 30)
     {
+        if (Caller.From(http) is not { SignedIn: true } caller) return SignInRequired();
+
         if (days < 1 || days > MaxStatsDays)
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -117,7 +124,7 @@ public static class LinkEndpoints
             });
         }
 
-        var link = await db.Links.AsNoTracking().FirstOrDefaultAsync(l => l.Code == code);
+        var link = await db.Links.AsNoTracking().VisibleTo(caller).FirstOrDefaultAsync(l => l.Code == code);
         if (link is null) return Results.NotFound();
 
         var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
@@ -160,8 +167,10 @@ public static class LinkEndpoints
         return rows.Select(r => new NamedCount(r.Name!, r.Clicks)).ToList();
     }
 
-    private static async Task<IResult> ListLinks(AppDbContext db, ShortUrlBuilder urls, int page = 1, int pageSize = 50)
+    private static async Task<IResult> ListLinks(HttpContext http, AppDbContext db, ShortUrlBuilder urls, int page = 1, int pageSize = 50)
     {
+        if (Caller.From(http) is not { SignedIn: true } caller) return SignInRequired();
+
         if (page < 1 || pageSize < 1 || pageSize > MaxPageSize)
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -170,8 +179,9 @@ public static class LinkEndpoints
             });
         }
 
-        var total = await db.Links.CountAsync();
-        var links = await db.Links.AsNoTracking()
+        var visible = db.Links.AsNoTracking().VisibleTo(caller);
+        var total = await visible.CountAsync();
+        var links = await visible
             .OrderByDescending(l => l.CreatedAt).ThenByDescending(l => l.Id)
             .Skip((page - 1) * pageSize).Take(pageSize)
             .ToListAsync();
@@ -179,34 +189,69 @@ public static class LinkEndpoints
         return Results.Ok(new PagedResponse<LinkResponse>(links.Select(l => LinkResponse.From(l, urls)).ToList(), page, pageSize, total));
     }
 
-    private static async Task<IResult> CreateLink(CreateLinkRequest request, AppDbContext db, ShortUrlBuilder urls, TimeProvider time)
+    private static async Task<IResult> CreateLink(
+        CreateLinkRequest? request, HttpContext http, AppDbContext db, ShortUrlBuilder urls, TimeProvider time, IConfiguration config)
     {
+        if (request is null)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["body"] = ["Send a JSON body with a url."] });
+
+        var caller = Caller.From(http);
+        var anonymous = caller is Caller.Anonymous;
         var now = time.GetUtcNow().UtcDateTime;
         var errors = new Dictionary<string, string[]>();
 
+        var rawUrl = request.Url?.Trim();
         Uri? uri = null;
-        if (string.IsNullOrWhiteSpace(request.Url) || request.Url.Length > MaxUrlLength ||
-            !Uri.TryCreate(request.Url, UriKind.Absolute, out uri) ||
-            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        if (string.IsNullOrEmpty(rawUrl))
         {
-            errors["url"] = [$"Url must be an absolute http or https URL of at most {MaxUrlLength} characters."];
+            errors["url"] = ["Enter a URL to shorten."];
+        }
+        else if (rawUrl.Length > MaxUrlLength)
+        {
+            errors["url"] = [$"The URL is too long; the limit is {MaxUrlLength} characters."];
+        }
+        else if (!Uri.TryCreate(rawUrl, UriKind.Absolute, out uri) ||
+                 (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
+                 string.IsNullOrEmpty(uri.Host) || rawUrl.Any(char.IsWhiteSpace))
+        {
+            errors["url"] = ["Enter a full web address starting with http:// or https://."];
+        }
+        else if (!string.IsNullOrEmpty(uri.UserInfo))
+        {
+            // https://bank.com@evil.com looks like bank.com but goes to evil.com: a common phishing trick.
+            errors["url"] = ["URLs with a user name or password in them can't be shortened."];
         }
         else if (urls.IsSelf(uri))
         {
-            errors["url"] = ["Url can't point at this shortener."];
+            errors["url"] = ["That URL is already an Ovi link."];
+        }
+        else if (LinkRules.IsBlockedHost(uri.IdnHost, config))
+        {
+            errors["url"] = ["Links to this site can't be created."];
         }
 
         var code = request.CustomCode?.Trim();
-        if (!string.IsNullOrEmpty(code) && !CodeGenerator.IsValidCustomCode(code))
+        if (!string.IsNullOrEmpty(code))
         {
-            errors["customCode"] = ["Code must be 3-32 characters of letters, digits, '-' or '_', and not a reserved word."];
+            if (anonymous)
+                errors["customCode"] = ["Sign in to choose a custom code."];
+            else if (!CodeGenerator.IsValidCustomCode(code))
+                errors["customCode"] = ["Code must be 3-32 characters of letters, digits, '-' or '_', and not a reserved word."];
         }
 
         var expiresAt = request.ExpiresAt?.UtcDateTime;
+        var latestExpiry = anonymous ? now.AddDays(LinkRules.AnonymousLinkDays) : now.AddYears(LinkRules.MaxExpiryYears);
         if (expiresAt is { } e && e <= now)
         {
-            errors["expiresAt"] = ["ExpiresAt must be in the future."];
+            errors["expiresAt"] = ["The expiry date must be in the future."];
         }
+        else if (expiresAt > latestExpiry)
+        {
+            errors["expiresAt"] = [anonymous
+                ? $"Links made without signing in last at most {LinkRules.AnonymousLinkDays} days."
+                : $"The expiry date can be at most {LinkRules.MaxExpiryYears} years away."];
+        }
+        if (anonymous) expiresAt ??= latestExpiry;
 
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
@@ -223,7 +268,15 @@ public static class LinkEndpoints
             while (await allLinks.AnyAsync(l => l.Code == code));
         }
 
-        var link = new Link { Code = code, Url = uri!.ToString(), CreatedAt = now, ExpiresAt = expiresAt };
+        var link = new Link
+        {
+            Code = code,
+            Url = uri!.ToString(),
+            CreatedAt = now,
+            ExpiresAt = expiresAt,
+            OwnerId = (caller as Caller.User)?.Id,
+            Anonymous = anonymous,
+        };
         db.Links.Add(link);
         try
         {
