@@ -9,3 +9,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # The app targets .NET 10. Moving to a new major is a deliberate upgrade
+      # (TargetFramework, EF Core and Npgsql packages), not an image bump.
+      # Patch updates to the 10.0 digests still come through.
+      - dependency-name: dotnet/sdk
+        update-types: ["version-update:semver-major"]
+      - dependency-name: dotnet/aspnet
+        update-types: ["version-update:semver-major"]
