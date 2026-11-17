@@ -84,7 +84,7 @@ jobs:
       - name: Check licenses and vulnerabilities
         run: |
           node ../scripts/check-npm-licenses.mjs package-lock.json
-          npm audit --audit-level=high
+          node ../scripts/check-npm-audit.mjs
 
   # Builds the image for every change and smoke-tests it, but holds no push permission.
   docker:

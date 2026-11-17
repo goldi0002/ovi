@@ -272,7 +272,7 @@ Tests use MSTest and `WebApplicationFactory` with a fake clock (`FakeTimeProvide
 1. Builds in Release mode and runs the tests. Results are uploaded as a `test-results` artifact.
 2. Checks every NuGet package, including transitive ones, for a disallowed license or a known vulnerability (`scripts/check-packages.py`).
 3. Fails if the EF model has changed without a migration.
-4. Type-checks, tests and builds the web UI, checks npm licenses, and runs `npm audit`.
+4. Type-checks, tests and builds the web UI, checks npm licenses, and fails on high or critical npm advisories (`scripts/check-npm-audit.mjs`, which prints any advisory it accepts because it has no fix and can't reach shipped code).
 5. Builds the Docker image for every change and smoke-tests it against a Postgres next to it. A separate job pushes the image to GitHub Container Registry, only from `main`, so the build and smoke-test jobs never hold push permission. Actions are pinned to commit SHAs and the Docker base images to digests, so a moved tag can't change what runs or ships:
 
 ```bash
