@@ -78,22 +78,19 @@ export function App() {
     [api],
   );
 
-  const sectionTitle = "text-[clamp(1.75rem,4vw,2.5rem)] font-extrabold tracking-tight";
-  const sectionLead = "mx-auto mt-2 max-w-[40rem] text-lg text-muted";
+  const sectionTitle = "text-[clamp(1.6rem,4vw,2.25rem)] font-extrabold tracking-[-0.03em] text-balance";
+  const sectionLead = "mx-auto mt-2 max-w-[38rem] text-[0.98rem] text-muted text-pretty sm:text-lg";
 
   return (
     <>
-      <div className="relative isolate min-h-screen overflow-x-clip" id="home">
+      <div className="relative isolate flex min-h-dvh flex-col overflow-x-clip" id="home">
+        {/* Soft accent glow behind the hero, clipped to the top of the page. */}
         <div
-          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] mask-b-from-55%"
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[560px] overflow-hidden mask-b-from-75%"
           aria-hidden="true"
         >
-          <svg viewBox="0 0 1440 520" preserveAspectRatio="none" className="block size-full">
-            <path className="fill-wave-a" d="M0 190C170 175 280 300 360 520H0Z" />
-            <path className="fill-wave-b" d="M0 250C150 250 250 360 300 520H0Z" />
-            <path className="fill-wave-a" d="M1440 90C1340 150 1290 330 1170 520H1440Z" />
-            <path className="fill-wave-b" d="M1440 200C1370 260 1330 400 1260 520H1440Z" />
-          </svg>
+          <div className="absolute top-[-300px] left-1/2 h-[540px] w-[min(1100px,140vw)] -translate-x-1/2 rounded-full bg-accent-soft blur-[100px]" />
+          <div className="absolute top-[60px] right-[-8%] h-[280px] w-[360px] rounded-full bg-accent-soft/70 blur-[90px]" />
         </div>
 
         <Header
@@ -108,69 +105,79 @@ export function App() {
         {path === "/links" ? (
           <LinksPage api={api} onSignIn={() => setSignInOpen(true)} onUnauthorized={signOut} />
         ) : (
-          <main>
-            <section className="mx-auto max-w-[820px] px-4 pt-8 pb-14 text-center max-sm:pt-6 max-sm:pb-8">
-              <p className="inline-flex items-center gap-2 rounded-full border border-line bg-accent-soft px-[1.1rem] py-[0.45rem] font-semibold max-sm:text-[0.9rem]">
-                <LinkIcon className="size-5 text-accent" />
-                URL Shortener by Ovi
+          <main className="flex-1">
+            <section className="mx-auto w-full max-w-[860px] px-4 pt-10 pb-8 text-center sm:px-6 sm:pt-16 sm:pb-10 lg:pt-20">
+              <p className="inline-flex items-center gap-2 rounded-full border border-line bg-surface/70 px-4 py-1.5 text-[0.82rem] font-semibold text-muted shadow-xs backdrop-blur sm:text-sm">
+                <LinkIcon className="size-4 text-accent" />
+                URL shortener by Ovi
               </p>
-              <h1 className="mt-5 mb-3 text-[clamp(2.75rem,8vw,5.25rem)] leading-[1.05] font-extrabold tracking-[-0.04em]">
-                URL <span className="text-accent-ink">Shortener</span>
+              <h1 className="mt-5 text-[clamp(2.5rem,9vw,4.75rem)] leading-[1.04] font-extrabold tracking-[-0.045em] text-balance">
+                URL{" "}
+                <span className="bg-linear-to-br from-accent to-accent-ink bg-clip-text text-transparent">
+                  Shortener
+                </span>
               </h1>
-              <p className="mx-auto max-w-xl text-[clamp(1.1rem,2.4vw,1.5rem)] text-muted">
+              <p className="mx-auto mt-4 max-w-[34rem] text-[clamp(1rem,2.4vw,1.3rem)] text-muted text-pretty">
                 Turn long, messy URLs into short, clean, and shareable links in seconds.
               </p>
             </section>
 
-            <div className="mx-auto grid max-w-[1200px] gap-8 px-4 pb-16">
-              <ShortenCard
-                getApi={getApi}
-                onUnauthorized={signOut}
-                onCreated={setCreated}
-              />
+            <div className="mx-auto grid w-full max-w-[1120px] gap-6 px-4 pb-16 sm:gap-8 sm:px-6 sm:pb-20">
+              <ShortenCard getApi={getApi} onUnauthorized={signOut} onCreated={setCreated} />
 
               {created && <LinkResult link={created} onDismiss={() => setCreated(null)} />}
 
-              <section
-                id="features"
-                className="grid grid-cols-3 gap-8 max-lg:grid-cols-1 max-lg:gap-4"
-                aria-labelledby="features-title"
-              >
-                <h2 id="features-title" className="sr-only">
-                  Features
-                </h2>
-                {FEATURES.map(({ icon: FeatureIcon, title, text }) => (
-                  <article key={title} className={`${card} flex items-center gap-6 p-7 max-sm:gap-4 max-sm:p-5`}>
-                    <span className={`${iconBubble} size-20 max-sm:size-15`}>
-                      <FeatureIcon className="size-10 max-sm:size-7" />
-                    </span>
-                    <div>
-                      <h3 className="mb-1 text-[1.3rem] font-bold tracking-tight">{title}</h3>
-                      <p className="text-muted">{text}</p>
-                    </div>
-                  </article>
-                ))}
+              <section id="features" className="pt-6 sm:pt-10" aria-labelledby="features-title">
+                <div className="mb-6 text-center sm:mb-8">
+                  <h2 id="features-title" className={sectionTitle}>
+                    Features
+                  </h2>
+                  <p className={sectionLead}>Everything you need to share a link and see how it does.</p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  {FEATURES.map(({ icon: FeatureIcon, title, text }) => (
+                    <article
+                      key={title}
+                      className={`${card} flex flex-col gap-4 p-5 transition-colors hover:border-line-strong sm:p-6`}
+                    >
+                      <span className={`${iconBubble} size-12`}>
+                        <FeatureIcon className="size-6" />
+                      </span>
+                      <div>
+                        <h3 className="text-[1.1rem] font-bold tracking-tight">{title}</h3>
+                        <p className="mt-1 text-[0.95rem] text-muted text-pretty">{text}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
               </section>
 
-              <section id="pricing" className="pt-8 text-center" aria-labelledby="pricing-title">
-                <h2 id="pricing-title" className={sectionTitle}>
-                  Pricing
-                </h2>
-                <p className={`${sectionLead} mb-7`}>One plan, with everything in it.</p>
+              <section id="pricing" className="pt-8 sm:pt-12" aria-labelledby="pricing-title">
+                <div className="mb-6 text-center sm:mb-8">
+                  <h2 id="pricing-title" className={sectionTitle}>
+                    Pricing
+                  </h2>
+                  <p className={sectionLead}>One plan, with everything in it.</p>
+                </div>
                 <div
-                  className={`${card} mx-auto grid max-w-[820px] grid-cols-2 items-center gap-8 rounded-3xl px-9 py-8 text-left max-sm:grid-cols-1 max-sm:gap-5 max-sm:p-6`}
+                  className={`${card} mx-auto grid max-w-[860px] gap-6 rounded-3xl p-6 text-left sm:p-8 md:grid-cols-2 md:items-center md:gap-10`}
                 >
                   <div>
                     <p className="font-bold text-accent-ink">Self-hosted</p>
-                    <p className="text-5xl leading-[1.2] font-extrabold tracking-[-0.03em]">
-                      $0 <span className="text-base font-medium tracking-normal text-muted">forever</span>
+                    <p className="mt-1 text-[clamp(2.25rem,6vw,3rem)] leading-[1.15] font-extrabold tracking-[-0.03em]">
+                      $0 <span className="text-sm font-medium tracking-normal text-muted">forever</span>
                     </p>
-                    <p className="text-muted">You only pay for the server and database you run it on.</p>
+                    <p className="mt-2 text-[0.95rem] text-muted text-pretty">
+                      You only pay for the server and database you run it on.
+                    </p>
                   </div>
-                  <ul className="grid gap-3">
+                  <ul className="grid gap-2.5 text-[0.95rem]">
                     {INCLUDED.map((item) => (
-                      <li key={item} className="flex items-center gap-2.5">
-                        <Check className="size-6 shrink-0 rounded-full bg-accent-soft p-1 text-accent" strokeWidth={3} />
+                      <li key={item} className="flex items-start gap-2.5">
+                        <Check
+                          className="mt-0.5 size-5 shrink-0 rounded-full bg-accent-soft p-1 text-accent"
+                          strokeWidth={3}
+                        />
                         {item}
                       </li>
                     ))}
@@ -178,23 +185,25 @@ export function App() {
                 </div>
               </section>
 
-              <section id="about" className="pt-8 text-center" aria-labelledby="about-title">
-                <h2 id="about-title" className={sectionTitle}>
-                  About Ovi
-                </h2>
-                <p className={sectionLead}>
-                  Ovi is a small URL shortener: an ASP.NET Core API with a PostgreSQL database, and this React app as
-                  its interface. Short links redirect instantly, count their clicks, come with a QR code and can expire
-                  on a date you choose.
-                </p>
+              <section id="about" className="pt-8 sm:pt-12" aria-labelledby="about-title">
+                <div className={`${card} mx-auto max-w-[860px] rounded-3xl px-6 py-8 text-center sm:px-10 sm:py-10`}>
+                  <h2 id="about-title" className={sectionTitle}>
+                    About Ovi
+                  </h2>
+                  <p className={`${sectionLead} max-w-[44rem]`}>
+                    Ovi is a small URL shortener: an ASP.NET Core API with a PostgreSQL database, and this React app as
+                    its interface. Short links redirect instantly, count their clicks, come with a QR code and can
+                    expire on a date you choose.
+                  </p>
+                </div>
               </section>
             </div>
           </main>
         )}
 
-        <footer className="mx-auto flex max-w-[1200px] items-center justify-between gap-4 border-t border-line px-4 pt-6 pb-8 text-[0.9rem]">
+        <footer className="mx-auto flex w-full max-w-[1120px] flex-col items-center justify-between gap-2 border-t border-line px-4 pt-6 pb-8 text-[0.85rem] text-muted sm:flex-row sm:px-6">
           <Brand small />
-          <span className="text-muted">© {new Date().getFullYear()} Ovi</span>
+          <span>© {new Date().getFullYear()} Ovi</span>
         </footer>
       </div>
 
