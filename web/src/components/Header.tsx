@@ -1,5 +1,5 @@
-import { Link as LinkIcon, List, Moon, Sun } from "lucide-react";
-import { useState } from "react";
+import { Link as LinkIcon, Menu, Moon, Sun, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { AppLink } from "../router";
 import type { Theme } from "../theme";
 import { button, focusRing, iconButton } from "../ui";
@@ -11,6 +11,8 @@ const NAV = [
   { href: "/#about", label: "About" },
   { href: "/links", label: "Links" },
 ];
+
+const DESKTOP_QUERY = "(min-width: 64rem)";
 
 interface Props {
   /** The current page path, to highlight the Links item. */
@@ -25,70 +27,145 @@ interface Props {
 export function Header({ path, theme, onToggleTheme, signedIn, onGetStarted, onSignOut }: Props) {
   // Which home-page section was picked last; on another page, that page's item is active.
   const [section, setSection] = useState("/#home");
+  const [menuOpen, setMenuOpen] = useState(false);
   const active = path === "/" ? section : path;
-  const headerButton = "max-sm:px-4 max-sm:py-2.5 max-sm:text-[0.95rem]";
+  const headerRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  // A page change (including one from the mobile menu) closes the menu.
+  useEffect(() => setMenuOpen(false), [path]);
+
+  // The mobile menu closes on Escape, on a click outside the header, and as soon as the layout is desktop-wide.
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setMenuOpen(false);
+      menuButtonRef.current?.focus();
+    };
+    const onPointerDown = (e: Event) => {
+      if (!headerRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const desktop = window.matchMedia(DESKTOP_QUERY);
+    const onLayoutChange = () => {
+      if (desktop.matches) setMenuOpen(false);
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    desktop.addEventListener("change", onLayoutChange);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+      desktop.removeEventListener("change", onLayoutChange);
+    };
+  }, [menuOpen]);
 
   return (
-    <header className="mx-auto grid max-w-[1200px] grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 py-[1.1rem] max-lg:grid-cols-[auto_1fr] max-sm:py-3">
-      <Brand href="/#home" onClick={() => setSection("/#home")} />
-      <nav className="flex gap-1 max-lg:hidden" aria-label="Main">
-        {NAV.map((item) => {
-          const isActive = active === item.href;
-          return (
-            <AppLink
-              key={item.href}
-              href={item.href}
-              className={`rounded-full px-5 py-2.5 text-[1.05rem] ${focusRing} ${
-                isActive ? "bg-accent-soft font-semibold text-accent-ink" : "font-medium text-ink hover:bg-accent-soft"
-              }`}
-              aria-current={isActive ? (item.href === "/links" ? "page" : "location") : undefined}
-              onClick={() => setSection(item.href)}
-            >
-              {item.label}
-            </AppLink>
-          );
-        })}
-      </nav>
-      <div className="flex items-center justify-end gap-5 max-sm:gap-2.5">
-        {/* The nav is hidden on small screens, so the Links page gets its own button there. */}
-        <AppLink
-          href="/links"
-          className={`${iconButton} lg:hidden ${path === "/links" ? "border-accent text-accent-ink" : ""}`}
-          aria-label="Your links"
-          aria-current={path === "/links" ? "page" : undefined}
-        >
-          <List className="size-6 max-sm:size-5" />
-        </AppLink>
-        <button
-          type="button"
-          className={iconButton}
-          onClick={onToggleTheme}
-          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-        >
-          {theme === "dark" ? <Sun className="size-6 max-sm:size-5" /> : <Moon className="size-6 max-sm:size-5" />}
-        </button>
-        {signedIn ? (
-          <button type="button" className={button("default", "md", headerButton)} onClick={onSignOut}>
-            Sign out
+    <header ref={headerRef} className="sticky top-0 z-20 border-b border-line/80 bg-page/85 backdrop-blur-md">
+      <div className="mx-auto flex w-full max-w-[1120px] items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <Brand href="/#home" onClick={() => setSection("/#home")} />
+
+        <nav className="hidden items-center gap-1 lg:flex" aria-label="Main">
+          {NAV.map((item) => {
+            const isActive = active === item.href;
+            return (
+              <AppLink
+                key={item.href}
+                href={item.href}
+                className={`rounded-full px-4 py-2 text-[0.95rem] transition-colors ${focusRing} ${
+                  isActive
+                    ? "bg-accent-soft font-semibold text-accent-ink"
+                    : "font-medium text-ink hover:bg-accent-soft/70"
+                }`}
+                aria-current={isActive ? (item.href === "/links" ? "page" : "location") : undefined}
+                onClick={() => setSection(item.href)}
+              >
+                {item.label}
+              </AppLink>
+            );
+          })}
+        </nav>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className={iconButton}
+            onClick={onToggleTheme}
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
           </button>
-        ) : (
-          <button type="button" className={button("primary", "md", headerButton)} onClick={onGetStarted}>
-            Get Started
+          {signedIn ? (
+            <button type="button" className={button("default", "md")} onClick={onSignOut}>
+              Sign out
+            </button>
+          ) : (
+            <button type="button" className={button("primary", "md")} onClick={onGetStarted}>
+              Get Started
+            </button>
+          )}
+          <button
+            ref={menuButtonRef}
+            type="button"
+            className={`${iconButton} lg:hidden`}
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-nav"
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+          >
+            {menuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
           </button>
-        )}
+        </div>
       </div>
+
+      {menuOpen && (
+        <nav
+          id="mobile-nav"
+          aria-label="Mobile"
+          className="border-t border-line bg-page px-4 pt-2 pb-4 sm:px-6 lg:hidden"
+        >
+          <ul className="grid gap-1">
+            {NAV.map((item) => {
+              const isActive = active === item.href;
+              return (
+                <li key={item.href}>
+                  <AppLink
+                    href={item.href}
+                    className={`block rounded-xl px-4 py-3 text-base ${focusRing} ${
+                      isActive
+                        ? "bg-accent-soft font-semibold text-accent-ink"
+                        : "font-medium text-ink hover:bg-accent-soft/70"
+                    }`}
+                    aria-current={isActive ? (item.href === "/links" ? "page" : "location") : undefined}
+                    onClick={() => {
+                      setSection(item.href);
+                      setMenuOpen(false);
+                    }}
+                  >
+                    {item.label}
+                  </AppLink>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      )}
     </header>
   );
 }
 
 /** The Ovi wordmark: a chain-link icon and the name. */
 export function Brand({ href, onClick, small = false }: { href?: string; onClick?: () => void; small?: boolean }) {
-  const className = `inline-flex items-center gap-2.5 font-extrabold tracking-[-0.03em] text-ink ${
-    small ? "text-[1.15rem]" : `text-[1.85rem] max-sm:text-2xl ${focusRing} rounded-lg`
+  const className = `inline-flex items-center gap-2 font-extrabold tracking-[-0.03em] text-ink ${
+    small ? "text-[1.05rem]" : `text-[1.5rem] sm:text-[1.7rem] ${focusRing} rounded-lg`
   }`;
   const content = (
     <>
-      <LinkIcon className="size-[1.2em] text-accent" strokeWidth={2.4} />
+      <LinkIcon className="size-[1.15em] text-accent" strokeWidth={2.4} />
       <span>Ovi</span>
     </>
   );

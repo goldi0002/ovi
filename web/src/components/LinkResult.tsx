@@ -7,31 +7,31 @@ import { CopyButton } from "./CopyButton";
 export function LinkResult({ link, onDismiss }: { link: Link; onDismiss: () => void }) {
   return (
     <section
-      className={`${card} flex w-full max-w-[1100px] items-center gap-6 justify-self-center border-accent p-6 max-sm:flex-col max-sm:items-stretch max-sm:text-center`}
+      className={`${card} flex w-full justify-self-center gap-5 rounded-2xl border-accent p-4 sm:items-center sm:gap-6 sm:p-6 max-sm:flex-col max-sm:text-center`}
       aria-live="polite"
       aria-label="New short link"
     >
       <img
-        className="shrink-0 rounded-[10px] border border-line bg-white p-1.5 max-sm:self-center"
+        className="shrink-0 self-center rounded-xl border border-line bg-white p-1.5 sm:self-auto"
         src={link.qrCodeUrl}
         alt={`QR code for ${link.shortUrl}`}
-        width={120}
-        height={120}
+        width={112}
+        height={112}
       />
-      <div className="grid min-w-0 gap-1.5">
-        <p className="text-muted">Your short link is ready</p>
+      <div className="grid min-w-0 flex-1 gap-1">
+        <p className="text-sm font-semibold text-ok-ink">Your short link is ready</p>
         <a
-          className="text-2xl font-bold break-all text-accent-ink hover:underline"
+          className="text-xl font-bold break-all text-accent-ink hover:underline sm:text-2xl"
           href={link.shortUrl}
           target="_blank"
           rel="noreferrer"
         >
           {link.shortUrl}
         </a>
-        <p className="truncate text-sm text-muted" title={link.url}>
+        <p className="truncate text-[0.85rem] text-muted" title={link.url}>
           → {link.url}
         </p>
-        <div className="mt-1.5 flex flex-wrap gap-1.5 max-sm:justify-center">
+        <div className="mt-2 flex flex-wrap gap-1.5 max-sm:justify-center">
           <CopyButton text={link.shortUrl} primary />
           <a className={button("default", "sm")} href={link.qrCodeUrl} download={`${link.code}-qr.png`}>
             <Download />

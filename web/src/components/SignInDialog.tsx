@@ -1,6 +1,6 @@
+import { KeyRound } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { ApiError, OviApi } from "../api";
-import { KeyRound } from "lucide-react";
 import { backdrop, button, card, errorBox, field, iconBubble, input } from "../ui";
 import { useModal } from "./useModal";
 
@@ -39,19 +39,19 @@ export function SignInDialog({ onSignedIn, onCancel }: Props) {
   return (
     <div className={backdrop} onMouseDown={(e) => e.target === e.currentTarget && onCancel()}>
       <form
-        className={`${card} grid w-full max-w-[420px] gap-4 rounded-3xl p-8 text-center`}
+        className={`${card} grid w-full max-w-[420px] gap-4 rounded-3xl p-6 text-center sm:p-8`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="sign-in-title"
         onSubmit={submit}
       >
-        <span className={`${iconBubble} size-16 justify-self-center`}>
-          <KeyRound className="size-8" />
+        <span className={`${iconBubble} size-14 justify-self-center`}>
+          <KeyRound className="size-7" />
         </span>
         <h2 id="sign-in-title" className="text-xl font-bold tracking-tight">
           Sign in to Ovi
         </h2>
-        <p className="text-muted">Enter your API key to create and manage short links.</p>
+        <p className="text-[0.95rem] text-muted">Enter your API key to create and manage short links.</p>
         <label className={field}>
           <span>API key</span>
           <input
@@ -64,7 +64,7 @@ export function SignInDialog({ onSignedIn, onCancel }: Props) {
             className={input}
           />
         </label>
-        <label className="flex items-center gap-2 text-left text-[0.95rem]">
+        <label className="flex items-center gap-2 text-left text-[0.9rem]">
           <input
             type="checkbox"
             checked={remember}

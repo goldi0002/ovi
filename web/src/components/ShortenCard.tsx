@@ -2,7 +2,7 @@ import { Link as LinkIcon, Minus, Plus, Scissors } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { ApiError, type Link, type OviApi } from "../api";
 import { localInputToIso } from "../format";
-import { button, card, errorBox, field, focusRing, input } from "../ui";
+import { button, card, errorBox, field, focusRing, iconBubble, input } from "../ui";
 
 interface Props {
   /** Returns a signed-in client, asking for the API key first if needed; null if the user cancels. */
@@ -50,21 +50,23 @@ export function ShortenCard({ getApi, onCreated, onUnauthorized }: Props) {
   return (
     <section
       id="shorten"
-      className={`${card} w-full max-w-[1100px] justify-self-center rounded-3xl px-10 py-9 max-sm:px-5 max-sm:py-6`}
+      className={`${card} w-full scroll-mt-24 justify-self-center rounded-3xl p-5 sm:p-7 lg:p-9`}
       aria-labelledby="shorten-title"
     >
       <h2
         id="shorten-title"
-        className="mb-6 flex items-center gap-4 text-[clamp(1.5rem,3vw,2rem)] font-bold tracking-tight"
+        className="mb-5 flex items-center gap-3 text-[clamp(1.3rem,3.4vw,1.75rem)] font-bold tracking-[-0.02em]"
       >
-        <LinkIcon className="size-12 shrink-0 text-accent max-sm:size-9" strokeWidth={2.3} />
+        <span className={`${iconBubble} size-10 sm:size-11`}>
+          <LinkIcon className="size-5" strokeWidth={2.4} />
+        </span>
         Shorten a URL
       </h2>
       <form onSubmit={submit} aria-label="Create a short link" className="grid gap-3.5">
-        <div className="flex gap-5 max-sm:flex-col max-sm:gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <label className="relative min-w-0 flex-1">
             <span className="sr-only">Long URL</span>
-            <LinkIcon className="pointer-events-none absolute top-1/2 left-5 size-6 -translate-y-1/2 text-muted" />
+            <LinkIcon className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-muted" />
             <input
               type="url"
               inputMode="url"
@@ -73,10 +75,10 @@ export function ShortenCard({ getApi, onCreated, onUnauthorized }: Props) {
               onChange={(e) => setUrl(e.target.value)}
               required
               maxLength={2048}
-              className={`${input} min-h-16 rounded-xl pl-[3.6rem] text-xl max-sm:min-h-14 max-sm:text-[1.05rem]`}
+              className={`${input} min-h-14 pl-12 text-base sm:text-[1.05rem]`}
             />
           </label>
-          <button className={button("primary", "lg")} type="submit" disabled={saving}>
+          <button className={button("primary", "lg", "w-full sm:w-auto")} type="submit" disabled={saving}>
             <Scissors />
             {saving ? "Shortening…" : "Shorten URL"}
           </button>
@@ -84,7 +86,7 @@ export function ShortenCard({ getApi, onCreated, onUnauthorized }: Props) {
 
         <button
           type="button"
-          className={`inline-flex cursor-pointer items-center gap-1 justify-self-start rounded py-1 text-[0.95rem] font-medium text-accent-ink hover:underline ${focusRing}`}
+          className={`inline-flex cursor-pointer items-center gap-1 justify-self-start rounded py-1 text-[0.9rem] font-medium text-accent-ink hover:underline ${focusRing}`}
           aria-expanded={showOptions}
           aria-controls="shorten-options"
           onClick={() => setShowOptions((v) => !v)}
@@ -94,7 +96,7 @@ export function ShortenCard({ getApi, onCreated, onUnauthorized }: Props) {
         </button>
 
         {showOptions && (
-          <div id="shorten-options" className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+          <div id="shorten-options" className="grid gap-4 sm:grid-cols-2">
             <label className={field}>
               <span>
                 Custom code <em className="font-normal text-muted not-italic">(optional)</em>

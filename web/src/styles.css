@@ -17,8 +17,6 @@
   --color-accent-hover: #4b20c4;
   --color-accent-ink: #4a1fc7;
   --color-accent-soft: #efebfd;
-  --color-wave-a: #ece7fc;
-  --color-wave-b: #f3f0fd;
   --color-danger: #c62828;
   --color-error-bg: #fdecec;
   --color-ok-bg: #e7f6ec;
@@ -27,8 +25,8 @@
   --color-warn-ink: #8a5300;
   --color-off-bg: #eeedf4;
 
-  --shadow-card: 0 1px 2px rgb(40 24 110 / 4%), 0 8px 28px rgb(40 24 110 / 7%);
-  --shadow-btn: 0 6px 18px rgb(91 43 224 / 28%);
+  --shadow-card: 0 1px 2px rgb(40 24 110 / 5%), 0 10px 30px -12px rgb(40 24 110 / 18%);
+  --shadow-btn: 0 8px 20px -8px rgb(91 43 224 / 55%);
 }
 
 [data-theme="dark"] {
@@ -43,8 +41,6 @@
   --color-accent-hover: #8466f5;
   --color-accent-ink: #a993ff;
   --color-accent-soft: #241f44;
-  --color-wave-a: #1c1834;
-  --color-wave-b: #16132b;
   --color-danger: #ff7b7b;
   --color-error-bg: #3a1a1f;
   --color-ok-bg: #12301f;
@@ -53,6 +49,16 @@
   --color-warn-ink: #f4c46b;
   --color-off-bg: #24213a;
 
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 30%);
-  --shadow-btn: 0 6px 18px rgb(115 80 240 / 30%);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 35%), 0 10px 30px -12px rgb(0 0 0 / 45%);
+  --shadow-btn: 0 8px 20px -8px rgb(115 80 240 / 60%);
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  ::selection {
+    background-color: var(--color-accent-soft);
+  }
 }
