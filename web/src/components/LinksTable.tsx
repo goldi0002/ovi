@@ -151,13 +151,13 @@ export function LinksTable({ api, onUnauthorized }: Props) {
             className={`${input} h-8 text-[0.8125rem]`}
           />
         </label>
-        <div className="flex rounded-lg bg-black/[0.06] p-0.5 max-sm:w-full" role="group" aria-label="Status">
+        <div className="flex rounded-lg bg-segment p-0.5 max-sm:w-full" role="group" aria-label="Status">
           {STATUSES.map((s) => (
             <button
               key={s.value}
               type="button"
               className={`cursor-pointer rounded-md px-3 py-1 text-[0.8125rem] font-medium whitespace-nowrap max-sm:flex-1 max-sm:px-2 ${focusRing} ${
-                status === s.value ? "bg-white text-ink shadow-control" : "text-muted hover:text-ink"
+                status === s.value ? "bg-segment-on text-ink shadow-control" : "text-muted hover:text-ink"
               }`}
               aria-pressed={status === s.value}
               onClick={() => changeStatus(s.value)}
