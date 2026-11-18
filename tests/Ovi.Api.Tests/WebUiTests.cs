@@ -10,7 +10,8 @@ public sealed class WebUiTests
     private static string FakeBuiltUi()
     {
         var root = Directory.CreateTempSubdirectory("ovi-ui-").FullName;
-        File.WriteAllText(Path.Combine(root, "index.html"), "<!doctype html><title>Ovi</title><div id=root></div>");
+        File.WriteAllText(Path.Combine(root, "index.html"),
+            "<!doctype html><html><head><title>Ovi</title></head><body><div id=root></div></body></html>");
         File.WriteAllText(Path.Combine(root, "favicon.svg"), "<svg xmlns='http://www.w3.org/2000/svg'/>");
         Directory.CreateDirectory(Path.Combine(root, "assets"));
         File.WriteAllText(Path.Combine(root, "assets", "index-abc123.js"), "console.log('ovi')");
@@ -86,6 +87,61 @@ public sealed class WebUiTests
     {
         using var factory = new OviApiFactory();
         Assert.AreEqual(HttpStatusCode.NotFound, (await factory.CreateUnauthedClient().GetAsync("/")).StatusCode);
+    }
+
+    [TestMethod]
+    public async Task Home_page_gets_an_absolute_canonical_and_the_other_pages_do_not()
+    {
+        using var factory = new OviApiFactory(webRoot: FakeBuiltUi());
+        var client = factory.CreateUnauthedClient();
+
+        var home = await client.GetAsync("/");
+        var origin = home.RequestMessage!.RequestUri!.GetLeftPart(UriPartial.Authority);
+        var body = await home.Content.ReadAsStringAsync();
+        Assert.Contains($"<link rel=\"canonical\" href=\"{origin}/\">", body);
+        Assert.Contains($"<meta property=\"og:url\" content=\"{origin}/\">", body);
+
+        Assert.DoesNotContain("canonical", await (await client.GetAsync("/links")).Content.ReadAsStringAsync());
+    }
+
+    [TestMethod]
+    public async Task Only_the_home_page_is_indexable()
+    {
+        using var factory = new OviApiFactory(webRoot: FakeBuiltUi());
+        var client = factory.CreateUnauthedClient();
+
+        Assert.IsFalse((await client.GetAsync("/")).Headers.Contains("X-Robots-Tag"));
+
+        var links = await client.GetAsync("/links");
+        Assert.AreEqual("noindex, follow", links.Headers.GetValues("X-Robots-Tag").Single());
+        var admin = await client.GetAsync("/admin");
+        Assert.AreEqual("noindex, follow", admin.Headers.GetValues("X-Robots-Tag").Single());
+    }
+
+    [TestMethod]
+    public async Task Robots_points_at_a_sitemap_on_the_same_origin()
+    {
+        using var factory = new OviApiFactory(webRoot: FakeBuiltUi());
+        var res = await factory.CreateUnauthedClient().GetAsync("/robots.txt");
+
+        Assert.AreEqual(HttpStatusCode.OK, res.StatusCode);
+        Assert.AreEqual("text/plain", res.Content.Headers.ContentType!.MediaType);
+        var origin = res.RequestMessage!.RequestUri!.GetLeftPart(UriPartial.Authority);
+        var body = await res.Content.ReadAsStringAsync();
+        Assert.Contains("Disallow: /api/", body);
+        Assert.Contains($"Sitemap: {origin}/sitemap.xml", body);
+    }
+
+    [TestMethod]
+    public async Task Sitemap_lists_the_home_page()
+    {
+        using var factory = new OviApiFactory(webRoot: FakeBuiltUi());
+        var res = await factory.CreateUnauthedClient().GetAsync("/sitemap.xml");
+
+        Assert.AreEqual(HttpStatusCode.OK, res.StatusCode);
+        Assert.AreEqual("application/xml", res.Content.Headers.ContentType!.MediaType);
+        var origin = res.RequestMessage!.RequestUri!.GetLeftPart(UriPartial.Authority);
+        Assert.Contains($"<loc>{origin}/</loc>", await res.Content.ReadAsStringAsync());
     }
 
     [TestMethod]

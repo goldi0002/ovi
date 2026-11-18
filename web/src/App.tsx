@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, OviApi, type Link, type Session } from "./api";
 import { Header } from "./components/Header";
+import { Faq } from "./components/Faq";
 import { LinkResult } from "./components/LinkResult";
 import { LoginDialog } from "./components/LoginDialog";
 import { ShortenCard } from "./components/ShortenCard";
@@ -142,6 +143,8 @@ export function App() {
               </div>
               {created && <LinkResult link={created} signedIn={signedIn} onDismiss={() => setCreated(null)} />}
             </div>
+
+            <Faq />
           </main>
         )}
 
