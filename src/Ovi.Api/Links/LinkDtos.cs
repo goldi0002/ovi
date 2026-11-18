@@ -8,6 +8,14 @@ namespace Ovi.Api.Links;
 /// <param name="ExpiresAt">Optional time (with offset, e.g. 2030-01-01T00:00:00Z) after which the link stops redirecting.</param>
 public record CreateLinkRequest(string Url, string? CustomCode = null, DateTimeOffset? ExpiresAt = null);
 
+/// <summary>
+/// Changes to a link; leave a field out (or null) to keep it as it is. The code, clicks and stats never change.
+/// </summary>
+/// <param name="Url">New absolute http or https URL to redirect to, checked like a new link's.</param>
+/// <param name="ExpiresAt">New expiry time (with offset). Must be in the future.</param>
+/// <param name="ClearExpiry">True to remove the expiry so the link never expires; can't be combined with ExpiresAt.</param>
+public record UpdateLinkRequest(string? Url = null, DateTimeOffset? ExpiresAt = null, bool ClearExpiry = false);
+
 public record LinkResponse(
     string Code,
     string ShortUrl,

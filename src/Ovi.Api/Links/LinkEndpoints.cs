@@ -51,6 +51,13 @@ public static class LinkEndpoints
             .ProducesValidationProblem()
             .Produces(StatusCodes.Status404NotFound);
 
+        api.MapPatch("/{code}", UpdateLink)
+            .RequireRateLimiting(RateLimits.Create)
+            .Produces<LinkResponse>()
+            .ProducesValidationProblem()
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status429TooManyRequests);
+
         // Soft delete: the row stays, marked deleted, and disappears from every other endpoint.
         api.MapDelete("/{code}", async (string code, HttpContext http, AppDbContext db, TimeProvider time) =>
             Caller.From(http) is not { SignedIn: true } caller ? SignInRequired()
@@ -193,19 +200,41 @@ public static class LinkEndpoints
         return rows.Select(r => new NamedCount(r.Name!, r.Clicks)).ToList();
     }
 
-    private static async Task<IResult> ListLinks(HttpContext http, AppDbContext db, ShortUrlBuilder urls, int page = 1, int pageSize = 50)
+    /// <param name="q">Optional search: links whose code or destination contains this, ignoring case (max 100 characters).</param>
+    /// <param name="status">"all" (the default), "active" (not expired) or "expired".</param>
+    private static async Task<IResult> ListLinks(HttpContext http, AppDbContext db, ShortUrlBuilder urls, TimeProvider time,
+        int page = 1, int pageSize = 50, string? q = null, string? status = null)
     {
         if (Caller.From(http) is not { SignedIn: true } caller) return SignInRequired();
 
+        var errors = new Dictionary<string, string[]>();
         if (page < 1 || page > MaxPage || pageSize < 1 || pageSize > MaxPageSize)
+            errors["paging"] = [$"page must be between 1 and {MaxPage} and pageSize between 1 and {MaxPageSize}."];
+        if (q?.Trim().Length > Search.MaxLength)
+            errors["q"] = [$"The search can be at most {Search.MaxLength} characters."];
+        var filter = status?.Trim().ToLowerInvariant() switch
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["paging"] = [$"page must be between 1 and {MaxPage} and pageSize between 1 and {MaxPageSize}."]
-            });
-        }
+            null or "" or "all" => StatusFilter.All,
+            "active" => StatusFilter.Active,
+            "expired" => StatusFilter.Expired,
+            _ => (StatusFilter?)null,
+        };
+        if (filter is null)
+            errors["status"] = ["status must be all, active or expired."];
+        if (errors.Count > 0) return Results.ValidationProblem(errors);
 
         var visible = db.Links.AsNoTracking().VisibleTo(caller);
+        if (Search.ContainsPattern(q) is { } pattern)
+            visible = visible.Where(l => EF.Functions.ILike(l.Code, pattern, "\\") || EF.Functions.ILike(l.Url, pattern, "\\"));
+        var now = time.GetUtcNow().UtcDateTime;
+        // The same rule as Link.IsExpired, written so it runs in the database.
+        visible = filter switch
+        {
+            StatusFilter.Active => visible.Where(l => l.ExpiresAt == null || l.ExpiresAt > now),
+            StatusFilter.Expired => visible.Where(l => l.ExpiresAt != null && l.ExpiresAt <= now),
+            _ => visible,
+        };
+
         var total = await visible.CountAsync();
         var links = await visible
             .OrderByDescending(l => l.CreatedAt).ThenByDescending(l => l.Id)
@@ -226,44 +255,8 @@ public static class LinkEndpoints
         var now = time.GetUtcNow().UtcDateTime;
         var errors = new Dictionary<string, string[]>();
 
-        var rawUrl = request.Url?.Trim();
-        Uri? uri = null;
-        if (string.IsNullOrEmpty(rawUrl))
-        {
-            errors["url"] = ["Enter a URL to shorten."];
-        }
-        else if (rawUrl.Length > MaxUrlLength)
-        {
-            errors["url"] = [$"The URL is too long; the limit is {MaxUrlLength} characters."];
-        }
-        else if (!Uri.TryCreate(rawUrl, UriKind.Absolute, out uri) ||
-                 (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
-                 string.IsNullOrEmpty(uri.Host) || rawUrl.Any(char.IsWhiteSpace))
-        {
-            errors["url"] = ["Enter a full web address starting with http:// or https://."];
-        }
-        else if (LinkRules.HasUnsafeCharacters(rawUrl))
-        {
-            errors["url"] = ["The URL contains characters that can't be shortened."];
-        }
-        else if (uri!.AbsoluteUri.Length > MaxUrlLength)
-        {
-            // Percent-encoding and punycode can make the stored form longer than what was typed.
-            errors["url"] = [$"The URL is too long once encoded; the limit is {MaxUrlLength} characters."];
-        }
-        else if (!string.IsNullOrEmpty(uri.UserInfo))
-        {
-            // https://bank.com@evil.com looks like bank.com but goes to evil.com: a common phishing trick.
-            errors["url"] = ["URLs with a user name or password in them can't be shortened."];
-        }
-        else if (urls.IsSelf(uri))
-        {
-            errors["url"] = ["That URL is already an Ovi link."];
-        }
-        else if (LinkRules.IsBlockedHost(uri.IdnHost, config))
-        {
-            errors["url"] = ["Links to this site can't be created."];
-        }
+        if (LinkRules.UrlProblem(request.Url, urls, config, out var uri) is { } urlProblem)
+            errors["url"] = [urlProblem];
 
         var code = request.CustomCode?.Trim();
         if (!string.IsNullOrEmpty(code))
@@ -275,18 +268,9 @@ public static class LinkEndpoints
         }
 
         var expiresAt = request.ExpiresAt?.UtcDateTime;
-        var latestExpiry = anonymous ? now.AddDays(LinkRules.AnonymousLinkDays) : now.AddYears(LinkRules.MaxExpiryYears);
-        if (expiresAt is { } e && e <= now)
-        {
-            errors["expiresAt"] = ["The expiry date must be in the future."];
-        }
-        else if (expiresAt > latestExpiry)
-        {
-            errors["expiresAt"] = [anonymous
-                ? $"Links made without signing in last at most {LinkRules.AnonymousLinkDays} days."
-                : $"The expiry date can be at most {LinkRules.MaxExpiryYears} years away."];
-        }
-        if (anonymous) expiresAt ??= latestExpiry;
+        if (LinkRules.ExpiryProblem(expiresAt, now, anonymous) is { } expiryProblem)
+            errors["expiresAt"] = [expiryProblem];
+        if (anonymous) expiresAt ??= LinkRules.LatestExpiry(now, anonymous);
 
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
@@ -326,6 +310,52 @@ public static class LinkEndpoints
         }
 
         return Results.Created($"/api/links/{code}", LinkResponse.From(link, urls));
+    }
+
+    private enum StatusFilter { All, Active, Expired }
+
+    /// <summary>
+    /// Changes where a link goes and when it expires. The code, clicks and stats stay. Who may do it follows the same rule
+    /// as delete: the owner or the admin; anyone else gets 404.
+    /// </summary>
+    private static async Task<IResult> UpdateLink(
+        string code, UpdateLinkRequest? request, HttpContext http, AppDbContext db, ShortUrlBuilder urls, TimeProvider time,
+        IConfiguration config)
+    {
+        if (Caller.From(http) is not { SignedIn: true } caller) return SignInRequired();
+        if (request is null || (request.Url is null && request.ExpiresAt is null && !request.ClearExpiry))
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["body"] = ["Send a JSON body with a url, an expiresAt, or clearExpiry: true."]
+            });
+
+        var link = await db.Links.VisibleTo(caller).FirstOrDefaultAsync(l => l.Code == code);
+        if (link is null) return Results.NotFound();
+
+        var now = time.GetUtcNow().UtcDateTime;
+        var errors = new Dictionary<string, string[]>();
+
+        Uri? uri = null;
+        if (request.Url is not null && LinkRules.UrlProblem(request.Url, urls, config, out uri) is { } urlProblem)
+            errors["url"] = [urlProblem];
+
+        var expiresAt = request.ExpiresAt?.UtcDateTime;
+        if (request.ClearExpiry && expiresAt is not null)
+            errors["expiresAt"] = ["Send either an expiresAt or clearExpiry, not both."];
+        else if (request.ClearExpiry && link.Anonymous)
+            errors["expiresAt"] = ["Links made without signing in always expire."];
+        else if (LinkRules.ExpiryProblem(expiresAt, now, link.Anonymous) is { } expiryProblem)
+            errors["expiresAt"] = [expiryProblem];
+
+        if (errors.Count > 0) return Results.ValidationProblem(errors);
+
+        if (uri is not null) link.Url = uri.AbsoluteUri;
+        if (request.ClearExpiry) link.ExpiresAt = null;
+        else if (expiresAt is not null) link.ExpiresAt = expiresAt;
+        // Only the changed columns are written, so clicks counted meanwhile aren't lost.
+        await db.SaveChangesAsync();
+
+        return Results.Ok(LinkResponse.From(link, urls));
     }
 
     private static IResult Taken(string code) =>
