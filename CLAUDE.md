@@ -34,4 +34,4 @@ This repo is developed by a team of Claude agents with a lead. The role definiti
 - **Lead (the main session):** plans the work, assigns it, keeps the shared task list, settles disagreements and is the only one who talks to the owner, commits, pushes and opens PRs.
 - **Teammates:** the roles listed in `docs/team.md`. They talk to each other directly with `SendMessage`, by name.
 
-To start the team, ask the lead to "start the Ovi team for <goal>". Agent teams are an experimental feature, so set `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` first, either under `env` in your Claude Code settings or as an environment variable.
+To start the team, ask the lead to "start the Ovi team for <goal>". Agent teams are an experimental feature, switched on for this repo by `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in `.claude/settings.json`.

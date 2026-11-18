@@ -83,7 +83,7 @@ Every agent has project memory in `.claude/agent-memory/<agent>/MEMORY.md`. Reco
 
 ## Limits to know
 
-- Agent teams are an **experimental** Claude Code feature. Turn them on with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`, under `env` in Claude Code settings or as an environment variable.
+- Agent teams are an **experimental** Claude Code feature. They are turned on for this repo by `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in `.claude/settings.json`. Set it to `0` in your own `.claude/settings.local.json` to turn them off.
 - There is one team per session, and teammates can't spawn teammates.
 - Resuming a session doesn't bring in-process teammates back. Ask the lead to start the team again.
 - Each teammate is a separate Claude instance, so a full team costs far more tokens than one session. For small jobs, the lead starts only the roles needed.

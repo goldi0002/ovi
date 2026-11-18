@@ -9,7 +9,7 @@ The owner wants the project developed by a team of agents that discuss issues wi
 
 ## Decision
 
-- **Team feature:** use Claude Code agent teams, switched on with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. The main session is the lead.
+- **Team feature:** use Claude Code agent teams, switched on with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in `.claude/settings.json`. The main session is the lead.
 - **Teammates:** eleven, each defined once in `.claude/agents/`: product manager, architect, backend, database, frontend, UX, QA, security reviewer, code reviewer, DevOps and technical writer.
 - **Working agreement:** ownership, workflow, definition of done and message format are in `docs/team.md`.
 - **Memory:** each agent has project memory, committed under `.claude/agent-memory/`.
