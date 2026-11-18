@@ -488,3 +488,8 @@ $RECYCLE.BIN/
 .env.local
 # Built web UI (from /web)
 src/Ovi.Api/wwwroot/
+
+# Claude Code: personal settings, worktrees and local-only agent memory stay out of git.
+.claude/settings.local.json
+.claude/worktrees/
+.claude/agent-memory-local/
