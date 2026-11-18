@@ -1,6 +1,14 @@
-import { Link as LinkIcon } from "lucide-react";
+import { Link as LinkIcon, Monitor, Moon, Sun } from "lucide-react";
 import { AppLink } from "../router";
-import { button, container, focusRing } from "../ui";
+import type { ThemeChoice } from "../storage";
+import { useTheme } from "../theme";
+import { button, container, focusRing, iconButton } from "../ui";
+
+const THEMES: Record<ThemeChoice, { label: string; icon: typeof Sun; next: ThemeChoice }> = {
+  system: { label: "System", icon: Monitor, next: "light" },
+  light: { label: "Light", icon: Sun, next: "dark" },
+  dark: { label: "Dark", icon: Moon, next: "system" },
+};
 
 const NAV = [
   { href: "/", label: "Shorten" },
@@ -24,11 +32,11 @@ interface Props {
 /** A translucent toolbar, like a macOS window's: the app name, a segmented control for the pages, and sign-in. */
 export function Header({ path, ready, isAdmin, accountName, onLogIn, onSignOut }: Props) {
   return (
-    <header className="sticky top-0 z-10 border-b border-line bg-white/75 backdrop-blur-xl backdrop-saturate-150">
+    <header className="sticky top-0 z-10 border-b border-line bg-toolbar backdrop-blur-xl backdrop-saturate-150">
       <div className={`${container} grid h-14 grid-cols-[1fr_auto_1fr] items-center gap-3 max-sm:grid-cols-[auto_minmax(0,1fr)_auto] max-sm:gap-1.5`}>
         <Brand href="/" />
         <nav
-          className="flex justify-self-center rounded-lg bg-black/[0.06] p-0.5"
+          className="flex justify-self-center rounded-lg bg-segment p-0.5"
           aria-label="Main"
         >
           {NAV.filter((item) => !item.adminOnly || isAdmin || path === item.href).map((item) => {
@@ -38,7 +46,7 @@ export function Header({ path, ready, isAdmin, accountName, onLogIn, onSignOut }
                 key={item.href}
                 href={item.href}
                 className={`rounded-md px-4 py-1 text-[0.8125rem] font-medium transition-colors max-sm:px-2.5 max-[360px]:px-2 max-[360px]:text-xs ${focusRing} ${
-                  isActive ? "bg-white text-ink shadow-control" : "text-muted hover:text-ink"
+                  isActive ? "bg-segment-on text-ink shadow-control" : "text-muted hover:text-ink"
                 }`}
                 aria-current={isActive ? "page" : undefined}
               >
@@ -47,7 +55,8 @@ export function Header({ path, ready, isAdmin, accountName, onLogIn, onSignOut }
             );
           })}
         </nav>
-        <div className="flex min-w-0 items-center justify-end gap-2">
+        <div className="flex min-w-0 items-center justify-end gap-2 max-sm:gap-1">
+          <ThemeToggle />
           {!ready ? null : accountName ? (
             <>
               <span
@@ -71,12 +80,29 @@ export function Header({ path, ready, isAdmin, accountName, onLogIn, onSignOut }
   );
 }
 
+/** Cycles the theme System → Light → Dark; the icon shows the current choice. Saved on this device. */
+export function ThemeToggle() {
+  const [choice, setChoice] = useTheme();
+  const { label, icon: Icon, next } = THEMES[choice];
+  return (
+    <button
+      type="button"
+      className={iconButton}
+      onClick={() => setChoice(next)}
+      aria-label={`Theme: ${label}`}
+      title={`Theme: ${label}. Switch to ${THEMES[next].label}`}
+    >
+      <Icon aria-hidden="true" />
+    </button>
+  );
+}
+
 /** The Ovi wordmark: an app-icon style tile and the name. */
 export function Brand({ href }: { href?: string }) {
   const className = `inline-flex shrink-0 items-center gap-2 justify-self-start rounded-md text-[0.9375rem] font-semibold text-ink ${focusRing}`;
   const content = (
     <>
-      <span className="grid size-7 place-items-center rounded-[7px] bg-linear-to-b from-[#48484a] to-ink text-white shadow-[0_0.5px_1.5px_rgb(0_0_0/30%)]">
+      <span className="grid size-7 place-items-center rounded-[7px] bg-linear-to-b from-primary-top to-ink text-on-ink shadow-[0_0.5px_1.5px_rgb(0_0_0/30%)]">
         <LinkIcon className="size-4" strokeWidth={2.4} aria-hidden="true" />
       </span>
       <span className="max-[360px]:sr-only">Ovi</span>

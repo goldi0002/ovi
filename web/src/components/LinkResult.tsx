@@ -14,8 +14,9 @@ export function LinkResult({ link, signedIn, onDismiss }: { link: Link; signedIn
       aria-live="polite"
       aria-label="New short link"
     >
+      {/* Always on white, in both themes: scanners need dark modules on a light ground. */}
       <img
-        className="row-start-2 size-24 rounded-lg shadow-control sm:row-start-1"
+        className="row-start-2 size-24 rounded-lg bg-white shadow-control sm:row-start-1"
         src={link.qrCodeUrl}
         alt={`QR code for ${link.shortUrl}`}
         width={96}
