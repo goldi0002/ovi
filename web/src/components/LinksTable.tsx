@@ -21,7 +21,7 @@ const th = "border-b border-line px-3 py-2 text-left text-[0.6875rem] font-semib
 const td = "px-3 py-2 align-middle max-md:p-0";
 
 export function Status({ link }: { link: Link }) {
-  if (isExpired(link)) return <span className={`${badge} text-muted before:bg-[#c7c7cc]`}>Expired</span>;
+  if (isExpired(link)) return <span className={`${badge} text-muted before:bg-dot-off`}>Expired</span>;
   if (link.expiresAt)
     return (
       <span className={`${badge} text-ink before:border-[1.5px] before:border-ink`} title={formatDateTime(link.expiresAt)}>

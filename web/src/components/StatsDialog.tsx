@@ -76,7 +76,7 @@ export function StatsDialog({ api, link, onClose, onUnauthorized }: Props) {
         </header>
 
         <div
-          className="flex w-fit max-w-full rounded-lg bg-black/[0.06] p-0.5 max-sm:w-full"
+          className="flex w-fit max-w-full rounded-lg bg-segment p-0.5 max-sm:w-full"
           role="group"
           aria-label="Date range"
         >
@@ -85,7 +85,7 @@ export function StatsDialog({ api, link, onClose, onUnauthorized }: Props) {
               key={r}
               type="button"
               className={`cursor-pointer rounded-md px-3 py-1 text-[0.8125rem] font-medium whitespace-nowrap max-sm:flex-1 max-sm:px-2 ${focusRing} ${
-                days === r ? "bg-white text-ink shadow-control" : "text-muted hover:text-ink"
+                days === r ? "bg-segment-on text-ink shadow-control" : "text-muted hover:text-ink"
               }`}
               aria-pressed={days === r}
               onClick={() => setDays(r)}
@@ -245,7 +245,7 @@ export function ClicksChart({ daily, title = "Clicks per day" }: { daily: LinkSt
                 <div
                   key={d.date}
                   className={`group flex h-full min-w-0 flex-1 items-end justify-center rounded-t ${
-                    i === active ? "is-active bg-black/5" : ""
+                    i === active ? "is-active bg-hover" : ""
                   }`}
                   onMouseEnter={() => setActive(i)}
                 >

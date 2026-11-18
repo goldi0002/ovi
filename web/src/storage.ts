@@ -28,3 +28,22 @@ export function clearApiKey(): void {
     localStorage.removeItem(KEY);
   }, undefined);
 }
+
+const THEME_KEY = "ovi.theme";
+
+/** The theme picked in the header: follow the system, or always light or dark. */
+export type ThemeChoice = "system" | "light" | "dark";
+
+/** The saved theme; "system" when none was picked or storage is unavailable. public/theme.js reads it too. */
+export function loadTheme(): ThemeChoice {
+  const saved = safe(() => localStorage.getItem(THEME_KEY), null);
+  return saved === "light" || saved === "dark" ? saved : "system";
+}
+
+/** Saves the theme on this device; "system" forgets the choice. */
+export function saveTheme(choice: ThemeChoice): void {
+  safe(() => {
+    if (choice === "system") localStorage.removeItem(THEME_KEY);
+    else localStorage.setItem(THEME_KEY, choice);
+  }, undefined);
+}
