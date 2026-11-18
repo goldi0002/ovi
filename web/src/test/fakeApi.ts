@@ -149,7 +149,29 @@ export function fakeApi({
     if (method === "GET" && url.pathname === "/api/links") {
       const page = Number(url.searchParams.get("page") ?? 1);
       const size = Number(url.searchParams.get("pageSize") ?? 50);
-      return json(200, { items: store.slice((page - 1) * size, page * size), page, pageSize: size, total: store.length });
+      const q = (url.searchParams.get("q") ?? "").toLowerCase();
+      const status = url.searchParams.get("status") ?? "all";
+      const expired = (l: Link) => l.expiresAt !== null && new Date(l.expiresAt) <= new Date();
+      const matches = store
+        .filter((l) => !q || l.code.toLowerCase().includes(q) || l.url.toLowerCase().includes(q))
+        .filter((l) => status === "all" || (status === "expired") === expired(l));
+      return json(200, { items: matches.slice((page - 1) * size, page * size), page, pageSize: size, total: matches.length });
+    }
+    const patch = url.pathname.match(/^\/api\/links\/([^/]+)$/);
+    if (method === "PATCH" && patch) {
+      const existing = store.find((l) => l.code === decodeURIComponent(patch[1]));
+      if (!existing) return json(404, { title: "Not Found" });
+      const body = JSON.parse(String(init.body)) as { url?: string; expiresAt?: string; clearExpiry?: boolean };
+      const errors: Record<string, string[]> = {};
+      if (body.url !== undefined && !/^https?:\/\/\S+$/.test(body.url))
+        errors.url = ["Enter a full web address starting with http:// or https://."];
+      if (body.expiresAt !== undefined && new Date(body.expiresAt) <= new Date())
+        errors.expiresAt = ["The expiry date must be in the future."];
+      if (Object.keys(errors).length > 0) return json(400, { title: "One or more validation errors occurred.", errors });
+      if (body.url !== undefined) existing.url = body.url;
+      if (body.clearExpiry) existing.expiresAt = null;
+      else if (body.expiresAt !== undefined) existing.expiresAt = body.expiresAt;
+      return json(200, existing);
     }
     if (method === "POST" && url.pathname === "/api/links") {
       const body = JSON.parse(String(init.body)) as { url: string; customCode?: string; expiresAt?: string };

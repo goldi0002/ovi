@@ -58,7 +58,7 @@ export function AdminPage({ api, state, onLogIn, onUnauthorized }: Props) {
           <Overview api={api} onUnauthorized={onUnauthorized} />
 
           <section className="grid gap-4">
-            <div className="flex w-fit rounded-lg bg-black/[0.06] p-0.5" role="tablist" aria-label="Admin lists">
+            <div className="flex w-fit rounded-lg bg-segment p-0.5" role="tablist" aria-label="Admin lists">
               {(["users", "links"] as const).map((t) => (
                 <button
                   key={t}
@@ -66,7 +66,7 @@ export function AdminPage({ api, state, onLogIn, onUnauthorized }: Props) {
                   role="tab"
                   aria-selected={tab === t}
                   className={`cursor-pointer rounded-md px-4 py-1 text-[0.8125rem] font-medium ${focusRing} ${
-                    tab === t ? "bg-white text-ink shadow-control" : "text-muted hover:text-ink"
+                    tab === t ? "bg-segment-on text-ink shadow-control" : "text-muted hover:text-ink"
                   }`}
                   onClick={() => setTab(t)}
                 >
@@ -382,14 +382,14 @@ function LinksList({
           <p className="text-[0.9375rem] font-semibold">
             Links {data && <span className="ml-1 font-normal text-muted">{data.total}</span>}
           </p>
-          <div className="flex rounded-lg bg-black/[0.06] p-0.5" role="group" aria-label="Made by">
+          <div className="flex rounded-lg bg-segment p-0.5" role="group" aria-label="Made by">
             {presets.map((p) => (
               <button
                 key={p.value}
                 type="button"
                 aria-pressed={isPreset && owner === p.value}
                 className={`cursor-pointer rounded-md px-2.5 py-0.5 text-xs font-medium ${focusRing} ${
-                  isPreset && owner === p.value ? "bg-white text-ink shadow-control" : "text-muted hover:text-ink"
+                  isPreset && owner === p.value ? "bg-segment-on text-ink shadow-control" : "text-muted hover:text-ink"
                 }`}
                 onClick={() => onOwnerFilter(p.value ? p : null)}
               >
@@ -491,7 +491,7 @@ function LinksList({
 function Badge({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
   return (
     <span
-      className={`rounded-full px-2 py-px text-[0.6875rem] font-semibold ${muted ? "bg-subtle text-muted" : "bg-ink text-white"}`}
+      className={`rounded-full px-2 py-px text-[0.6875rem] font-semibold ${muted ? "bg-subtle text-muted" : "bg-ink text-on-ink"}`}
     >
       {children}
     </span>

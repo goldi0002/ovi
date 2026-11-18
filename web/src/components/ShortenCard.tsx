@@ -1,7 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { ApiError, type Link, type OviApi } from "../api";
-import { localInputToIso } from "../format";
+import { isoToLocalInput, localInputToIso } from "../format";
 import { button, errorBox, field, focusRing, input } from "../ui";
 
 interface Props {
@@ -16,9 +16,7 @@ interface Props {
 
 /** The latest expiry the server accepts without an account, as a datetime-local value. */
 function anonymousMaxExpiry(days: number): string {
-  const d = new Date(Date.now() + days * 86_400_000);
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 16);
+  return isoToLocalInput(new Date(Date.now() + days * 86_400_000).toISOString());
 }
 
 export function ShortenCard({ api, signedIn, anonymousLinkDays, onLogIn, onCreated, onUnauthorized }: Props) {

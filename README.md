@@ -199,9 +199,10 @@ Redirects and QR codes are public.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `POST` | `/api/links` | anyone | Create a link. Body: `{ "url": "https://...", "customCode": "optional", "expiresAt": "optional, e.g. 2030-01-01T00:00:00Z" }` |
-| `GET` | `/api/links?page=1&pageSize=50` | user, key | List links, newest first. Returns `{ items, page, pageSize, total }`; `pageSize` max 100, `page` max 100000 |
+| `GET` | `/api/links?page=1&pageSize=50&q=&status=all` | user, key | List links, newest first. Returns `{ items, page, pageSize, total }`; `pageSize` max 100, `page` max 100000. Optional `q` searches code and URL (case-insensitive, max 100 characters); `status` is `all` (default), `active` or `expired` |
 | `GET` | `/api/links/{code}` | user, key | Show one link's details and click count |
 | `GET` | `/api/links/{code}/stats?days=30` | user, key | Click analytics for the last 1–365 days (UTC): clicks per day, top referrers, devices and browsers |
+| `PATCH` | `/api/links/{code}` | user, key | Edit a link's destination or expiry; the code, clicks and stats stay. Body (every field optional): `{ "url": "https://...", "expiresAt": "2030-01-01T00:00:00Z" }`, or `{ "clearExpiry": true }` to make it never expire. A missing or `null` field is left as it is. Checked like a new link; returns the updated link |
 | `DELETE` | `/api/links/{code}` | user, key | Delete a link (soft delete: the row is kept with `DeletedAt` set, and the link disappears from every endpoint) |
 | `GET` | `/api/admin/overview` | admin | Totals, clicks and sign-ups per day for 14 days, top links |
 | `GET` | `/api/admin/users?page=1&pageSize=20&q=` | admin | Every user with link and click counts; `q` searches name and email |

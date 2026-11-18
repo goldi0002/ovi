@@ -104,7 +104,7 @@ public static class AdminEndpoints
         if (PagingProblem(page, pageSize) is { } problem) return problem;
 
         var users = db.Users.AsNoTracking();
-        if (SearchPattern(q) is { } pattern)
+        if (Search.ContainsPattern(q) is { } pattern)
             users = users.Where(u => EF.Functions.ILike(u.Name, pattern, "\\") || EF.Functions.ILike(u.Email ?? "", pattern, "\\"));
 
         var total = await users.CountAsync();
@@ -147,7 +147,7 @@ public static class AdminEndpoints
                 links = links.Where(l => l.OwnerId == ownerId);
                 break;
         }
-        if (SearchPattern(q) is { } pattern)
+        if (Search.ContainsPattern(q) is { } pattern)
             links = links.Where(l => EF.Functions.ILike(l.Code, pattern, "\\") || EF.Functions.ILike(l.Url, pattern, "\\"));
 
         var total = await links.CountAsync();
@@ -194,13 +194,4 @@ public static class AdminEndpoints
                 ["paging"] = [$"page must be between 1 and {LinkEndpoints.MaxPage} and pageSize between 1 and {LinkEndpoints.MaxPageSize}."]
             })
             : null;
-
-    /// <summary>A case-insensitive "contains" pattern with LIKE's wildcards escaped, or null for no search.</summary>
-    private static string? SearchPattern(string? q)
-    {
-        var term = q?.Trim();
-        if (string.IsNullOrEmpty(term)) return null;
-        if (term.Length > 100) term = term[..100];
-        return "%" + term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
-    }
 }
