@@ -4,11 +4,131 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
+    <title>Ovi — Short links with QR codes and click stats</title>
+    <meta
+      name="description"
+      content="Paste a URL and get a short link with a QR code in a second — no account needed. Sign in to keep links, choose custom codes and see click stats."
+    />
+    <!-- The canonical link and og:url need the site's own address; the server adds them (WebUiSetup). -->
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="application-name" content="Ovi" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <title>Ovi · URL shortener</title>
+    <meta name="theme-color" content="#ffffff" />
+
+    <!-- The card shown when a link to Ovi is shared. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Ovi" />
+    <meta property="og:title" content="Ovi — Short links with QR codes and click stats" />
+    <meta
+      property="og:description"
+      content="Paste a URL and get a short link with a QR code in a second — no account needed. Sign in to keep links, choose custom codes and see click stats."
+    />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Ovi — Short links with QR codes and click stats" />
+    <meta
+      name="twitter:description"
+      content="Paste a URL and get a short link with a QR code in a second — no account needed. Sign in to keep links, choose custom codes and see click stats."
+    />
+
+    <!-- Structured data, for search engines and answer engines. The FAQ mirrors the questions on the page. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "#website",
+            "name": "Ovi",
+            "alternateName": "Ovi URL shortener",
+            "description": "A fast URL shortener with QR codes, custom codes and click stats.",
+            "inLanguage": "en"
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "#app",
+            "name": "Ovi",
+            "description": "Shorten a long URL and get a short link with a QR code, then follow the clicks. Works without an account; sign in with Google or GitHub to keep links, choose custom codes and see stats.",
+            "applicationCategory": "UtilityApplication",
+            "operatingSystem": "Any modern web browser",
+            "browserRequirements": "Requires JavaScript",
+            "isAccessibleForFree": true,
+            "featureList": [
+              "Shorten a URL without an account",
+              "A QR code for every link",
+              "Custom short codes",
+              "Expiry dates",
+              "Click stats by day, referrer, device and browser",
+              "Self-hosted JSON API"
+            ],
+            "isPartOf": { "@id": "#website" }
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "#faq",
+            "isPartOf": { "@id": "#website" },
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Do I need an account to shorten a link?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. Paste any URL on the home page and press Shorten URL. Links made without an account get a random code and expire after 30 days."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "How long do links last?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "30 days for links made without an account. After signing in you can set your own expiry date, or leave it empty to keep the link for good."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Can I choose my own short code?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes, once you sign in with Google or GitHub. Codes are 3 to 32 letters, digits, hyphens or underscores."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "What do the click stats show?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Clicks per day for the last 7, 30 or 90 days, the site each click came from, and the device and browser used. Only the time, the referring site, the device and the browser are stored — never IP addresses or full user agents."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Is there an API?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. The server is an ASP.NET Core JSON API; its OpenAPI document is at /openapi/v1.json and Swagger UI is served at /swagger when it is turned on."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
   </head>
   <body class="bg-page font-sans leading-normal text-ink antialiased">
     <div id="root"></div>
+    <!-- What a reader without JavaScript (or a crawler that does not run it) still gets. -->
+    <noscript>
+      <h1>Ovi — short links with QR codes and click stats</h1>
+      <p>
+        Ovi turns a long URL into a short link and a QR code. Paste a URL on the home page and press Shorten URL; no
+        account is needed.
+      </p>
+      <p>
+        Links made without an account expire after 30 days. Sign in with Google or GitHub to keep your links, choose
+        your own short code and see click stats.
+      </p>
+      <p>The interface needs JavaScript. The API is documented at <a href="/openapi/v1.json">/openapi/v1.json</a>.</p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

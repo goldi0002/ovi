@@ -17,7 +17,7 @@ export function LinksPage({ api, state, onLogIn, onUnauthorized }: Props) {
   useEffect(() => {
     document.title = "Your links · Ovi";
     return () => {
-      document.title = "Ovi · URL shortener";
+      document.title = "Ovi — Short links with QR codes and click stats";
     };
   }, []);
 

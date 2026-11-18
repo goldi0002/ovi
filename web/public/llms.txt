@@ -1,0 +1,35 @@
+# Ovi
+
+> Ovi is a fast, self-hosted URL shortener. Paste a long URL, get a short link and a QR code, then see how often it was clicked. Shortening a link needs no account.
+
+Ovi is a small ASP.NET Core web app with a React interface. It runs on one address: the same server serves the UI and the JSON API, so there is no CORS setup and no separate short domain.
+
+## What it does
+
+- Anyone can shorten a URL without signing in. Those links get a random code and expire after 30 days.
+- Signing in with Google or GitHub creates the account on first use. Signed-in users can choose a custom code (3–32 letters, digits, hyphens or underscores), set an expiry date or none, and keep every link they make.
+- Every link comes with a downloadable QR code.
+- Click stats show clicks per day over the last 7, 30 or 90 days, the top referring sites, and the devices and browsers visitors used. A click stores only the time, the referring site's name, a device category and a browser category: no IP address and no full user agent.
+- The server admin can sign in with an API key, see totals, every account and every link, and suspend an account.
+- Links are stored in PostgreSQL. The API uses .NET 10, EF Core and minimal APIs.
+
+## Pages
+
+- `/`: the shortener. No account needed.
+- `/links`: the signed-in user's links, with clicks, status and stats. Not indexed.
+- `/admin`: the admin dashboard. Not indexed.
+- `/openapi/v1.json`: the OpenAPI document for the API.
+
+## API
+
+- `POST /api/links` with `{"url": "https://example.com"}` creates a link. Optional: `customCode`, `expiresAt`.
+- `GET /api/links?page=1&pageSize=20` lists the caller's links.
+- `GET /api/links/{code}/stats?days=30` returns the click stats for one link.
+- `DELETE /api/links/{code}` deletes a link.
+- `GET /api/session` says who the caller is and which sign-in providers are turned on.
+- `GET /health` reports whether the database is reachable.
+
+## Notes
+
+- There is no advertising, no tracking pixel and no third-party analytics.
+- The app can be self-hosted; see the repository on GitHub for setup.

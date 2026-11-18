@@ -24,7 +24,7 @@ export function AdminPage({ api, state, onLogIn, onUnauthorized }: Props) {
   useEffect(() => {
     document.title = "Admin · Ovi";
     return () => {
-      document.title = "Ovi · URL shortener";
+      document.title = "Ovi — Short links with QR codes and click stats";
     };
   }, []);
 
