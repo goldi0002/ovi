@@ -95,6 +95,23 @@ export interface CreateLinkInput {
   expiresAt?: string;
 }
 
+/** Changes to a link; leave a field out to keep it. The code, clicks and stats never change. */
+export interface UpdateLinkInput {
+  url?: string;
+  expiresAt?: string;
+  /** Remove the expiry so the link never expires (can't be sent together with expiresAt). */
+  clearExpiry?: boolean;
+}
+
+/** Which links to list: every one, those still working, or those past their expiry. */
+export type LinkStatus = "all" | "active" | "expired";
+
+export interface LinkFilter {
+  /** Matches the code or destination, ignoring case. */
+  q?: string;
+  status?: LinkStatus;
+}
+
 /** An error from the API, with a readable message built from its problem-details body. */
 export class ApiError extends Error {
   constructor(
@@ -186,12 +203,18 @@ export class OviApi {
     return this.request(`/api/admin/users/${userId}/${blocked ? "block" : "unblock"}`, { method: "POST" });
   }
 
-  list(page = 1, pageSize = 20): Promise<Page<Link>> {
-    return this.request(`/api/links?page=${page}&pageSize=${pageSize}`);
+  list(page = 1, pageSize = 20, { q = "", status = "all" }: LinkFilter = {}): Promise<Page<Link>> {
+    const search = q.trim() ? `&q=${encodeURIComponent(q.trim())}` : "";
+    const filter = status !== "all" ? `&status=${status}` : "";
+    return this.request(`/api/links?page=${page}&pageSize=${pageSize}${search}${filter}`);
   }
 
   create(input: CreateLinkInput): Promise<Link> {
     return this.request("/api/links", { method: "POST", body: JSON.stringify(input) });
+  }
+
+  update(code: string, input: UpdateLinkInput): Promise<Link> {
+    return this.request(`/api/links/${encodeURIComponent(code)}`, { method: "PATCH", body: JSON.stringify(input) });
   }
 
   stats(code: string, days = 30): Promise<LinkStats> {

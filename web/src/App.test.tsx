@@ -156,7 +156,7 @@ describe("App", () => {
     fakeApi({ links: [link({ code: "old", expiresAt: "2020-01-01T00:00:00Z" })], user: ada });
     await openLinks(await renderApp());
 
-    expect(await screen.findByText("Expired")).toBeInTheDocument();
+    expect(await within(await screen.findByRole("table")).findByText("Expired")).toBeInTheDocument();
   });
 
   it("forgets a saved API key that stops working", async () => {

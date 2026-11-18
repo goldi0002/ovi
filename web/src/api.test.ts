@@ -46,6 +46,31 @@ describe("OviApi", () => {
     await expect(new OviApi("k").list()).rejects.toMatchObject({ status: 429, message: expect.stringMatching(/Too many/) });
   });
 
+  it("sends search and status only when they narrow the list", async () => {
+    const { fetchMock } = fakeApi();
+    const api = new OviApi("good-key");
+    await api.list(2, 10);
+    await api.list(1, 20, { q: "  a&b%  ", status: "expired" });
+    await api.list(1, 20, { q: " ", status: "all" });
+
+    expect(fetchMock.mock.calls.map(([u]) => u)).toEqual([
+      "/api/links?page=2&pageSize=10",
+      "/api/links?page=1&pageSize=20&q=a%26b%25&status=expired",
+      "/api/links?page=1&pageSize=20",
+    ]);
+  });
+
+  it("edits a link with PATCH and returns the updated link", async () => {
+    const { fetchMock } = fakeApi({ links: [link({ code: "a b" })] });
+    const updated = await new OviApi("good-key").update("a b", { url: "https://example.com/new", clearExpiry: true });
+
+    expect(updated.url).toBe("https://example.com/new");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/links/a%20b");
+    expect(init?.method).toBe("PATCH");
+    expect(new Headers(init?.headers).get("Content-Type")).toBe("application/json");
+  });
+
   it("handles 204 No Content on delete", async () => {
     fakeApi({ links: [link({ code: "bye" })] });
     await expect(new OviApi("good-key").remove("bye")).resolves.toBeUndefined();
