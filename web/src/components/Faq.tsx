@@ -21,8 +21,4 @@ export const FAQ_ITEMS = [
     q: "What do the click stats show?",
     a: "Clicks per day for the last 7, 30 or 90 days, the site each click came from, and the device and browser used. Only the time, the referring site, the device and the browser are stored — never IP addresses or full user agents.",
   },
-  {
-    q: "Is there an API?",
-    a: "Yes. The server is an ASP.NET Core JSON API; its OpenAPI document is at /openapi/v1.json and Swagger UI is served at /swagger when it is turned on.",
-  },
 ];

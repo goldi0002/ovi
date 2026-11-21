@@ -2,7 +2,7 @@
 <html lang="en" class="scroll-smooth scroll-pt-16 motion-reduce:scroll-auto">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
     <title>Ovi — Short links with QR codes and click stats</title>
     <meta
@@ -13,6 +13,13 @@
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="application-name" content="Ovi" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Installable as an app: the manifest, the service worker (registered in src/pwa.ts) and the iOS icon and title. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Ovi" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#141416" media="(prefers-color-scheme: dark)" />
     <!-- Sets data-theme on <html> from the saved choice before first paint. It is a file, not an
@@ -62,8 +69,7 @@
               "A QR code for every link",
               "Custom short codes",
               "Expiry dates",
-              "Click stats by day, referrer, device and browser",
-              "Self-hosted JSON API"
+              "Click stats by day, referrer, device and browser"
             ],
             "isPartOf": { "@id": "#website" }
           },
@@ -111,14 +117,6 @@
                   "@type": "Answer",
                   "text": "Clicks per day for the last 7, 30 or 90 days, the site each click came from, and the device and browser used. Only the time, the referring site, the device and the browser are stored — never IP addresses or full user agents."
                 }
-              },
-              {
-                "@type": "Question",
-                "name": "Is there an API?",
-                "acceptedAnswer": {
-                  "@type": "Answer",
-                  "text": "Yes. The server is an ASP.NET Core JSON API; its OpenAPI document is at /openapi/v1.json and Swagger UI is served at /swagger when it is turned on."
-                }
               }
             ]
           }
@@ -139,7 +137,7 @@
         Links made without an account expire after 30 days. Sign in with Google or GitHub to keep your links, choose
         your own short code and see click stats.
       </p>
-      <p>The interface needs JavaScript. The API is documented at <a href="/openapi/v1.json">/openapi/v1.json</a>.</p>
+      <p>The interface needs JavaScript.</p>
     </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>

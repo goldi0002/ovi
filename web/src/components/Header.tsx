@@ -49,7 +49,7 @@ interface Props {
 export function Header({ path, ready, isAdmin, account, onLogIn, onSignOut, onOpenSettings }: Props) {
   if (!account) {
     return (
-      <header className="sticky top-0 z-20 border-b border-line bg-toolbar backdrop-blur-xl backdrop-saturate-150">
+      <header className="sticky top-0 z-20 border-b border-line bg-toolbar pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
           <Brand href={PAGES.home} />
           <div className="flex items-center gap-1.5">
@@ -70,7 +70,7 @@ export function Header({ path, ready, isAdmin, account, onLogIn, onSignOut, onOp
   return (
     // On phones the blur sits on a pseudo-element: a backdrop-filter on the header itself would make it the
     // containing block of the fixed tab bar inside it, pinning the bar to the header instead of the screen.
-    <header className="z-20 flex items-center justify-between gap-3 border-line max-lg:sticky max-lg:top-0 max-lg:h-14 max-lg:border-b max-lg:px-4 max-lg:before:absolute max-lg:before:inset-0 max-lg:before:-z-10 max-lg:before:bg-toolbar max-lg:before:backdrop-blur-xl max-lg:before:backdrop-saturate-150 lg:fixed lg:inset-y-0 lg:left-0 lg:w-60 lg:flex-col lg:items-stretch lg:gap-0 lg:border-r lg:bg-sidebar lg:backdrop-blur-xl lg:backdrop-saturate-150">
+    <header className="z-20 flex items-center justify-between gap-3 border-line max-lg:sticky max-lg:top-0 max-lg:h-[calc(3.5rem+env(safe-area-inset-top))] max-lg:pt-[env(safe-area-inset-top)] max-lg:border-b max-lg:px-4 max-lg:before:absolute max-lg:before:inset-0 max-lg:before:-z-10 max-lg:before:bg-toolbar max-lg:before:backdrop-blur-xl max-lg:before:backdrop-saturate-150 lg:fixed lg:inset-y-0 lg:left-0 lg:w-60 lg:flex-col lg:items-stretch lg:gap-0 lg:border-r lg:bg-sidebar lg:backdrop-blur-xl lg:backdrop-saturate-150">
       <div className="flex items-center lg:h-16 lg:px-5">
         <Brand href={PAGES.home} />
       </div>

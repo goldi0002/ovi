@@ -1,4 +1,4 @@
-import { CircleAlert } from "lucide-react";
+import { CircleAlert, WifiOff } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, OviApi, type Session } from "./api";
 import { Header, type Account } from "./components/Header";
@@ -12,6 +12,7 @@ import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { HomePage } from "./pages/HomePage";
 import { LinksPage } from "./pages/LinksPage";
 import { QrCodesPage } from "./pages/QrCodesPage";
+import { useOnline } from "./pwa";
 import { PAGES, scrollAfterNavigation, usePath } from "./router";
 import { clearApiKey, loadApiKey, saveApiKey } from "./storage";
 import { container, errorBox } from "./ui";
@@ -49,6 +50,7 @@ function OviApp() {
     ] ?? null,
   );
   const path = usePath();
+  const online = useOnline();
   const firstRender = useRef(true);
 
   // The browser handles the anchor on first load; after that, every page change scrolls here.
@@ -161,7 +163,16 @@ function OviApp() {
         />
 
         {/* The same element whether or not someone is signed in, so the page inside keeps its state. */}
-        <div className={`flex flex-col ${account ? "min-h-dvh max-lg:min-h-[calc(100dvh-3.5rem)] max-lg:pb-16 lg:pl-60" : "min-h-[calc(100dvh-3.5rem)]"}`}>
+        <div className={`flex flex-col ${account ? "min-h-dvh max-lg:min-h-[calc(100dvh-3.5rem)] max-lg:pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pl-60" : "min-h-[calc(100dvh-3.5rem)]"}`}>
+          {!online && (
+            <div className={`${container} pt-4`}>
+              <p className="flex items-center gap-3 rounded-xl border border-line bg-subtle px-3.5 py-2.5 text-[0.8125rem] text-muted" role="status">
+                <WifiOff className="size-4 shrink-0" aria-hidden="true" />
+                You're offline. Links can't be created or loaded until you're back online.
+              </p>
+            </div>
+          )}
+
           {notice && (
             <div className={`${container} pt-4`}>
               <p className={`${errorBox} flex items-center gap-3`} role="alert">
@@ -177,13 +188,6 @@ function OviApp() {
           <div key={path} className="flex flex-1 animate-page-in flex-col">
             {page}
           </div>
-
-          <footer>
-            <div className={`${container} flex flex-wrap items-center justify-between gap-2 py-6 text-xs text-muted`}>
-              <span>© {new Date().getFullYear()} Ovi</span>
-              <span>Self-hosted URL shortener</span>
-            </div>
-          </footer>
         </div>
       </div>
 

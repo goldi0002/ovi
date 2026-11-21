@@ -1,6 +1,7 @@
-import { LogOut, Monitor, Moon, Sun } from "lucide-react";
+import { Download, LogOut, Monitor, Moon, Share, Sun } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ThemeChoice } from "../storage";
+import { useInstall } from "../pwa";
 import { useTheme } from "../theme";
 import { button, eyebrow } from "../ui";
 import type { Account } from "./Header";
@@ -17,6 +18,7 @@ const THEME_OPTIONS: { value: ThemeChoice; label: ReactNode; ariaLabel: string }
 /** The account and this device's preferences. Everything here takes effect at once; there is nothing to save. */
 export function SettingsDialog({ account, onClose, onSignOut }: { account: Account; onClose: () => void; onSignOut: () => void }) {
   const [theme, setTheme] = useTheme();
+  const install = useInstall();
 
   return (
     <Dialog title="Settings" onClose={onClose} autoFocusClose>
@@ -45,6 +47,25 @@ export function SettingsDialog({ account, onClose, onSignOut }: { account: Accou
         <SegmentedControl label="Theme" options={THEME_OPTIONS} value={theme} onChange={setTheme} full className="[&>button]:inline-flex [&>button]:items-center [&>button]:justify-center [&>button]:gap-1.5" />
         <p className="text-xs text-muted">System follows your device's light or dark setting. Saved on this device.</p>
       </Section>
+
+      {install.mode && (
+        <Section title="Install">
+          {install.mode === "prompt" ? (
+            <>
+              <button type="button" className={button("default", "md", "justify-self-start max-sm:w-full")} onClick={() => void install.prompt()}>
+                <Download />
+                Install Ovi
+              </button>
+              <p className="text-xs text-muted">Adds Ovi to your home screen or app list and opens it in its own window.</p>
+            </>
+          ) : (
+            <p className="flex items-start gap-2 text-[0.8125rem] text-muted">
+              <Share className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <span>To install Ovi, tap Share in Safari, then Add to Home Screen.</span>
+            </p>
+          )}
+        </Section>
+      )}
 
       <div className="flex justify-end border-t border-line pt-4">
         <button
