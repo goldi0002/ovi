@@ -48,6 +48,20 @@ public sealed class WebUiTests
     }
 
     [TestMethod]
+    [DataRow("/links/analytics")]
+    [DataRow("/links/qr-codes")]
+    public async Task Pages_under_links_serve_the_ui_without_being_indexed(string path)
+    {
+        using var factory = new OviApiFactory(webRoot: FakeBuiltUi());
+        var res = await factory.CreateUnauthedClient().GetAsync(path);
+
+        Assert.AreEqual(HttpStatusCode.OK, res.StatusCode);
+        Assert.Contains("<div id=root>", await res.Content.ReadAsStringAsync());
+        Assert.Contains("script-src 'self'", res.Headers.GetValues("Content-Security-Policy").Single());
+        Assert.AreEqual("noindex, follow", res.Headers.GetValues("X-Robots-Tag").Single());
+    }
+
+    [TestMethod]
     public void Every_ui_page_is_a_reserved_code()
     {
         foreach (var page in Ovi.Api.Infrastructure.WebUiSetup.Pages.Where(p => p != "/"))

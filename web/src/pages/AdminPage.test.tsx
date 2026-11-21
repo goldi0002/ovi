@@ -9,7 +9,7 @@ const ada = { name: "Ada Lovelace", email: "ada@example.com", provider: "google"
 async function openAdmin() {
   window.history.replaceState(null, "", "/admin");
   render(<App />);
-  await within(screen.getByRole("banner")).findByRole("button", { name: /^(Log in|Sign out)$/ });
+  await within(screen.getByRole("banner")).findByRole("button", { name: /^(Log in|Account)$/ });
   return userEvent.setup();
 }
 
@@ -17,7 +17,7 @@ describe("Admin page", () => {
   it("shows the Admin item only to admins", async () => {
     fakeApi({ user: ada });
     render(<App />);
-    await within(screen.getByRole("banner")).findByRole("button", { name: "Sign out" });
+    await within(screen.getByRole("banner")).findByRole("button", { name: "Account" });
     expect(screen.queryByRole("link", { name: "Admin" })).not.toBeInTheDocument();
   });
 
@@ -58,11 +58,11 @@ describe("Admin page", () => {
   });
 
   it("suspends and restores a user", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const { accounts } = fakeApi({ user: boss, users: [adminUser()] });
     const user = await openAdmin();
 
     await user.click(await screen.findByRole("button", { name: "Suspend Ada Lovelace" }));
+    await user.click(within(screen.getByRole("dialog", { name: "Suspend Ada Lovelace?" })).getByRole("button", { name: "Suspend account" }));
     expect(await screen.findByText("Suspended")).toBeInTheDocument();
     expect(accounts[0].blockedAt).not.toBeNull();
 
@@ -72,7 +72,6 @@ describe("Admin page", () => {
   });
 
   it("filters links by owner and deletes one", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const { store, fetchMock } = fakeApi({ user: boss, users: [adminUser()], links: [link({ code: "adas" }), link({ code: "anon1" })] });
     const user = await openAdmin();
 
@@ -84,6 +83,7 @@ describe("Admin page", () => {
 
     await user.click(screen.getByRole("button", { name: "Show links from everyone" }));
     await user.click(await screen.findByRole("button", { name: "Delete /anon1" }));
+    await user.click(within(screen.getByRole("dialog", { name: "Delete this link /anon1?" })).getByRole("button", { name: "Delete link" }));
     await screen.findByRole("list", { name: "All links" });
     expect(store.map((l) => l.code)).toEqual(["adas"]);
   });

@@ -1,4 +1,4 @@
-import { Check, Download, X } from "lucide-react";
+import { CircleCheck, Download, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { Link } from "../api";
 import { downloadCsv } from "../bulk";
@@ -25,7 +25,7 @@ export function BulkResult({ links, onDismiss }: Props) {
   useEffect(() => headingRef.current?.focus(), [links]);
 
   return (
-    <section className={`${card} relative grid gap-3 p-4 sm:p-5`} aria-labelledby="bulk-result-title">
+    <section className={`${card} relative grid animate-sheet-in gap-4 p-5 sm:p-6`} aria-labelledby="bulk-result-title">
       <div className="pr-10">
         <h2
           id="bulk-result-title"
@@ -33,7 +33,7 @@ export function BulkResult({ links, onDismiss }: Props) {
           tabIndex={-1}
           className="flex items-center gap-1.5 text-[0.9375rem] font-semibold focus:outline-none"
         >
-          <Check className="size-4 shrink-0 text-success" aria-hidden="true" />
+          <CircleCheck className="size-4 shrink-0 text-success" aria-hidden="true" />
           {n} {n === 1 ? "link" : "links"} shortened
         </h2>
         {expiresAt && <p className="mt-0.5 text-xs text-muted">All expire {formatDateTime(expiresAt)}.</p>}
@@ -46,28 +46,24 @@ export function BulkResult({ links, onDismiss }: Props) {
           label="Copy all"
           ariaLabel={`Copy all ${n} short ${n === 1 ? "link" : "links"}`}
           primary
+          size="md"
         />
-        <button type="button" className={button("default", "sm")} onClick={() => downloadCsv(links)}>
+        <button type="button" className={button("default", "md")} onClick={() => downloadCsv(links)}>
           <Download />
           Download CSV
         </button>
       </div>
 
       {/* After the actions in the DOM (so Tab reaches Copy all first); it sits in the corner either way. */}
-      <button
-        type="button"
-        className={`${iconButton} absolute top-3 right-3 sm:top-4 sm:right-4`}
-        onClick={onDismiss}
-        aria-label="Dismiss results"
-      >
+      <button type="button" className={`${iconButton} absolute top-3 right-3`} onClick={onDismiss} aria-label="Dismiss results" data-tip="Dismiss">
         <X />
       </button>
 
-      <ol className="divide-y divide-line border-t border-line">
+      <ol className="-mx-2 divide-y divide-line rounded-lg bg-subtle/60 px-2">
         {links.map((link, i) => (
-          <li key={`${i}-${link.code}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 py-2.5">
+          <li key={`${i}-${link.code}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-1 py-2.5">
             <a
-              className="truncate font-mono text-[0.8125rem] font-semibold underline-offset-4 hover:underline"
+              className="truncate font-mono text-[0.8125rem] font-semibold text-accent-text underline-offset-4 hover:underline"
               href={link.shortUrl}
               target="_blank"
               rel="noreferrer"

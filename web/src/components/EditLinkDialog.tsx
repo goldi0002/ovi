@@ -1,11 +1,10 @@
-import { X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { ApiError, type Link, type OviApi, type UpdateLinkInput } from "../api";
 import { isoToLocalInput, localInputToIso } from "../format";
-import { backdrop, button, errorBox, field, iconButton, input, sheet } from "../ui";
-import { useModal } from "./useModal";
-
-const fieldError = "text-xs font-normal text-danger";
+import { button, errorBox, field, fieldError, hint, input } from "../ui";
+import { useToast } from "./ui/Toast";
+import { Dialog } from "./ui/Dialog";
+import { Spinner } from "./ui/primitives";
 
 interface Props {
   api: OviApi;
@@ -23,7 +22,7 @@ export function EditLinkDialog({ api, link, onClose, onSaved, onUnauthorized }: 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  useModal(onClose);
+  const notify = useToast();
 
   /** Only what changed, so an untouched expiry isn't re-sent (and re-checked) at minute precision. */
   function changes(): UpdateLinkInput {
@@ -45,6 +44,7 @@ export function EditLinkDialog({ api, link, onClose, onSaved, onUnauthorized }: 
     setFieldErrors({});
     try {
       onSaved(await api.update(link.code, input));
+      notify(`Saved /${link.code}`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) return onUnauthorized();
       if (err instanceof ApiError && (err.fieldErrors.url || err.fieldErrors.expiresAt)) setFieldErrors(err.fieldErrors);
@@ -57,20 +57,7 @@ export function EditLinkDialog({ api, link, onClose, onSaved, onUnauthorized }: 
   const expiryError = fieldErrors.expiresAt?.[0];
 
   return (
-    <div className={backdrop} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <section className={`${sheet} grid w-full max-w-md gap-4 p-5`} role="dialog" aria-modal="true" aria-labelledby="edit-title">
-        <header className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 id="edit-title" className="text-[0.9375rem] font-semibold">
-              Edit /{link.code}
-            </h2>
-            <p className="mt-0.5 text-[0.8125rem] text-muted">The short link and its clicks stay the same.</p>
-          </div>
-          <button type="button" className={`${iconButton} -mt-1 -mr-1`} onClick={onClose} aria-label="Close">
-            <X />
-          </button>
-        </header>
-
+    <Dialog title={`Edit /${link.code}`} description="The short link and its clicks stay the same." onClose={onClose}>
         <form className="grid gap-4" onSubmit={submit} aria-label={`Edit /${link.code}`} noValidate>
           <label className={field}>
             <span>Destination URL</span>
@@ -85,7 +72,7 @@ export function EditLinkDialog({ api, link, onClose, onSaved, onUnauthorized }: 
               aria-invalid={urlError ? true : undefined}
               aria-describedby={urlError ? "edit-url-error" : undefined}
               autoFocus
-              className={input}
+              className={`${input} font-normal`}
             />
             {urlError && (
               <span id="edit-url-error" className={fieldError}>
@@ -106,10 +93,10 @@ export function EditLinkDialog({ api, link, onClose, onSaved, onUnauthorized }: 
                 onChange={(e) => setExpiresAt(e.target.value)}
                 aria-invalid={expiryError ? true : undefined}
                 aria-describedby={expiryError ? "edit-expires-error" : "edit-expires-note"}
-                className={input}
+                className={`${input} font-normal`}
               />
               {expiresAt && (
-                <button type="button" className={button("ghost", "sm", "h-10")} onClick={() => setExpiresAt("")}>
+                <button type="button" className={button("default", "md")} onClick={() => setExpiresAt("")}>
                   Never expire
                 </button>
               )}
@@ -119,7 +106,7 @@ export function EditLinkDialog({ api, link, onClose, onSaved, onUnauthorized }: 
                 {expiryError}
               </span>
             ) : (
-              <span id="edit-expires-note" className="text-xs font-normal text-muted">
+              <span id="edit-expires-note" className={hint}>
                 Leave empty for a link that never expires.
               </span>
             )}
@@ -131,16 +118,16 @@ export function EditLinkDialog({ api, link, onClose, onSaved, onUnauthorized }: 
             </p>
           )}
 
-          <div className="flex justify-end gap-2">
-            <button type="button" className={button("ghost", "sm")} onClick={onClose}>
+          <div className="flex justify-end gap-2 pt-1 max-sm:grid max-sm:grid-cols-2">
+            <button type="button" className={button("default", "md")} onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className={button("primary", "sm")} disabled={saving}>
+            <button type="submit" className={button("primary", "md", "min-w-20")} disabled={saving}>
+              {saving && <Spinner />}
               {saving ? "Saving…" : "Save"}
             </button>
           </div>
         </form>
-      </section>
-    </div>
+    </Dialog>
   );
 }

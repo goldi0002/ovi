@@ -14,6 +14,6 @@
   document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
   if (choice) {
     var metas = document.querySelectorAll('meta[name="theme-color"]');
-    for (var i = 0; i < metas.length; i++) metas[i].setAttribute("content", dark ? "#121213" : "#ffffff");
+    for (var i = 0; i < metas.length; i++) metas[i].setAttribute("content", dark ? "#141416" : "#f5f5f7");
   }
 })();

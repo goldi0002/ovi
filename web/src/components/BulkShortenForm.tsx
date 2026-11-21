@@ -1,14 +1,14 @@
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, CircleAlert, FileUp, Layers } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
 import { ApiError, type Link, type OviApi } from "../api";
 import { MAX_BULK_URLS, bulkErrors, lineRange, parseBulkInput } from "../bulk";
 import { localInputToIso } from "../format";
-import { button, errorBox, field, focusRing, input } from "../ui";
+import { button, errorBox, field, fieldError, focusRing, hint, input } from "../ui";
+import { EmptyState, Spinner } from "./ui/primitives";
 
 /** The id of the textarea, so the results' Dismiss can return focus here. */
 export const BULK_TEXTAREA_ID = "bulk-urls";
 
-const fieldError = "text-xs font-normal text-danger";
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 interface Props {
@@ -182,13 +182,18 @@ export function BulkShortenForm({ api, signedIn, onLogIn, onCreated, onUnauthori
 
   if (!signedIn && !signedOutWithDraft) {
     return (
-      <div className="grid justify-items-center gap-3 rounded-lg bg-subtle px-4 py-6 text-center">
-        <p className="text-[0.8125rem] text-muted">
-          Shortening many links at once needs an account. It's free with Google or GitHub.
-        </p>
-        <button type="button" className={button("primary", "sm")} onClick={onLogIn}>
-          Log in
-        </button>
+      <div className="rounded-xl bg-subtle/70">
+        <EmptyState
+          plain
+          icon={<Layers />}
+          title="Shorten up to 25 links at once"
+          description="Shortening many links at once needs an account. It's free with Google or GitHub."
+          action={
+            <button type="button" className={button("primary", "md")} onClick={onLogIn}>
+              Log in
+            </button>
+          }
+        />
       </div>
     );
   }
@@ -226,26 +231,27 @@ export function BulkShortenForm({ api, signedIn, onLogIn, onCreated, onUnauthori
           aria-describedby={describedBy}
           aria-invalid={lineErrors.length > 0 ? true : undefined}
           aria-keyshortcuts="Control+Enter Meta+Enter"
-          className={`${input} h-auto min-h-36 resize-y py-2 font-mono text-[0.8125rem] leading-relaxed`}
+          className={`${input} h-auto min-h-40 resize-y rounded-[10px] py-2.5 font-mono text-[0.8125rem] leading-relaxed`}
         />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <button
           type="button"
-          className={`inline-flex cursor-pointer items-center gap-1 rounded py-0.5 text-[0.8125rem] text-muted hover:text-ink ${focusRing}`}
+          className={`inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-[0.8125rem] font-medium text-muted hover:text-ink ${focusRing}`}
           aria-expanded={showExpiry}
           aria-controls="bulk-expiry"
           onClick={() => setShowExpiry((v) => !v)}
         >
           Expiry
-          <ChevronDown className={`size-4 transition-transform ${showExpiry ? "rotate-180" : ""}`} aria-hidden="true" />
+          <ChevronDown className={`size-3.5 transition-transform duration-200 ${showExpiry ? "rotate-180" : ""}`} aria-hidden="true" />
         </button>
-        <label className={`cursor-pointer rounded py-0.5 text-[0.8125rem] text-muted underline underline-offset-2 hover:text-ink has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2`}>
+        <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-[0.8125rem] font-medium text-muted hover:text-ink has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-accent/35`}>
+          <FileUp className="size-3.5" aria-hidden="true" />
           Upload CSV
           <input aria-describedby="bulk-csv-note" type="file" accept=".csv,text/csv,text/plain" className="sr-only" onChange={onFile} disabled={saving} />
         </label>
-        <span id="bulk-count" className={`text-[0.8125rem] tabular-nums ${over > 0 ? "text-danger" : "text-muted"}`}>
+        <span id="bulk-count" className={`ml-auto rounded-full px-2 py-0.5 text-xs font-medium tabular-nums ${over > 0 ? "bg-error-bg text-danger" : "bg-subtle text-muted"}`}>
           {over > 0 ? overMessage : `${count} of ${MAX_BULK_URLS}`}
         </span>
         {over > 0 && (
@@ -255,12 +261,12 @@ export function BulkShortenForm({ api, signedIn, onLogIn, onCreated, onUnauthori
         )}
       </div>
 
-      <p id="bulk-csv-note" className="text-xs text-muted">
-        For a custom code or expiry per link, use a CSV: a first line of <code>url,code,expires_at</code>, then one link per line.
+      <p id="bulk-csv-note" className={hint}>
+        For a custom code or expiry per link, use a CSV: a first line of <code className="rounded bg-subtle px-1 py-px font-mono text-[0.6875rem]">url,code,expires_at</code>, then one link per line.
       </p>
 
       {showExpiry && (
-        <div id="bulk-expiry" className={field}>
+        <div id="bulk-expiry" className={`${field} animate-pop-in rounded-xl bg-subtle/70 p-3.5`}>
           <label htmlFor="bulk-expires">
             Expires <span className="font-normal text-muted">(optional)</span>
           </label>
@@ -273,14 +279,14 @@ export function BulkShortenForm({ api, signedIn, onLogIn, onCreated, onUnauthori
             readOnly={saving}
             aria-invalid={expiryError ? true : undefined}
             aria-describedby={expiryError ? "bulk-expires-error" : "bulk-expires-note"}
-            className={`${input} sm:max-w-xs`}
+            className={`${input} font-normal sm:max-w-xs`}
           />
           {expiryError ? (
             <span id="bulk-expires-error" className={fieldError}>
               {expiryError}
             </span>
           ) : (
-            <span id="bulk-expires-note" className="text-xs font-normal text-muted">
+            <span id="bulk-expires-note" className={hint}>
               Applies to every link without its own expires_at. Leave empty to keep them for good.
             </span>
           )}
@@ -318,8 +324,9 @@ export function BulkShortenForm({ api, signedIn, onLogIn, onCreated, onUnauthori
       )}
 
       {error && (
-        <p className={errorBox} role="alert">
-          {error}
+        <p className={`${errorBox} flex items-start gap-2`} role="alert">
+          <CircleAlert className="mt-px size-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </p>
       )}
 
@@ -328,18 +335,19 @@ export function BulkShortenForm({ api, signedIn, onLogIn, onCreated, onUnauthori
           type="submit"
           className={button(
             "primary",
-            "md",
+            "lg",
             "justify-self-end max-sm:w-full aria-disabled:cursor-not-allowed aria-disabled:opacity-45",
           )}
           // Not `disabled` while saving: that would drop focus from the button the user pressed. submit() ignores repeats.
           disabled={!saving && (count === 0 || over > 0)}
           aria-disabled={saving || undefined}
         >
+          {saving && <Spinner />}
           {submitLabel}
         </button>
       ) : (
         // The alert above already says to copy the list first, so this is just the button.
-        <button type="button" ref={logInRef} className={button("primary", "sm", "justify-self-end")} onClick={onLogIn}>
+        <button type="button" ref={logInRef} className={button("primary", "md", "justify-self-end")} onClick={onLogIn}>
           Log in
         </button>
       )}

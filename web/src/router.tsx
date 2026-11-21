@@ -1,7 +1,14 @@
 import { useSyncExternalStore, type AnchorHTMLAttributes, type MouseEvent } from "react";
 
-// A minimal client-side router for the app's two pages ("/" and "/links").
-// The server returns index.html for each page path, so deep links and reloads work.
+// A minimal client-side router. The server returns index.html for each page path (WebUiSetup.Pages),
+// so deep links and reloads work. Keep this list and that one in step.
+export const PAGES = {
+  home: "/",
+  links: "/links",
+  analytics: "/links/analytics",
+  qrCodes: "/links/qr-codes",
+  admin: "/admin",
+} as const;
 
 const NAVIGATE = "ovi:navigate";
 
@@ -19,10 +26,16 @@ export function usePath(): string {
   return useSyncExternalStore(subscribe, () => window.location.pathname);
 }
 
+/** The current query string, e.g. "?code=docs". Re-renders when it changes. */
+export function useSearch(): string {
+  return useSyncExternalStore(subscribe, () => window.location.search);
+}
+
 /** Goes to an in-app URL ("/links", "/#pricing") without reloading the page. */
-export function navigate(to: string) {
+export function navigate(to: string, { replace = false } = {}) {
   const url = new URL(to, window.location.href);
-  window.history.pushState(null, "", url);
+  if (replace) window.history.replaceState(null, "", url);
+  else window.history.pushState(null, "", url);
   window.dispatchEvent(new Event(NAVIGATE));
 }
 
@@ -41,7 +54,7 @@ export function AppLink({ href, onClick, ...rest }: AnchorHTMLAttributes<HTMLAnc
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     const url = new URL(href, window.location.href);
     // A same-page anchor (#features on the home page) can use the browser's own scrolling.
-    if (url.pathname === window.location.pathname && url.hash) return;
+    if (url.pathname === window.location.pathname && url.search === window.location.search && url.hash) return;
     e.preventDefault();
     navigate(href);
   }

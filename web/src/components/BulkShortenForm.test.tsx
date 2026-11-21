@@ -8,7 +8,7 @@ const ada = { name: "Ada Lovelace", email: "ada@example.com", provider: "google"
 /** Renders the app, waits for the session, and switches the home page to "Many links". */
 async function openBulk() {
   render(<App />);
-  await within(screen.getByRole("banner")).findByRole("button", { name: /^(Log in|Sign out)$/ });
+  await within(screen.getByRole("banner")).findByRole("button", { name: /^(Log in|Account)$/ });
   const user = userEvent.setup();
   const toggle = screen.getByRole("group", { name: "How many links" });
   await waitFor(() => expect(within(toggle).getByRole("button", { name: "Many links" })).toBeEnabled());
