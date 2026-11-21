@@ -1,31 +1,73 @@
-# ovi
+# Ovi
 
 [![CI](https://github.com/goldi0002/ovi/actions/workflows/ci.yml/badge.svg)](https://github.com/goldi0002/ovi/actions/workflows/ci.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![Image](https://img.shields.io/badge/image-ghcr.io%2Fgoldi0002%2Fovi-blue)](https://github.com/goldi0002/ovi/pkgs/container/ovi)
 
-A small URL shortener API built with ASP.NET Core minimal APIs (.NET 10 LTS), EF Core and PostgreSQL (hosted on [Neon](https://neon.com) in production).
+**A URL shortener you can run yourself**, with QR codes and click stats that don't track people. One container and a Postgres database, on amd64 or ARM64.
 
-## Run locally
+Try it at **[getovi.link](https://getovi.link)**, or [run your own in two minutes](#self-host-with-docker-compose).
+
+![Shortening a link on Ovi: the short link, its QR code, and Copy, Open and QR code buttons](docs/screenshots/home.png)
+
+| Your links | Click stats, in dark mode |
+|---|---|
+| ![The My Links page: short links with their destination, clicks, age and status](docs/screenshots/links.png) | ![Stats for one link: clicks per day over 30 days, and the top referrers, devices and browsers](docs/screenshots/stats-dark.png) |
+
+## Features
+
+- **Short links without an account.** Paste a URL and get a short link and a QR code. Anonymous links expire after 30 days.
+- **Accounts with Google or GitHub** (optional): custom codes, your own expiry dates or none, and a list of every link you've made.
+- **Many links at once**: paste up to 25 URLs, or upload a CSV with a custom code and expiry per link.
+- **Click stats that respect visitors**: clicks per day, referring sites, devices and browsers. No IP addresses or full user agents are stored.
+- **A QR code for every link**, as a crisp PNG.
+- **An admin dashboard**: every user and link, totals, suspending accounts, and a queue of links people reported.
+- **Abuse protection**: rate limits, a blocklist, an optional Google Safe Browsing check on new links, and a public **Report a link** page.
+- **An HTTP API** with an admin API key, documented below.
+- **Installable** as an app on phones and desktops, with light and dark mode.
+- **Small and stateless**: one container, all data in Postgres, migrations on start. Several instances can share one database.
+
+## Self-host with Docker Compose
+
+The quickest way to run your own Ovi: the app and a Postgres database, from the published image. It runs on amd64 and ARM64 (a Raspberry Pi 4 or 5 with a 64-bit OS, or an ARM cloud server).
 
 ```bash
-dotnet tool restore                      # installs dotnet-ef locally
-docker run -d --name ovi-pg -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=ovi postgres:17-alpine
-ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/Ovi.Api --urls http://localhost:5080
+curl -O https://raw.githubusercontent.com/goldi0002/ovi/main/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/goldi0002/ovi/main/.env.example
+# Edit .env: set OVI_PUBLIC_URL, OVI_API_KEY (openssl rand -hex 32) and POSTGRES_PASSWORD (openssl rand -hex 24)
+docker compose up -d
 ```
 
-Development connects to that local Postgres by default (`ConnectionStrings:Default` in `appsettings.Development.json`). To use a Neon branch instead, export its variables first:
+Ovi is then on http://localhost:8080. Sign in as the admin with **Log in → Admin? Use an API key** and the `OVI_API_KEY` value. The database lives in the `ovi-db` volume, and migrations run on start, so upgrading is `docker compose pull && docker compose up -d`. The compose file uses the `1` image tag, so that picks up every 1.x release but never a 2.0 that could need changes on your side (see [Image tags](#image-tags)).
+
+For a public site, put a reverse proxy with TLS in front of it. With [Caddy](https://caddyserver.com), which gets the certificate for you, a `Caddyfile` of
+
+```
+links.example.com {
+    reverse_proxy localhost:8080
+}
+```
+
+is enough. Set `OVI_PUBLIC_URL` to that address, and see [Deploying behind a reverse proxy](#deploying-behind-a-reverse-proxy) so rate limits see real client IPs. Sign-in with Google or GitHub, admin emails and the Safe Browsing check are commented out in `docker-compose.yml`: uncomment the lines you need and set the values in `.env`.
+
+## Run with Docker
+
+To use your own Postgres instead, build or pull the image and pass the settings yourself:
 
 ```bash
-neon env pull                            # writes DATABASE_URL etc. to .env.local (git-ignored)
-set -a; source .env.local; set +a
+docker build -t ovi .
+docker run -d -p 8080:8080 \
+  -e DATABASE_URL='postgresql://user:pass@host/db?sslmode=require' \
+  -e Auth__ApiKey='a-long-random-secret' \
+  -e App__PublicBaseUrl='https://your.domain' \
+  ovi
 ```
 
-Swagger UI: http://localhost:5080/swagger. Click **Authorize** and enter `dev-key-change-me`.
+The container runs as a non-root user. It keeps no local state: all data is in Postgres.
 
-The schema is created and migrated automatically on startup.
+## Using Ovi
 
-## Web UI
-
-A React app in [`web/`](web) (Vite, TypeScript, Tailwind CSS, Lucide icons) is the UI for the API. It's served by the API itself at `/`, so there's one address and no CORS setup.
+The web app is served by the API itself at `/`, so there's one address and no CORS setup.
 
 - A simple design after macOS: black text on white, the system font, a translucent toolbar with a Shorten / Links segmented control, and sheet-style dialogs. It works from 320px phones up, and long URLs and codes are cut off or wrapped instead of stretching the page.
 - The home page is just the shortener.
@@ -43,48 +85,6 @@ A React app in [`web/`](web) (Vite, TypeScript, Tailwind CSS, Lucide icons) is t
   - every link, with its owner; filter by owner (anonymous, API key or one user), search, open its stats, or delete it
   - a **Reports** tab, with a badge showing the number of open reports, listing links with open reports, most reported first: the number of reports, a count per reason, the latest details people wrote (up to 5), and the link's owner. Dismiss or mark as actioned closes all of a link's open reports; you can also delete the link or suspend its owner from there
 - Open **Stats** on any link for its clicks per day over the last 7, 30 or 90 days, its top referrers, and the devices and browsers visitors used. Each click stores only the time, the referring site's name (no page path), and a device and browser category: no IP address or full user agent.
-
-Develop it with hot reload while the API runs on `:5080` (see above). Vite proxies `/api` calls to it:
-
-```bash
-cd web
-npm ci
-npm run dev          # http://localhost:5173
-npm test             # Vitest + Testing Library
-npm run build        # type-checks, then builds into src/Ovi.Api/wwwroot
-```
-
-After `npm run build`, the API serves the UI at http://localhost:5080/. The Docker image builds it automatically. `index.html` is sent with a strict Content-Security-Policy and `no-cache`, and the hashed files in `/assets` are cached for a year.
-
-## Run with Docker Compose
-
-The quickest way to run your own Ovi: the app and a Postgres database, from the published image. It runs on amd64 and ARM64 (a Raspberry Pi 4 or 5 with a 64-bit OS, or an ARM cloud server).
-
-```bash
-curl -O https://raw.githubusercontent.com/goldi0002/ovi/main/docker-compose.yml
-curl -o .env https://raw.githubusercontent.com/goldi0002/ovi/main/.env.example
-# Edit .env: set OVI_PUBLIC_URL, OVI_API_KEY (openssl rand -hex 32) and POSTGRES_PASSWORD (openssl rand -hex 24)
-docker compose up -d
-```
-
-Ovi is then on http://localhost:8080. Sign in as the admin with **Log in → Admin? Use an API key** and the `OVI_API_KEY` value. The database lives in the `ovi-db` volume, and migrations run on start, so upgrading is `docker compose pull && docker compose up -d`. The compose file uses the `1` image tag, so that picks up every 1.x release but never a 2.0 that could need changes on your side (see [Image tags](#image-tags)).
-
-For a public site, put a reverse proxy with TLS in front of it (see [Deploying behind a reverse proxy](#deploying-behind-a-reverse-proxy)). Sign-in with Google or GitHub, admin emails and the Safe Browsing check are commented out in `docker-compose.yml`: uncomment the lines you need and set the values in `.env`.
-
-## Run with Docker
-
-To use your own Postgres instead, build or pull the image and pass the settings yourself:
-
-```bash
-docker build -t ovi .
-docker run -d -p 8080:8080 \
-  -e DATABASE_URL='postgresql://user:pass@host/db?sslmode=require' \
-  -e Auth__ApiKey='a-long-random-secret' \
-  -e App__PublicBaseUrl='https://your.domain' \
-  ovi
-```
-
-The container runs as a non-root user. It keeps no local state: all data is in Postgres.
 
 ## Deploy to Render
 
@@ -374,6 +374,41 @@ HTTP/1.1 201 Created
 
 - A missing or empty `urls` list gives `errors.urls` = `["Add at least one URL."]`. More than 25 gives `["You can shorten at most 25 URLs at once."]` before any URL is checked.
 - Custom codes and per-URL expiry dates aren't supported. Other fields, such as `customCode`, are never used.
+
+## Development
+
+### Run locally
+
+```bash
+dotnet tool restore                      # installs dotnet-ef locally
+docker run -d --name ovi-pg -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=ovi postgres:17-alpine
+ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/Ovi.Api --urls http://localhost:5080
+```
+
+Development connects to that local Postgres by default (`ConnectionStrings:Default` in `appsettings.Development.json`). To use a Neon branch instead, export its variables first:
+
+```bash
+neon env pull                            # writes DATABASE_URL etc. to .env.local (git-ignored)
+set -a; source .env.local; set +a
+```
+
+Swagger UI: http://localhost:5080/swagger. Click **Authorize** and enter `dev-key-change-me`.
+
+The schema is created and migrated automatically on startup.
+
+### Web UI
+
+A React app in [`web/`](web) (Vite, TypeScript, Tailwind CSS, Lucide icons). Develop it with hot reload while the API runs on `:5080` (see above). Vite proxies `/api` calls to it:
+
+```bash
+cd web
+npm ci
+npm run dev          # http://localhost:5173
+npm test             # Vitest + Testing Library
+npm run build        # type-checks, then builds into src/Ovi.Api/wwwroot
+```
+
+After `npm run build`, the API serves the UI at http://localhost:5080/. The Docker image builds it automatically. `index.html` is sent with a strict Content-Security-Policy and `no-cache`, and the hashed files in `/assets` are cached for a year.
 
 ## Database migrations
 
