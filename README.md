@@ -35,11 +35,13 @@ A React app in [`web/`](web) (Vite, TypeScript, Tailwind CSS, Lucide icons) is t
 - Copy the result or download its QR code.
 - Signed-in users can switch the form to **Many links** and paste up to 25 URLs, one per line, with one optional expiry for all of them. Blank lines are skipped. To choose a custom code and expiry per link, upload a CSV (or paste one) whose first line is `url,code,expires_at`. If any line is wrong, nothing is shortened and each bad line is listed with its line number. The results can be copied all at once (one short URL per line, in input order) or downloaded as a CSV file (`url,short_url,code,expires_at`).
 - The **Links** page (`/links`) lists your links (every link for the admin) (a table on wide screens, cards on phones) with clicks, creation time and status (active, expiring, expired); page through them and delete them. Its address works directly, so you can bookmark it.
+- Anyone, signed in or not, can open **Report a link** (`/report`, linked in the header) to tell the admin about a short link that scams, infects or spams people. Paste the short link or its code, choose phishing, malware, spam or other, and add optional details (up to 500 characters). A report stores only the link, the reason, the details and the time: no IP address, user agent or account. The page can be pre-filled with `/report?link=abc123`.
 - Admins get an **Admin** page (`/admin`):
   - totals and clicks over the last 14 days
   - the top links
   - every user, with their links and clicks; an admin can suspend or restore a user
   - every link, with its owner; filter by owner (anonymous, API key or one user), search, open its stats, or delete it
+  - a **Reports** tab, with a badge showing the number of open reports, listing links with open reports, most reported first: the number of reports, a count per reason, the latest details people wrote (up to 5), and the link's owner. Dismiss or mark as actioned closes all of a link's open reports; you can also delete the link or suspend its owner from there
 - Open **Stats** on any link for its clicks per day over the last 7, 30 or 90 days, its top referrers, and the devices and browsers visitors used. Each click stores only the time, the referring site's name (no page path), and a device and browser category: no IP address or full user agent.
 
 Develop it with hot reload while the API runs on `:5080` (see above). Vite proxies `/api` calls to it:
@@ -179,6 +181,7 @@ Both accept Neon's `postgresql://…?sslmode=require&channel_binding=require` UR
 | `RateLimits:AnonymousCreatePerHour` | `RateLimits__AnonymousCreatePerHour` | `20` | Links made per IP without signing in |
 | `RateLimits:AuthPerMinute` | `RateLimits__AuthPerMinute` | `20` | Sign-in starts per IP |
 | `RateLimits:StatsPerMinute` | `RateLimits__StatsPerMinute` | `60` | Stats requests per user (or per IP) |
+| `RateLimits:ReportPerHour` | `RateLimits__ReportPerHour` | `10` | Reports sent per client IP per hour |
 | `RateLimits:ApiKeyFailuresPerMinute` | `RateLimits__ApiKeyFailuresPerMinute` | `10` | Wrong `X-Api-Key` attempts per client per minute before 429, so a key can't be guessed online |
 | `Clicks:DedupeSeconds` | `Clicks__DedupeSeconds` | `30` | Repeat visits from the same client to the same link within this window count once |
 | `Clicks:MaxRecordedPerMinute` | `Clicks__MaxRecordedPerMinute` | `1000` | Clicks recorded per minute across the whole site; beyond it, visitors are still redirected but not counted |
@@ -228,13 +231,16 @@ Redirects and QR codes are public.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `POST` | `/api/links` | anyone | Create a link. Body: `{ "url": "https://...", "customCode": "optional", "expiresAt": "optional, e.g. 2030-01-01T00:00:00Z" }` |
+| `POST` | `/api/reports` | anyone | Report a link as abusive. Body: `{ "link": "abc123" or "https://getovi.link/abc123", "reason": "phishing" \| "malware" \| "spam" \| "other", "details": "optional, up to 500 characters" }`. Needs the `X-Ovi-Request` header. Returns 202 with no body. 400 for a link that isn't an Ovi short link or code, a missing or unknown reason, or details that are too long or contain characters that can't be saved; 403 without the header; 404 if the link doesn't exist (a deleted link counts as missing); 429 over the rate limit. See [Report a link](#report-a-link) |
 | `POST` | `/api/links/bulk` | user, key | Shorten 1 to 25 URLs in one request, all or nothing. Body: `{ "urls": ["https://...", "https://..."], "expiresAt": "optional, set on every link" }`, or `{ "items": [{ "url": "...", "customCode": "optional", "expiresAt": "optional" }] }` for a code and expiry per link. Without `customCode` codes are random; without `expiresAt` the links never expire. Returns 201 `{ "items": [link, ...] }` in input order, each in the same shape as `POST /api/links`. Any bad URL or expiry gives 400 and creates nothing. Counts as N links against the create rate limit (a 400 or 429 costs nothing, except a 400 from the Safe Browsing check). 503 "Couldn't make short codes; try again." means nothing was created and a retry is safe. See [Bulk create](#bulk-create) |
 | `GET` | `/api/links?page=1&pageSize=50&q=&status=all` | user, key | List links, newest first. Returns `{ items, page, pageSize, total }`; `pageSize` max 100, `page` max 100000. Optional `q` searches code and URL (case-insensitive, max 100 characters); `status` is `all` (default), `active` or `expired` |
 | `GET` | `/api/links/{code}` | user, key | Show one link's details and click count |
 | `GET` | `/api/links/{code}/stats?days=30` | user, key | Click analytics for the last 1–365 days (UTC): clicks per day, top referrers, devices and browsers |
 | `PATCH` | `/api/links/{code}` | user, key | Edit a link's destination or expiry; the code, clicks and stats stay. Body (every field optional): `{ "url": "https://...", "expiresAt": "2030-01-01T00:00:00Z" }`, or `{ "clearExpiry": true }` to make it never expire. A missing or `null` field is left as it is. Checked like a new link; returns the updated link |
 | `DELETE` | `/api/links/{code}` | user, key | Delete a link (soft delete: the row is kept with `DeletedAt` set, and the link disappears from every endpoint). Counts as 1 link against the create rate limit, so a 429 with `Retry-After` follows a burst of deletes |
-| `GET` | `/api/admin/overview` | admin | Totals, clicks and sign-ups per day for 14 days, top links |
+| `GET` | `/api/admin/overview` | admin | Totals, clicks and sign-ups per day for 14 days, top links, and `openReports` (open reports on links that still exist) |
+| `GET` | `/api/admin/reports?page=1&pageSize=20` | admin | Links with open reports (not deleted links), most reports first. Each item has `code`, `shortUrl`, `url`, `owner`, `anonymous`, `openReports`, `reasons` (`phishing`, `malware`, `spam`, `other` counts), `latestAt` and `details` (the latest 5 non-empty texts). Returns `{ items, page, pageSize, total }` |
+| `POST` | `/api/admin/reports/{code}/resolve` | admin | Close every open report on a link. Body: `{ "resolution": "dismissed" }` or `{ "resolution": "actioned" }`. Returns 204; 400 for any other resolution; 404 if the link doesn't exist |
 | `GET` | `/api/admin/users?page=1&pageSize=20&q=` | admin | Every user with link and click counts; `q` searches name and email |
 | `GET` | `/api/admin/links?page=1&pageSize=20&q=&owner=` | admin | Every link with its owner; `owner` is `anonymous`, `apikey` or a user id; `q` searches code and URL |
 | `POST` | `/api/admin/users/{id}/block` / `unblock` | admin | Suspend or restore a user (not yourself or another admin) |
@@ -253,7 +259,7 @@ Validation rules:
 - A URL can't contain a user name or password (`https://bank.example@evil.example` is a phishing trick).
 - A URL can't point back at the shortener, or at a site in `Links:BlockedHosts`.
 - When `SafeBrowsing:ApiKey` is set, a URL that Google Safe Browsing flags as unsafe is refused with 400 under `url` (see [Abuse protection](#abuse-protection)).
-- A custom code is 3 to 32 characters of letters, digits, `-` or `_`, and only for signed-in users and the admin. It can't be a reserved word (`api`, `auth`, `swagger`, `openapi`, `health`, `qr`, `assets`, `links`, `admin`).
+- A custom code is 3 to 32 characters of letters, digits, `-` or `_`, and only for signed-in users and the admin. It can't be a reserved word (`api`, `auth`, `swagger`, `openapi`, `health`, `qr`, `assets`, `links`, `admin`, `report`).
 - `expiresAt` must be in the future and at most 10 years away. Anonymous links expire after 30 days by default, and can't be set to last longer.
 - Request bodies over 64 KB are refused.
 - Hosts are compared in one normal form (punycode, lowercase, no trailing dot), so `Evil.COM.` matches a block on `evil.com`. The blocklist also applies when a link is visited: links made before a site was blocked return 410.
@@ -271,6 +277,8 @@ Rate limits for making links:
 - Single create and edit each cost 1, even when they fail validation. A bulk request of N URLs costs N.
 - A bulk request that fails validation (400) or is over the remaining budget (429) costs nothing. The exception is a batch refused by the Safe Browsing check: that check runs after the budget is taken, so the batch still costs N.
 
+Rate limit for reports: `POST /api/reports` allows 10 an hour per client IP (`RateLimits:ReportPerHour`), then returns 429.
+
 Errors use RFC 7807 problem JSON:
 - 400: validation failed.
 - 401: the API key is wrong, or the endpoint needs you to sign in.
@@ -287,6 +295,25 @@ curl -X POST localhost:5080/api/links -H "X-Api-Key: $KEY" -H 'content-type: app
 curl -i localhost:5080/dotnet
 curl -o dotnet.png localhost:5080/dotnet/qr
 ```
+
+### Report a link
+
+Anyone can report a short link. No sign-in is needed, but the request must send `X-Ovi-Request: 1`.
+
+```bash
+curl -X POST localhost:5080/api/reports -H 'X-Ovi-Request: 1' -H 'content-type: application/json' \
+  -d '{"link":"https://getovi.link/abc123","reason":"phishing","details":"Fake bank login page"}'
+# 202 Accepted, empty body
+```
+
+- `link` is an Ovi code or a short URL on this site's own host. Anything else gets 400 ("Enter an Ovi short link or its code.").
+- `reason` is `phishing`, `malware`, `spam` or `other`.
+- `details` is optional, trimmed, at most 500 characters. Line breaks (`\n`, `\r\n` or `\r`, all saved as `\n`) and tabs are fine; any other control or direction-override character gets 400 ("The details contain characters that can't be saved."). More than 500 characters after that gives 400 ("Keep the details under 500 characters.").
+- Expired and disabled links can be reported. A deleted link gets 404.
+- Each link keeps at most 50 open reports. Later ones get 202 but are dropped, so one link can't flood the list.
+- A report stores the link, reason, details and time. It never stores the reporter's IP address, user agent or account.
+
+An admin then closes a link's reports from the **Reports** tab, or with `POST /api/admin/reports/{code}/resolve`. Closing marks all of the link's open reports `dismissed` or `actioned`; it doesn't delete or disable the link, so do that separately if needed.
 
 ### Bulk create
 

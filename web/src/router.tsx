@@ -8,6 +8,7 @@ export const PAGES = {
   analytics: "/links/analytics",
   qrCodes: "/links/qr-codes",
   admin: "/admin",
+  report: "/report",
 } as const;
 
 const NAVIGATE = "ovi:navigate";

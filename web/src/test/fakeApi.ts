@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { AdminUser, Link, LinkStats, Provider, Session } from "../api";
+import type { AdminReport, AdminUser, Link, LinkStats, Provider, Session } from "../api";
 
 export function link(overrides: Partial<Link> = {}): Link {
   const code = overrides.code ?? "abc1234";
@@ -59,6 +59,8 @@ interface FakeOptions {
   users?: AdminUser[];
   /** Make POST /api/links/bulk answer 429, as when the create budget is used up. */
   bulkRateLimited?: boolean;
+  /** Open reports the admin sees (grouped by link). */
+  reports?: AdminReport[];
 }
 
 export function adminUser(overrides: Partial<AdminUser> = {}): AdminUser {
@@ -85,10 +87,13 @@ export function fakeApi({
   providers = ["google", "github"],
   users = [],
   bulkRateLimited = false,
+  reports = [],
 }: FakeOptions = {}) {
   const store = [...links];
   const accounts = [...users];
   const state = { user, bulkRateLimited };
+  const openReports = [...reports];
+  const submitted: { link: string; reason: string; details?: string }[] = [];
   let bulkCount = 0;
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = new URL(String(input), "http://localhost");
@@ -111,6 +116,14 @@ export function fakeApi({
       const created = link({ code: "anon123", url: body.url, expiresAt: "2026-12-17T12:00:00Z" });
       store.unshift(created);
       return json(201, created);
+    }
+    if (method === "POST" && url.pathname === "/api/reports") {
+      const body = JSON.parse(String(init.body)) as { link: string; reason: string; details?: string };
+      if (!/^[\w-]{3,32}$/.test(body.link.replace(/^https?:\/\/[^/]+\//, "")))
+        return json(400, { errors: { link: ["Enter an Ovi short link or its code."] } });
+      if (body.link.endsWith("nope")) return json(404, { title: "We couldn't find that Ovi link." });
+      submitted.push(body);
+      return json(202, undefined);
     }
     if (method === "POST" && url.pathname === "/api/links/bulk") {
       if (!signedIn) return json(401, { title: "Sign in to shorten many links at once." });
@@ -162,6 +175,7 @@ export function fakeApi({
           expiredLinks: 0,
           deletedLinks: 3,
           totalClicks: 42,
+          openReports: openReports.reduce((n, r) => n + r.openReports, 0),
           dailyClicks: stats("x", 14).daily.map((d) => ({ date: d.date, count: d.clicks })),
           dailySignups: stats("x", 14).daily.map((d) => ({ date: d.date, count: 0 })),
           topLinks: store.slice(0, 5).map((l) => ({ code: l.code, shortUrl: l.shortUrl, url: l.url, clicks: l.clicks, ownerName: "Ada Lovelace" })),
@@ -175,6 +189,14 @@ export function fakeApi({
           .map((l, i) => ({ link: l, owner: i === 0 ? { id: 1, name: "Ada Lovelace", email: "ada@example.com" } : null, anonymous: i !== 0 }))
           .filter((r) => !owner || (owner === "anonymous" ? r.anonymous : owner === "apikey" ? false : r.owner?.id === Number(owner)));
         return page(rows);
+      }
+      if (url.pathname === "/api/admin/reports") return page(openReports);
+      const resolve = url.pathname.match(/^\/api\/admin\/reports\/([^/]+)\/resolve$/);
+      if (method === "POST" && resolve) {
+        const at = openReports.findIndex((r) => r.code === resolve[1]);
+        if (at < 0) return json(404, { title: "Not Found" });
+        openReports.splice(at, 1);
+        return json(204, undefined);
       }
       const block = url.pathname.match(/^\/api\/admin\/users\/(\d+)\/(block|unblock)$/);
       if (method === "POST" && block) {
@@ -238,5 +260,5 @@ export function fakeApi({
     return json(404, { title: "Not Found" });
   });
   vi.stubGlobal("fetch", fetchMock);
-  return { fetchMock, store, state, accounts };
+  return { fetchMock, store, state, accounts, submitted, openReports };
 }
