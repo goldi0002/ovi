@@ -332,35 +332,73 @@ public static class LinkEndpoints
         if (!caller.SignedIn)
             return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Sign in to shorten many links at once.");
 
-        if (request?.Urls is not { Count: > 0 } input)
-            return Results.ValidationProblem(new Dictionary<string, string[]> { ["urls"] = ["Add at least one URL."] });
+        if (request is { Urls: not null, Items: not null })
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["items"] = ["Send either urls or items, not both."] });
+
+        // Both shapes become one list: a URL, an optional custom code and an optional expiry per link.
+        var usingItems = request?.Items is not null;
+        var rows = usingItems
+            ? request!.Items!.Select(it => (Url: it?.Url, Code: it?.CustomCode?.Trim(), Expiry: it?.ExpiresAt?.UtcDateTime)).ToList()
+            : request?.Urls?.Select(u => (Url: u, Code: (string?)null, Expiry: (DateTime?)null)).ToList();
+        var listKey = usingItems ? "items" : "urls";
+        if (rows is not { Count: > 0 })
+            return Results.ValidationProblem(new Dictionary<string, string[]> { [listKey] = ["Add at least one URL."] });
         // A batch can never take more permits than the budget holds, so a lower configured limit lowers the batch size.
         var max = Math.Min(MaxBulkUrls, budget.PermitLimit);
-        if (input.Count > max)
-            return Results.ValidationProblem(new Dictionary<string, string[]> { ["urls"] = [$"You can shorten at most {max} URLs at once."] });
+        if (rows.Count > max)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { [listKey] = [$"You can shorten at most {max} URLs at once."] });
 
         var now = time.GetUtcNow().UtcDateTime;
         var errors = new Dictionary<string, string[]>();
-        var uris = new Uri[input.Count];
-        for (var i = 0; i < input.Count; i++)
+        var uris = new Uri[rows.Count];
+        var expiries = new DateTime?[rows.Count];
+        var wanted = new Dictionary<string, int>(StringComparer.Ordinal);
+        var requestExpiry = request!.ExpiresAt?.UtcDateTime;
+        for (var i = 0; i < rows.Count; i++)
         {
-            if (LinkRules.UrlProblem(input[i], urls, config, out var uri) is { } urlProblem)
-                errors[$"urls[{i}]"] = [urlProblem];
+            var urlKey = usingItems ? $"items[{i}].url" : $"urls[{i}]";
+            if (LinkRules.UrlProblem(rows[i].Url, urls, config, out var uri) is { } urlProblem)
+                errors[urlKey] = [urlProblem];
             else
                 uris[i] = uri!;
+
+            expiries[i] = rows[i].Expiry ?? requestExpiry;
+            if (LinkRules.ExpiryProblem(expiries[i], now, anonymous: false) is { } itemExpiryProblem)
+                errors[rows[i].Expiry is null ? "expiresAt" : $"items[{i}].expiresAt"] = [itemExpiryProblem];
+
+            if (string.IsNullOrEmpty(rows[i].Code)) continue;
+            if (!CodeGenerator.IsValidCustomCode(rows[i].Code!))
+                errors[$"items[{i}].customCode"] = ["Code must be 3-32 characters of letters, digits, '-' or '_', and not a reserved word."];
+            else if (!wanted.TryAdd(rows[i].Code!, i))
+                errors[$"items[{i}].customCode"] = [$"Code '{rows[i].Code}' is used twice in this batch."];
         }
-        var expiresAt = request.ExpiresAt?.UtcDateTime;
-        if (LinkRules.ExpiryProblem(expiresAt, now, anonymous: false) is { } expiryProblem)
-            errors["expiresAt"] = [expiryProblem];
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
-        if (!budget.TryAcquire(http, input.Count, out var retryAfter))
+        // Chosen codes must be free, deleted links included (they keep their codes). One query, before any budget is used.
+        if (wanted.Count > 0)
+        {
+            var codes = wanted.Keys.ToList();
+            var taken = await db.Links.IgnoreQueryFilters().Where(l => codes.Contains(l.Code))
+                .Select(l => new { l.Code, l.DeletedAt }).ToListAsync();
+            foreach (var t in taken)
+                errors[$"items[{wanted[t.Code]}].customCode"] = [t.DeletedAt is null
+                    ? $"Code '{t.Code}' is already taken."
+                    : $"Code '{t.Code}' belonged to a deleted link and can't be reused."];
+            if (errors.Count > 0) return Results.ValidationProblem(errors);
+        }
+
+        if (!budget.TryAcquire(http, rows.Count, out var retryAfter))
             return CreateBudget.TooMany(http, retryAfter);
 
-        var codes = await NewCodesAsync(db, input.Count, codeSource.Next);
-        if (codes.Count < input.Count) return NoCodes();
+        var random = rows.Count - wanted.Count;
+        var generated = random > 0 ? await NewCodesAsync(db, random, codeSource.Next) : [];
+        if (generated.Count < random) return NoCodes();
+        // A random code can land on a code someone chose in this batch; the chosen one wins, so draw again.
+        if (generated.Any(wanted.ContainsKey)) return NoCodes();
 
-        var links = uris.Select((uri, i) => NewLink(uri, codes[i], now, expiresAt, caller)).ToList();
+        var next = 0;
+        var links = uris.Select((uri, i) =>
+            NewLink(uri, string.IsNullOrEmpty(rows[i].Code) ? generated[next++] : rows[i].Code!, now, expiries[i], caller)).ToList();
         db.Links.AddRange(links);
         try
         {

@@ -303,4 +303,43 @@ describe("Bulk shortening", () => {
     expect(await screen.findByRole("heading", { name: "1 link shortened" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "New short link" })).not.toBeInTheDocument();
   });
+
+  it("sends a CSV's codes and expiries as items, and lists a taken code on its line", async () => {
+    const { fetchMock } = fakeApi({ user: ada });
+    const user = await openBulk();
+    await user.click(textarea());
+    await user.paste("url,code,expires_at\nhttps://a.test,taken,\nhttps://b.test,menu,2031-01-31T09:00:00Z");
+
+    await user.click(screen.getByRole("button", { name: "Shorten 2 URLs" }));
+    const summary = await screen.findByRole("group", { name: /needs fixing/ });
+    expect(within(summary).getByText(/Line 2:/)).toBeInTheDocument();
+    expect(within(summary).getByText(/already taken/)).toBeInTheDocument();
+
+    await user.clear(textarea());
+    await user.paste("url,code,expires_at\nhttps://b.test,menu,2031-01-31T09:00:00Z");
+    await user.click(screen.getByRole("button", { name: "Shorten 1 URL" }));
+    await waitFor(() => expect(bulkCalls(fetchMock)).toHaveLength(2));
+    expect(JSON.parse(String(bulkCalls(fetchMock)[1][1]?.body))).toEqual({
+      items: [{ url: "https://b.test", customCode: "menu", expiresAt: "2031-01-31T09:00:00.000Z" }],
+    });
+  });
+
+  it("fills the box from an uploaded CSV file", async () => {
+    fakeApi({ user: ada });
+    const user = await openBulk();
+    const file = new File(["url,code\nhttps://a.test,menu"], "links.csv", { type: "text/csv" });
+    await user.upload(screen.getByLabelText("Upload CSV"), file);
+    await waitFor(() => expect(textarea()).toHaveValue("url,code\nhttps://a.test,menu"));
+    expect(screen.getByRole("button", { name: "Shorten 1 URL" })).toBeEnabled();
+  });
+
+  it("doesn't claim every link expires together when a CSV gave them different expiries", async () => {
+    fakeApi({ user: ada });
+    const user = await openBulk();
+    await user.click(textarea());
+    await user.paste("url,expires_at\nhttps://a.test,2031-03-01T09:00:00Z\nhttps://b.test,\n");
+    await user.click(screen.getByRole("button", { name: "Shorten 2 URLs" }));
+    expect(await screen.findByText(/Expiry differs by link/)).toBeInTheDocument();
+    expect(screen.queryByText(/All expire/)).not.toBeInTheDocument();
+  });
 });

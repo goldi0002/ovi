@@ -11,7 +11,13 @@ public record CreateLinkRequest(string Url, string? CustomCode = null, DateTimeO
 /// <summary>Shortens many URLs at once, all or nothing. Each gets a random code.</summary>
 /// <param name="Urls">1 to 25 absolute http or https URLs, each checked like a new link's. Repeats each get their own link.</param>
 /// <param name="ExpiresAt">Optional time (with offset) set on every link; without it the links never expire.</param>
-public record BulkCreateLinksRequest(List<string?>? Urls, DateTimeOffset? ExpiresAt = null);
+/// <param name="Items">Alternative to <paramref name="Urls"/> (send one or the other): 1 to 25 links, each with its own optional custom code and expiry.</param>
+public record BulkCreateLinksRequest(List<string?>? Urls, DateTimeOffset? ExpiresAt = null, List<BulkLinkItem?>? Items = null);
+
+/// <param name="Url">Absolute http or https URL, checked like a new link's.</param>
+/// <param name="CustomCode">Optional code, checked like a single link's; one is generated if omitted.</param>
+/// <param name="ExpiresAt">Optional expiry for this link; falls back to the request's <c>expiresAt</c>.</param>
+public record BulkLinkItem(string? Url, string? CustomCode = null, DateTimeOffset? ExpiresAt = null);
 
 /// <param name="Items">The new links, in the same order as the request's URLs.</param>
 public record BulkCreateLinksResponse(IReadOnlyList<LinkResponse> Items);

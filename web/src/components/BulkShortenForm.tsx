@@ -1,7 +1,7 @@
 import { ChevronDown } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
 import { ApiError, type Link, type OviApi } from "../api";
-import { MAX_BULK_URLS, bulkErrors, lineRange, parseUrlLines } from "../bulk";
+import { MAX_BULK_URLS, bulkErrors, lineRange, parseBulkInput } from "../bulk";
 import { localInputToIso } from "../format";
 import { button, errorBox, field, focusRing, input } from "../ui";
 
@@ -53,7 +53,8 @@ export function BulkShortenForm({ api, signedIn, onLogIn, onCreated, onUnauthori
   // Set when a 400 had an expiry error, so focus moves to that field once it has rendered.
   const [focusExpiry, setFocusExpiry] = useState(0);
 
-  const lines = parseUrlLines(text);
+  const parsed = parseBulkInput(text);
+  const lines = parsed.rows;
   const count = lines.length;
   const over = count - MAX_BULK_URLS;
 
@@ -87,11 +88,22 @@ export function BulkShortenForm({ api, signedIn, onLogIn, onCreated, onUnauthori
     setError(null);
     setExpiryError(null);
     setLineErrors([]);
+    if (parsed.problems.length > 0) {
+      setLineErrors(parsed.problems);
+      inFlight.current = false;
+      setSaving(false);
+      return;
+    }
     try {
-      const links = await api.createMany({
-        urls: sent.map((l) => l.url),
-        expiresAt: showExpiry ? localInputToIso(expiresAt) : undefined,
-      });
+      const batchExpiry = showExpiry ? localInputToIso(expiresAt) : undefined;
+      const links = await api.createMany(
+        parsed.csv
+          ? {
+              items: sent.map((l) => ({ url: l.url, customCode: l.code, expiresAt: l.expiresAt })),
+              expiresAt: batchExpiry,
+            }
+          : { urls: sent.map((l) => l.url), expiresAt: batchExpiry },
+      );
       setText("");
       setExpiresAt("");
       onCreated(links);
@@ -111,7 +123,7 @@ export function BulkShortenForm({ api, signedIn, onLogIn, onCreated, onUnauthori
       } else {
         const items = bulkErrors(err.fieldErrors);
         const expiry = err.fieldErrors.expiresAt?.[0];
-        const batch = err.fieldErrors.urls?.[0];
+        const batch = err.fieldErrors.urls?.[0] ?? err.fieldErrors.items?.[0];
         if (expiry) {
           setShowExpiry(true);
           setExpiryError(expiry);
@@ -145,6 +157,20 @@ export function BulkShortenForm({ api, signedIn, onLogIn, onCreated, onUnauthori
     const lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 20;
     ta.scrollTop = Math.max(0, (line - 1) * lineHeight - ta.clientHeight / 2);
     ta.scrollLeft = 0;
+  }
+
+  /** Puts a chosen CSV (or text) file into the box; the box is the one place the list is read from. */
+  async function onFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 60 * 1024) {
+      setError("That file is too big. Keep it under 60 KB (25 links at most).");
+      return;
+    }
+    setError(null);
+    setLineErrors([]);
+    setText(await file.text());
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -215,6 +241,10 @@ export function BulkShortenForm({ api, signedIn, onLogIn, onCreated, onUnauthori
           Expiry
           <ChevronDown className={`size-4 transition-transform ${showExpiry ? "rotate-180" : ""}`} aria-hidden="true" />
         </button>
+        <label className={`cursor-pointer rounded py-0.5 text-[0.8125rem] text-muted underline underline-offset-2 hover:text-ink has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2`}>
+          Upload CSV
+          <input aria-describedby="bulk-csv-note" type="file" accept=".csv,text/csv,text/plain" className="sr-only" onChange={onFile} disabled={saving} />
+        </label>
         <span id="bulk-count" className={`text-[0.8125rem] tabular-nums ${over > 0 ? "text-danger" : "text-muted"}`}>
           {over > 0 ? overMessage : `${count} of ${MAX_BULK_URLS}`}
         </span>
@@ -224,6 +254,10 @@ export function BulkShortenForm({ api, signedIn, onLogIn, onCreated, onUnauthori
           </span>
         )}
       </div>
+
+      <p id="bulk-csv-note" className="text-xs text-muted">
+        For a custom code or expiry per link, use a CSV: a first line of <code>url,code,expires_at</code>, then one link per line.
+      </p>
 
       {showExpiry && (
         <div id="bulk-expiry" className={field}>
@@ -247,7 +281,7 @@ export function BulkShortenForm({ api, signedIn, onLogIn, onCreated, onUnauthori
             </span>
           ) : (
             <span id="bulk-expires-note" className="text-xs font-normal text-muted">
-              Applies to every link. Leave empty to keep them for good.
+              Applies to every link without its own expires_at. Leave empty to keep them for good.
             </span>
           )}
         </div>

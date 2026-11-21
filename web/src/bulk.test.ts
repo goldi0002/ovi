@@ -1,4 +1,4 @@
-import { MAX_BULK_URLS, bulkErrors, csvFileName, lineRange, parseUrlLines, parseUrls, toCsv } from "./bulk";
+import { MAX_BULK_URLS, bulkErrors, csvFileName, lineRange, parseBulkInput, parseUrlLines, parseUrls, toCsv } from "./bulk";
 import { link } from "./test/fakeApi";
 
 describe("parseUrls", () => {
@@ -133,5 +133,46 @@ describe("parseUrlLines and lineRange", () => {
     const text = Array.from({ length: MAX_BULK_URLS }, (_, i) => `https://x.test/${i}`).join("\r\n");
     expect(parseUrlLines(text)).toHaveLength(MAX_BULK_URLS);
     expect(parseUrlLines(text).at(-1)).toEqual({ url: "https://x.test/24", line: 25 });
+  });
+});
+
+describe("parseBulkInput", () => {
+  it("treats plain lines as URLs", () => {
+    const parsed = parseBulkInput("https://a.test\n\nhttps://b.test,with-comma");
+    expect(parsed.csv).toBe(false);
+    expect(parsed.rows.map((r) => [r.url, r.line])).toEqual([["https://a.test", 1], ["https://b.test,with-comma", 3]]);
+  });
+
+  it("reads a CSV with a header, quoted cells, code and expiry, keeping line numbers", () => {
+    const text = '\uFEFFurl,code,expires_at\r\nhttps://a.test/?x=1,spring,2030-01-31T09:00:00Z\r\n\r\n"https://b.test/?x=1,2",,\r\nhttps://c.test';
+    const parsed = parseBulkInput(text);
+    expect(parsed.csv).toBe(true);
+    expect(parsed.problems).toEqual([]);
+    expect(parsed.rows).toEqual([
+      { url: "https://a.test/?x=1", line: 2, code: "spring", expiresAt: "2030-01-31T09:00:00.000Z" },
+      { url: "https://b.test/?x=1,2", line: 4 },
+      { url: "https://c.test", line: 5 },
+    ]);
+  });
+
+  it("accepts the downloaded results file (url,short_url,code,expires_at) and column order", () => {
+    const parsed = parseBulkInput("code,url\nmenu,https://a.test");
+    expect(parsed.rows).toEqual([{ url: "https://a.test", line: 2, code: "menu" }]);
+    expect(parseBulkInput("url,short_url,code,expires_at\nhttps://a.test,https://o.vi/x,x,").rows[0].code).toBe("x");
+  });
+
+  it("reports an expires_at that isn't a date, and doesn't treat other first lines as a header", () => {
+    expect(parseBulkInput("url,expires_at\nhttps://a.test,soon").problems).toEqual([
+      expect.objectContaining({ line: 2, url: "https://a.test", message: expect.stringContaining("soon") }),
+    ]);
+    expect(parseBulkInput("url,notes\nhttps://a.test").csv).toBe(false);
+  });
+
+  it("maps items[i].field errors to the list position", () => {
+    expect(bulkErrors({ "items[2].customCode": ["Taken."], "urls[0]": ["Bad."], "items[1].url": ["Bad url."] })).toEqual([
+      { index: 0, message: "Bad." },
+      { index: 1, message: "Bad url." },
+      { index: 2, message: "Taken." },
+    ]);
   });
 });
