@@ -459,6 +459,8 @@ docker pull ghcr.io/goldi0002/ovi:1
    git tag v1.2.3 && git push origin v1.2.3
    ```
 
+   Or create the release on GitHub's **Releases** page with a new `v1.2.3` tag on `main`: that creates the tag too, and CI fills in the release's title and notes.
+
 CI then runs every check, publishes the image tags above, and creates the GitHub Release with that version's changelog section as its notes. If the changelog has no section for the version, CI fails before anything is published. A tag with a suffix, such as `v1.3.0-rc.1`, becomes a pre-release: it gets its own tag but doesn't move `1`, `1.3` or `latest`.
 
 ## Dependencies and licenses

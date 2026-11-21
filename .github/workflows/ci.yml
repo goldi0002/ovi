@@ -258,4 +258,9 @@ jobs:
           python3 scripts/release-notes.py "${GITHUB_REF_NAME#v}" > notes.md
           prerelease=()
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then prerelease=(--prerelease); fi
-          gh release create "$GITHUB_REF_NAME" --verify-tag --title "Ovi $GITHUB_REF_NAME" --notes-file notes.md "${prerelease[@]}"
+          # A release made on GitHub's Releases page (which also creates the tag) gets its title and notes here.
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --title "Ovi $GITHUB_REF_NAME" --notes-file notes.md "${prerelease[@]}"
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "Ovi $GITHUB_REF_NAME" --notes-file notes.md "${prerelease[@]}"
+          fi
