@@ -22,6 +22,10 @@ builder.Services.AddOviAuth(builder.Configuration, builder.Environment);
 builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = 64 * 1024);
 builder.Services.AddProblemDetails();
 builder.Services.AddOviOpenApi();
+// The client's default logging would write request URIs; the Safe Browsing key is in the query string, so none of it.
+builder.Services.AddHttpClient(SafeBrowsingUrlThreatCheck.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(10))
+    .RemoveAllLoggers();
+builder.Services.AddSingleton<IUrlThreatCheck, SafeBrowsingUrlThreatCheck>();
 var behindProxy = builder.Services.ConfigureReverseProxy(builder.Configuration);
 if (builder.Configuration.GetValue("KeepAlive:Enabled", false))
 {

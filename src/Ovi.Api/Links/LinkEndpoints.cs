@@ -263,7 +263,7 @@ public static class LinkEndpoints
 
     private static async Task<IResult> CreateLink(
         CreateLinkRequest? request, HttpContext http, AppDbContext db, ShortUrlBuilder urls, TimeProvider time, IConfiguration config,
-        CodeSource codeSource)
+        CodeSource codeSource, IUrlThreatCheck threats)
     {
         if (request is null)
             return Results.ValidationProblem(new Dictionary<string, string[]> { ["body"] = ["Send a JSON body with a url."] });
@@ -291,6 +291,10 @@ public static class LinkEndpoints
         if (anonymous) expiresAt ??= LinkRules.LatestExpiry(now, anonymous);
 
         if (errors.Count > 0) return Results.ValidationProblem(errors);
+
+        // After local validation and after the create budget (the route's filter), so this is no free lookup service.
+        if ((await threats.FindUnsafeAsync([uri!.AbsoluteUri], http.RequestAborted)).Count > 0)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["url"] = [SafeBrowsingUrlThreatCheck.FlaggedMessage] });
 
         // Deleted links keep their code, so check against every row, deleted or not.
         var allLinks = db.Links.IgnoreQueryFilters();
@@ -326,7 +330,7 @@ public static class LinkEndpoints
     /// </summary>
     private static async Task<IResult> CreateLinks(
         BulkCreateLinksRequest? request, HttpContext http, AppDbContext db, ShortUrlBuilder urls, TimeProvider time,
-        IConfiguration config, CreateBudget budget, CodeSource codeSource)
+        IConfiguration config, CreateBudget budget, CodeSource codeSource, IUrlThreatCheck threats)
     {
         var caller = Caller.From(http);
         if (!caller.SignedIn)
@@ -389,6 +393,16 @@ public static class LinkEndpoints
 
         if (!budget.TryAcquire(http, rows.Count, out var retryAfter))
             return CreateBudget.TooMany(http, retryAfter);
+
+        // One lookup for the whole batch, only after the budget is taken. Flagged lines are reported like any other.
+        var flagged = await threats.FindUnsafeAsync(uris.Select(u => u.AbsoluteUri).ToList(), http.RequestAborted);
+        if (flagged.Count > 0)
+        {
+            for (var i = 0; i < uris.Length; i++)
+                if (flagged.Contains(uris[i].AbsoluteUri))
+                    errors[usingItems ? $"items[{i}].url" : $"urls[{i}]"] = [SafeBrowsingUrlThreatCheck.FlaggedMessage];
+            return Results.ValidationProblem(errors);
+        }
 
         var random = rows.Count - wanted.Count;
         var generated = random > 0 ? await NewCodesAsync(db, random, codeSource.Next) : [];
@@ -467,7 +481,7 @@ public static class LinkEndpoints
     /// </summary>
     private static async Task<IResult> UpdateLink(
         string code, UpdateLinkRequest? request, HttpContext http, AppDbContext db, ShortUrlBuilder urls, TimeProvider time,
-        IConfiguration config)
+        IConfiguration config, IUrlThreatCheck threats)
     {
         if (Caller.From(http) is not { SignedIn: true } caller) return SignInRequired();
         if (request is null || (request.Url is null && request.ExpiresAt is null && !request.ClearExpiry))
@@ -495,6 +509,11 @@ public static class LinkEndpoints
             errors["expiresAt"] = [expiryProblem];
 
         if (errors.Count > 0) return Results.ValidationProblem(errors);
+
+        // Only a changed destination is looked up, after the route's create budget has been taken.
+        if (uri is not null && uri.AbsoluteUri != link.Url
+            && (await threats.FindUnsafeAsync([uri.AbsoluteUri], http.RequestAborted)).Count > 0)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["url"] = [SafeBrowsingUrlThreatCheck.FlaggedMessage] });
 
         if (uri is not null) link.Url = uri.AbsoluteUri;
         if (request.ClearExpiry) link.ExpiresAt = null;
