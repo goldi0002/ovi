@@ -4,6 +4,11 @@ User-facing changes to Ovi, newest first.
 
 ## Unreleased
 
+### Custom codes and expiries for many links
+
+- In **Many links**, upload a CSV file or paste CSV text whose first line is `url,code,expires_at`. Each row can have its own custom code and expiry; leave a cell empty for a random code or the batch expiry. The downloaded results file works too.
+- The API takes `items` (`{ "url", "customCode", "expiresAt" }` each) instead of `urls` on `POST /api/links/bulk`. Errors are listed per row and nothing is created if any row is wrong.
+
 ### Shorten many links at once
 
 - Signed-in users can switch the home page form to **Many links**, paste up to 25 URLs (one per line) and shorten them all in one go. One optional expiry applies to every link.

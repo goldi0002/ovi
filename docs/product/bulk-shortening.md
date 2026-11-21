@@ -126,7 +126,7 @@ Layout and copy are ux's call; these criteria fix the behaviour.
 ## Later slices (in order)
 
 1. **This slice:** paste up to 25 URLs, signed in or API key, all or nothing, copy and CSV.
-2. CSV file upload with optional per-row custom code and expiry.
+2. CSV file upload with optional per-row custom code and expiry. (Built: `items` in the API, CSV header `url,code,expires_at` in the box or via Upload CSV. Quoted cells stay on one line.)
 3. ZIP of QR codes for a batch.
 4. Bulk delete from `/links`.
 

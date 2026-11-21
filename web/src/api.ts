@@ -97,8 +97,10 @@ export interface CreateLinkInput {
 
 /** POST /api/links/bulk: many links with random codes, all or nothing (signed-in users and the API key only). */
 export interface BulkCreateLinksInput {
-  /** At most 25 (fewer if the server's create budget is lower), in the order the results should come back. */
-  urls: string[];
+  /** At most 25 (fewer if the server's create budget is lower), in the order the results should come back. Send this or `items`. */
+  urls?: string[];
+  /** Like `urls`, with an optional custom code and expiry per link; errors come back as items[i].url, .customCode, .expiresAt. */
+  items?: { url: string; customCode?: string; expiresAt?: string }[];
   /** One expiry for every link in the batch; leave out for links that never expire. */
   expiresAt?: string;
 }

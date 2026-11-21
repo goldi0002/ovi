@@ -24,7 +24,7 @@ Ovi is a small ASP.NET Core web app with a React interface. It runs on one addre
 ## API
 
 - `POST /api/links` with `{"url": "https://example.com"}` creates a link. Optional: `customCode`, `expiresAt`.
-- `POST /api/links/bulk` with `{"urls": ["https://example.com/a", "https://example.com/b"]}` creates 1 to 25 links with random codes, all or nothing, and returns `{"items": [...]}` in input order. Optional: `expiresAt` for every link. Signed-in users and the API key only. Each URL counts as one link against the create rate limit.
+- `POST /api/links/bulk` with `{"urls": ["https://example.com/a", "https://example.com/b"]}` creates 1 to 25 links with random codes, all or nothing, and returns `{"items": [...]}` in input order. Optional: `expiresAt` for every link, or send `items` (`{"url", "customCode", "expiresAt"}` each) instead of `urls` for a custom code and expiry per link. Signed-in users and the API key only. Each URL counts as one link against the create rate limit.
 - `GET /api/links?page=1&pageSize=20` lists the caller's links.
 - `GET /api/links/{code}/stats?days=30` returns the click stats for one link.
 - `DELETE /api/links/{code}` deletes a link.

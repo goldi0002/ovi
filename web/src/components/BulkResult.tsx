@@ -15,7 +15,10 @@ interface Props {
 /** The links a bulk request made: copy them all, download a CSV, or copy one. */
 export function BulkResult({ links, onDismiss }: Props) {
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const expiresAt = links[0]?.expiresAt ?? null;
+  // Links can have different expiries (a CSV sets one per row), so only say "all" when they really are the same.
+  const expiries = new Set(links.map((l) => l.expiresAt));
+  const expiresAt = expiries.size === 1 ? (links[0]?.expiresAt ?? null) : null;
+  const mixed = expiries.size > 1;
   const n = links.length;
 
   // Moving focus here is the announcement; the section has no aria-live, which would read every row.
@@ -34,6 +37,7 @@ export function BulkResult({ links, onDismiss }: Props) {
           {n} {n === 1 ? "link" : "links"} shortened
         </h2>
         {expiresAt && <p className="mt-0.5 text-xs text-muted">All expire {formatDateTime(expiresAt)}.</p>}
+        {mixed && <p className="mt-0.5 text-xs text-muted">Expiry differs by link. The CSV has each one.</p>}
       </div>
 
       <div className="flex flex-wrap gap-2 max-sm:grid max-sm:grid-cols-2">

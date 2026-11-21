@@ -115,7 +115,23 @@ export function fakeApi({
     if (method === "POST" && url.pathname === "/api/links/bulk") {
       if (!signedIn) return json(401, { title: "Sign in to shorten many links at once." });
       if (state.bulkRateLimited) return json(429, { title: "You've made too many links in the last minute; try again shortly." });
-      const body = JSON.parse(String(init.body)) as { urls?: string[]; expiresAt?: string };
+      const body = JSON.parse(String(init.body)) as {
+        urls?: string[];
+        expiresAt?: string;
+        items?: { url: string; customCode?: string; expiresAt?: string }[];
+      };
+      if (body.items) {
+        const errors: Record<string, string[]> = {};
+        body.items.forEach((it, i) => {
+          if (it.customCode === "taken") errors[`items[${i}].customCode`] = ["Code 'taken' is already taken."];
+        });
+        if (Object.keys(errors).length > 0) return json(400, { title: "One or more validation errors occurred.", errors });
+        const made = body.items.map((it) =>
+          link({ code: it.customCode ?? `bulk${++bulkCount}`, url: it.url, expiresAt: it.expiresAt ?? body.expiresAt ?? null }),
+        );
+        store.unshift(...[...made].reverse());
+        return json(201, { items: made });
+      }
       const urls = body.urls ?? [];
       if (urls.length === 0) return json(400, { title: "One or more validation errors occurred.", errors: { urls: ["Add at least one URL."] } });
       if (urls.length > 25)
