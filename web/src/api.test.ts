@@ -85,3 +85,48 @@ describe("isExpired", () => {
     expect(isExpired(link({ expiresAt: "2029-12-31T00:00:00Z" }), now)).toBe(true);
   });
 });
+
+describe("OviApi.createMany", () => {
+  it("posts the URLs and expiry to /api/links/bulk and returns the links in order", async () => {
+    const { fetchMock } = fakeApi({ user: { name: "Ada", email: null, provider: "github", isAdmin: false } });
+    const links = await new OviApi().createMany({ urls: ["https://a.test", "https://b.test"], expiresAt: "2099-01-01T00:00:00.000Z" });
+
+    expect(links.map((l) => l.url)).toEqual(["https://a.test", "https://b.test"]);
+    expect(links.every((l) => l.expiresAt === "2099-01-01T00:00:00.000Z")).toBe(true);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/links/bulk");
+    expect(init?.method).toBe("POST");
+    expect(new Headers(init?.headers).get("X-Ovi-Request")).toBe("1");
+    expect(JSON.parse(String(init?.body))).toEqual({ urls: ["https://a.test", "https://b.test"], expiresAt: "2099-01-01T00:00:00.000Z" });
+  });
+
+  it("rejects with the per-URL errors keyed by position", async () => {
+    fakeApi({ user: { name: "Ada", email: null, provider: "github", isAdmin: false } });
+    const err = (await new OviApi().createMany({ urls: ["https://ok.test", "nope"] }).catch((e: unknown) => e)) as ApiError;
+
+    expect(err.status).toBe(400);
+    expect(Object.keys(err.fieldErrors)).toEqual(["urls[1]"]);
+  });
+
+  it("is refused when signed out", async () => {
+    fakeApi();
+    await expect(new OviApi().createMany({ urls: ["https://a.test"] })).rejects.toMatchObject({
+      status: 401,
+      message: "Sign in to shorten many links at once.",
+    });
+  });
+});
+
+describe("ApiError.fromServer", () => {
+  it("is true only when the message came from the problem body", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ title: "Couldn't make short codes; try again." }), { status: 503 })));
+    await expect(new OviApi().createMany({ urls: ["https://a.test"] })).rejects.toMatchObject({ status: 503, fromServer: true });
+
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<html></html>", { status: 503 })));
+    await expect(new OviApi().createMany({ urls: ["https://a.test"] })).rejects.toMatchObject({
+      status: 503,
+      fromServer: false,
+      message: "Request failed (503).",
+    });
+  });
+});

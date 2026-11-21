@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, OviApi, type Link, type Session } from "./api";
+import { BulkResult } from "./components/BulkResult";
+import { BULK_TEXTAREA_ID } from "./components/BulkShortenForm";
 import { Header } from "./components/Header";
 import { Faq } from "./components/Faq";
 import { LinkResult } from "./components/LinkResult";
@@ -32,7 +34,21 @@ export function App() {
       takeLoginFlag() ?? ""
     ] ?? null,
   );
+  // The latest result on the home page: one link, or a bulk batch. Showing one clears the other.
   const [created, setCreated] = useState<Link | null>(null);
+  const [bulk, setBulk] = useState<Link[] | null>(null);
+  const showCreated = useCallback((link: Link) => {
+    setBulk(null);
+    setCreated(link);
+  }, []);
+  const showBulk = useCallback((links: Link[]) => {
+    setCreated(null);
+    setBulk(links);
+  }, []);
+  const dismissBulk = useCallback(() => {
+    setBulk(null);
+    document.getElementById(BULK_TEXTAREA_ID)?.focus();
+  }, []);
   const path = usePath();
   const firstRender = useRef(true);
 
@@ -73,6 +89,7 @@ export function App() {
 
   const signOut = useCallback(async () => {
     setCreated(null);
+    setBulk(null);
     if (api.isAdmin) {
       clearApiKey();
       setApiKey(null);
@@ -135,13 +152,16 @@ export function App() {
                 <ShortenCard
                   api={api}
                   signedIn={signedIn}
+                  ready={session !== null}
                   anonymousLinkDays={current?.anonymousLinkDays ?? 30}
                   onLogIn={openLogin}
-                  onCreated={setCreated}
+                  onCreated={showCreated}
+                  onBulkCreated={showBulk}
                   onUnauthorized={onUnauthorized}
                 />
               </div>
               {created && <LinkResult link={created} signedIn={signedIn} onDismiss={() => setCreated(null)} />}
+              {bulk && <BulkResult links={bulk} onDismiss={dismissBulk} />}
             </div>
 
             <Faq />

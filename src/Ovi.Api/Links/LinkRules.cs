@@ -10,6 +10,17 @@ public static class LinkRules
     /// <summary>Links made without signing in expire after this many days.</summary>
     public const int AnonymousLinkDays = 30;
 
+    /// <summary>The URI with a Unicode host replaced by its punycode form; other URIs come back unchanged.</summary>
+    public static Uri WithAsciiHost(Uri uri) =>
+        uri.HostNameType == UriHostNameType.Dns && uri.IdnHost != uri.Host ? new UriBuilder(uri) { Host = uri.IdnHost }.Uri : uri;
+
+    /// <summary>
+    /// A stored URL as it can be sent in a Location header. Links stored before hosts were kept as punycode may have a
+    /// Unicode host; this converts those, and leaves every other URL exactly as stored.
+    /// </summary>
+    public static string RedirectTarget(string url) =>
+        url.Any(c => c > '\u007F') && Uri.TryCreate(url, UriKind.Absolute, out var uri) ? WithAsciiHost(uri).AbsoluteUri : url;
+
     /// <summary>The furthest ahead an expiry date may be.</summary>
     public const int MaxExpiryYears = 10;
 
@@ -31,6 +42,9 @@ public static class LinkRules
             return "Enter a full web address starting with http:// or https://.";
         if (HasUnsafeCharacters(rawUrl))
             return "The URL contains characters that can't be shortened.";
+        // AbsoluteUri percent-encodes the path but keeps a Unicode host as typed, and Kestrel refuses to send a non-ASCII
+        // Location header. Store the punycode host, so the stored form is all ASCII.
+        parsed = WithAsciiHost(parsed);
         // Percent-encoding and punycode can make the stored form longer than what was typed.
         if (parsed.AbsoluteUri.Length > MaxUrlLength)
             return $"The URL is too long once encoded; the limit is {MaxUrlLength} characters.";

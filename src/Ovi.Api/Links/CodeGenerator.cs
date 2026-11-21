@@ -22,3 +22,9 @@ public static partial class CodeGenerator
     [GeneratedRegex("^[A-Za-z0-9_-]{3,32}$")]
     private static partial Regex ValidCode();
 }
+
+/// <summary>Where new random codes come from (a service, so tests can replace it to force collisions).</summary>
+public class CodeSource
+{
+    public virtual string Next() => CodeGenerator.Generate();
+}

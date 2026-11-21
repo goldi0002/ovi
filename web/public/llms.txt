@@ -8,6 +8,7 @@ Ovi is a small ASP.NET Core web app with a React interface. It runs on one addre
 
 - Anyone can shorten a URL without signing in. Those links get a random code and expire after 30 days.
 - Signing in with Google or GitHub creates the account on first use. Signed-in users can choose a custom code (3–32 letters, digits, hyphens or underscores), set an expiry date or none, and keep every link they make.
+- Signed-in users can shorten up to 25 URLs at once, one per line, with one optional expiry for all. It's all or nothing: if any line is wrong, nothing is created and each bad line is listed. The results can be copied in one go or downloaded as a CSV file.
 - Every link comes with a downloadable QR code.
 - Click stats show clicks per day over the last 7, 30 or 90 days, the top referring sites, and the devices and browsers visitors used. A click stores only the time, the referring site's name, a device category and a browser category: no IP address and no full user agent.
 - The server admin can sign in with an API key, see totals, every account and every link, and suspend an account.
@@ -23,6 +24,7 @@ Ovi is a small ASP.NET Core web app with a React interface. It runs on one addre
 ## API
 
 - `POST /api/links` with `{"url": "https://example.com"}` creates a link. Optional: `customCode`, `expiresAt`.
+- `POST /api/links/bulk` with `{"urls": ["https://example.com/a", "https://example.com/b"]}` creates 1 to 25 links with random codes, all or nothing, and returns `{"items": [...]}` in input order. Optional: `expiresAt` for every link. Signed-in users and the API key only. Each URL counts as one link against the create rate limit.
 - `GET /api/links?page=1&pageSize=20` lists the caller's links.
 - `GET /api/links/{code}/stats?days=30` returns the click stats for one link.
 - `DELETE /api/links/{code}` deletes a link.

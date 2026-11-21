@@ -33,6 +33,7 @@ A React app in [`web/`](web) (Vite, TypeScript, Tailwind CSS, Lucide icons) is t
 - **Log in** with Google or GitHub. The first sign-in creates the account, so there's no separate sign-up. Signed-in users can pick a custom code and expiry (or none), and see their links and stats.
 - The admin can choose **Admin? Use an API key** in the Log in dialog. The key is kept for the browser tab, or on the device with **Remember on this device**, and gives access to every link.
 - Copy the result or download its QR code.
+- Signed-in users can switch the form to **Many links** and paste up to 25 URLs, one per line, with one optional expiry for all of them. Blank lines are skipped. If any line is wrong, nothing is shortened and each bad line is listed with its line number. The results can be copied all at once (one short URL per line, in input order) or downloaded as a CSV file (`url,short_url,code,expires_at`).
 - The **Links** page (`/links`) lists your links (every link for the admin) (a table on wide screens, cards on phones) with clicks, creation time and status (active, expiring, expired); page through them and delete them. Its address works directly, so you can bookmark it.
 - Admins get an **Admin** page (`/admin`):
   - totals and clicks over the last 14 days
@@ -146,8 +147,8 @@ Both accept Neon's `postgresql://…?sslmode=require&channel_binding=require` UR
 | — | `DATABASE_URL` | none | **Required in production.** Postgres URL or Npgsql connection string for app traffic (Neon: pooled endpoint) |
 | — | `DATABASE_URL_UNPOOLED` | `DATABASE_URL` | Connection used to run migrations (Neon: direct endpoint) |
 | `ConnectionStrings:Default` | `ConnectionStrings__Default` | none (local Postgres in Development) | Fallback when `DATABASE_URL` isn't set |
-| `RateLimits:CreatePerMinute` | `RateLimits__CreatePerMinute` | `30` | Link creation per signed-in user (and per IP for the API key) |
-| `RateLimits:AnonymousCreatePerHour` | `RateLimits__AnonymousCreatePerHour` | `20` | Link creation per IP without signing in |
+| `RateLimits:CreatePerMinute` | `RateLimits__CreatePerMinute` | `30` | Links made or edited per minute per signed-in user (and per IP for the API key). A bulk request of N URLs counts as N. It also caps the bulk batch size: below `25`, a bulk request can hold at most this many URLs, and a larger one gets 400 |
+| `RateLimits:AnonymousCreatePerHour` | `RateLimits__AnonymousCreatePerHour` | `20` | Links made per IP without signing in |
 | `RateLimits:AuthPerMinute` | `RateLimits__AuthPerMinute` | `20` | Sign-in starts per IP |
 | `RateLimits:StatsPerMinute` | `RateLimits__StatsPerMinute` | `60` | Stats requests per user (or per IP) |
 | `RateLimits:ApiKeyFailuresPerMinute` | `RateLimits__ApiKeyFailuresPerMinute` | `10` | Wrong `X-Api-Key` attempts per client per minute before 429, so a key can't be guessed online |
@@ -192,13 +193,14 @@ The app keeps no local state, so you can run several instances against the same 
 Each `/api` request acts as one of three callers:
 - **Admin:** sends the `X-Api-Key` header. A wrong key is always a 401, with no fallback to the cookie. The admin sees every link.
 - **User:** has the session cookie from signing in, and sees only their own links.
-- **Anonymous:** neither. Can only create links, with no custom code, and they expire within 30 days.
+- **Anonymous:** neither. Can only create links one at a time, with no custom code, and they expire within 30 days.
 
 Redirects and QR codes are public.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `POST` | `/api/links` | anyone | Create a link. Body: `{ "url": "https://...", "customCode": "optional", "expiresAt": "optional, e.g. 2030-01-01T00:00:00Z" }` |
+| `POST` | `/api/links/bulk` | user, key | Shorten 1 to 25 URLs in one request, all or nothing. Body: `{ "urls": ["https://...", "https://..."], "expiresAt": "optional, set on every link" }`. Codes are always random; without `expiresAt` the links never expire. Returns 201 `{ "items": [link, ...] }` in input order, each in the same shape as `POST /api/links`. Any bad URL or expiry gives 400 and creates nothing. Counts as N links against the create rate limit (a 400 or 429 costs nothing). 503 "Couldn't make short codes; try again." means nothing was created and a retry is safe. See [Bulk create](#bulk-create) |
 | `GET` | `/api/links?page=1&pageSize=50&q=&status=all` | user, key | List links, newest first. Returns `{ items, page, pageSize, total }`; `pageSize` max 100, `page` max 100000. Optional `q` searches code and URL (case-insensitive, max 100 characters); `status` is `all` (default), `active` or `expired` |
 | `GET` | `/api/links/{code}` | user, key | Show one link's details and click count |
 | `GET` | `/api/links/{code}/stats?days=30` | user, key | Click analytics for the last 1–365 days (UTC): clicks per day, top referrers, devices and browsers |
@@ -235,12 +237,19 @@ Click counting:
 - Rate limits group IPv6 clients by their /64, so rotating addresses doesn't get around them.
 - A deleted link's code stays reserved, so an old short URL or printed QR code can never start pointing somewhere else.
 
+Rate limits for making links:
+- Single create, edit (`PATCH`) and bulk create share one budget, counted in links: 30 a minute per signed-in user, or per IP for the API key (`RateLimits:CreatePerMinute`). Anonymous visitors get 20 links an hour per IP.
+- Single create and edit each cost 1, even when they fail validation. A bulk request of N URLs costs N.
+- A bulk request that fails validation (400) or is over the remaining budget (429) costs nothing.
+
 Errors use RFC 7807 problem JSON:
 - 400: validation failed.
 - 401: the API key is wrong, or the endpoint needs you to sign in.
-- 403: a cookie request that changes data is missing `X-Ovi-Request`.
+- 403: a cookie request that changes data is missing `X-Ovi-Request`, or the account is suspended.
 - 409: the code is already taken.
-- 429: the client is over its rate limit.
+- 413: the request body is over 64 KB.
+- 429: the client is over its rate limit. Link creation and edits also send a `Retry-After` header (in seconds).
+- 503: no free random code could be found. Nothing was created, so it's safe to retry.
 
 ```bash
 KEY=dev-key-change-me
@@ -249,6 +258,48 @@ curl -X POST localhost:5080/api/links -H "X-Api-Key: $KEY" -H 'content-type: app
 curl -i localhost:5080/dotnet
 curl -o dotnet.png localhost:5080/dotnet/qr
 ```
+
+### Bulk create
+
+`POST /api/links/bulk` shortens up to 25 URLs at once for signed-in users and the API key. Anonymous callers get 401 ("Sign in to shorten many links at once."). With a cookie, send `X-Ovi-Request: 1` as for any other change.
+
+```bash
+curl -X POST localhost:5080/api/links/bulk -H "X-Api-Key: $KEY" -H 'content-type: application/json' \
+  -d '{"urls":["https://example.com/a","https://example.com/b"],"expiresAt":"2030-01-01T00:00:00Z"}'
+```
+
+```http
+HTTP/1.1 201 Created
+
+{
+  "items": [
+    { "code": "aB3xK9q", "shortUrl": "http://localhost:5080/aB3xK9q", "qrCodeUrl": "http://localhost:5080/aB3xK9q/qr",
+      "url": "https://example.com/a", "clicks": 0, "createdAt": "2026-11-18T10:00:00Z", "lastClickedAt": null,
+      "expiresAt": "2030-01-01T00:00:00Z" },
+    { "code": "Tz7mQ2w", "shortUrl": "http://localhost:5080/Tz7mQ2w", "qrCodeUrl": "http://localhost:5080/Tz7mQ2w/qr",
+      "url": "https://example.com/b", "clicks": 0, "createdAt": "2026-11-18T10:00:00Z", "lastClickedAt": null,
+      "expiresAt": "2030-01-01T00:00:00Z" }
+  ]
+}
+```
+
+- `items` is in the same order as `urls`. The same URL twice gets two links.
+- Each URL is checked by the same rules as single create. Leading and trailing spaces are trimmed, but empty items aren't skipped: they're errors.
+- It's all or nothing. If any URL or the expiry is invalid, the response is 400, nothing is created, and every problem is listed. URL errors are keyed by zero-based position:
+
+```json
+{
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "urls[1]": ["Enter a full web address starting with http:// or https://."],
+    "expiresAt": ["The expiry date must be in the future."]
+  }
+}
+```
+
+- A missing or empty `urls` list gives `errors.urls` = `["Add at least one URL."]`. More than 25 gives `["You can shorten at most 25 URLs at once."]` before any URL is checked.
+- Custom codes and per-URL expiry dates aren't supported. Other fields, such as `customCode`, are never used.
 
 ## Database migrations
 

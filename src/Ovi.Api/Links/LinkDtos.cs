@@ -8,6 +8,14 @@ namespace Ovi.Api.Links;
 /// <param name="ExpiresAt">Optional time (with offset, e.g. 2030-01-01T00:00:00Z) after which the link stops redirecting.</param>
 public record CreateLinkRequest(string Url, string? CustomCode = null, DateTimeOffset? ExpiresAt = null);
 
+/// <summary>Shortens many URLs at once, all or nothing. Each gets a random code.</summary>
+/// <param name="Urls">1 to 25 absolute http or https URLs, each checked like a new link's. Repeats each get their own link.</param>
+/// <param name="ExpiresAt">Optional time (with offset) set on every link; without it the links never expire.</param>
+public record BulkCreateLinksRequest(List<string?>? Urls, DateTimeOffset? ExpiresAt = null);
+
+/// <param name="Items">The new links, in the same order as the request's URLs.</param>
+public record BulkCreateLinksResponse(IReadOnlyList<LinkResponse> Items);
+
 /// <summary>
 /// Changes to a link; leave a field out (or null) to keep it as it is. The code, clicks and stats never change.
 /// </summary>

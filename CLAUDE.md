@@ -3,7 +3,7 @@
 Ovi is a self-hosted URL shortener with QR codes and click stats, live at https://getovi.link.
 
 - **API:** `src/Ovi.Api`, .NET 10 minimal APIs with EF Core and Npgsql on Postgres (Neon in production). Areas: `Links`, `Accounts` (Google/GitHub OAuth, API key), `Admin`, `Security`, `Data`, `Infrastructure`.
-- **Tests:** `tests/Ovi.Api.Tests`, xUnit integration tests against a real Postgres started with Testcontainers, so Docker must be running.
+- **Tests:** `tests/Ovi.Api.Tests`, MSTest integration tests against a real Postgres started with Testcontainers, so Docker must be running.
 - **Web UI:** `web/`, React 19, Vite and Tailwind v4, tested with vitest. `npm run build` writes into `src/Ovi.Api/wwwroot`, which is gitignored. The API serves the UI.
 - **Deploy:** `Dockerfile` (images pinned by digest) and `render.yaml`. CI (`.github/workflows/ci.yml`) builds, tests, checks licences and vulnerabilities, checks EF migrations, smoke-tests the image and publishes it to GHCR from `main`.
 

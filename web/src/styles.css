@@ -22,6 +22,8 @@
   --color-danger: light-dark(#c41e1e, #ff7a72);
   --color-error-bg: light-dark(#fff2f2, #3a1e1f);
   --color-error-line: light-dark(rgb(196 30 30 / 25%), rgb(255 122 114 / 30%));
+  /* A done tick or count (bulk results). AA text: 5.3:1 on white, 4.9:1 on subtle; 7.1:1+ in dark. */
+  --color-success: light-dark(#1e7b34, #30d158);
 
   /* Text and icons on an ink fill: badges, the brand tile, primary buttons. */
   --color-on-ink: light-dark(#ffffff, #1d1d1f);

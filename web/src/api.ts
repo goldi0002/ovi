@@ -95,6 +95,19 @@ export interface CreateLinkInput {
   expiresAt?: string;
 }
 
+/** POST /api/links/bulk: many links with random codes, all or nothing (signed-in users and the API key only). */
+export interface BulkCreateLinksInput {
+  /** At most 25 (fewer if the server's create budget is lower), in the order the results should come back. */
+  urls: string[];
+  /** One expiry for every link in the batch; leave out for links that never expire. */
+  expiresAt?: string;
+}
+
+/** The 201 body of POST /api/links/bulk: one link per URL sent, in the same order. */
+export interface BulkCreateLinksResponse {
+  items: Link[];
+}
+
 /** Changes to a link; leave a field out to keep it. The code, clicks and stats never change. */
 export interface UpdateLinkInput {
   url?: string;
@@ -118,6 +131,8 @@ export class ApiError extends Error {
     public readonly status: number,
     message: string,
     public readonly fieldErrors: Record<string, string[]> = {},
+    /** True when the message is the server's own words (from the problem body), not a fallback. */
+    public readonly fromServer = false,
   ) {
     super(message);
     this.name = "ApiError";
@@ -139,12 +154,10 @@ async function toError(res: Response): Promise<ApiError> {
   }
   const fieldErrors = problem.errors ?? {};
   const fieldMessages = Object.values(fieldErrors).flat();
+  const serverMessage = fieldMessages[0] ?? problem.detail ?? problem.title;
   const message =
-    fieldMessages[0] ??
-    problem.detail ??
-    problem.title ??
-    (res.status === 429 ? "Too many requests. Wait a minute and try again." : `Request failed (${res.status}).`);
-  return new ApiError(res.status, message, fieldErrors);
+    serverMessage ?? (res.status === 429 ? "Too many requests. Wait a minute and try again." : `Request failed (${res.status}).`);
+  return new ApiError(res.status, message, fieldErrors, serverMessage !== undefined);
 }
 
 /**
@@ -211,6 +224,15 @@ export class OviApi {
 
   create(input: CreateLinkInput): Promise<Link> {
     return this.request("/api/links", { method: "POST", body: JSON.stringify(input) });
+  }
+
+  /**
+   * Shortens many URLs in one request. Nothing is created if any URL is invalid: the 400 lists each one under
+   * errors["urls[i]"], where i is its position in `urls`.
+   */
+  async createMany(input: BulkCreateLinksInput): Promise<Link[]> {
+    const res = await this.request<BulkCreateLinksResponse>("/api/links/bulk", { method: "POST", body: JSON.stringify(input) });
+    return res.items;
   }
 
   update(code: string, input: UpdateLinkInput): Promise<Link> {
