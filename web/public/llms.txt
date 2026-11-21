@@ -9,6 +9,7 @@ Ovi runs on one address: the same site serves the app and the short links, so th
 - Anyone can shorten a URL without signing in. Those links get a random code and expire after 30 days.
 - Signing in with Google or GitHub creates the account on first use. Signed-in users can choose a custom code (3–32 letters, digits, hyphens or underscores), set an expiry date or none, and keep every link they make.
 - Signed-in users can shorten up to 25 URLs at once, one per line, with one optional expiry for all. It's all or nothing: if any line is wrong, nothing is created and each bad line is listed. The results can be copied in one go or downloaded as a CSV file.
+- Destination URLs can be checked against Google Safe Browsing: a site flagged as unsafe is refused.
 - Every link comes with a downloadable QR code.
 - Click stats show clicks per day over the last 7, 30 or 90 days, the top referring sites, and the devices and browsers visitors used. A click stores only the time, the referring site's name, a device category and a browser category: no IP address and no full user agent.
 - The server admin can sign in with an API key, see totals, every account and every link, and suspend an account.

@@ -9,6 +9,7 @@ using Microsoft.Extensions.Time.Testing;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using Ovi.Api.Accounts;
 using Ovi.Api.Data;
 using Ovi.Api.Security;
@@ -19,6 +20,15 @@ namespace Ovi.Api.Tests;
 public class OviApiFactory(Dictionary<string, string?>? settings = null, IPAddress? remoteIp = null, string? webRoot = null) : WebApplicationFactory<Program>
 {
     public const string ApiKey = "test-key";
+
+    /// <summary>Name of the named HttpClient the app uses for Safe Browsing (must match the app).</summary>
+    public const string SafeBrowsingClientName = Ovi.Api.Security.SafeBrowsingUrlThreatCheck.HttpClientName;
+
+    /// <summary>Stands in for Google Safe Browsing in every test, so no test can reach the real network.</summary>
+    public FakeSafeBrowsing SafeBrowsing { get; } = new();
+
+    /// <summary>Every log entry the app wrote, for checking that secrets never reach the logs.</summary>
+    public CapturingLoggerProvider Logs { get; } = new();
 
     public FakeTimeProvider Time { get; } = new(new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero));
 
@@ -69,8 +79,10 @@ public class OviApiFactory(Dictionary<string, string?>? settings = null, IPAddre
         builder.UseSetting("Clicks:DedupeSeconds", "0");
         foreach (var (key, value) in settings ?? []) builder.UseSetting(key, value);
 
+        builder.ConfigureLogging(l => l.AddProvider(Logs));
         builder.ConfigureServices(services =>
         {
+            services.AddHttpClient(SafeBrowsingClientName).ConfigurePrimaryHttpMessageHandler(() => SafeBrowsing);
             // An empty web root unless a test supplies one, so API tests don't depend on a built UI.
             // (UseWebRoot doesn't apply to minimal hosting here; set it on the environment directly.)
             var root = webRoot ?? Directory.CreateTempSubdirectory("ovi-webroot-").FullName;
