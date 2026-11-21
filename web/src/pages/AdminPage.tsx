@@ -1,6 +1,6 @@
-import { ChartColumn, Link2, MousePointerClick, Search, ShieldOff, Trash2, TimerOff, UserRound, Users, UserX, X } from "lucide-react";
+import { ChartColumn, Flag, Link2, MousePointerClick, Search, ShieldOff, Trash2, TimerOff, UserRound, Users, UserX, X } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { ApiError, type AdminLink, type AdminOverview, type AdminUser, type Link, type OviApi, type Page } from "../api";
+import { ApiError, type AdminLink, type AdminOverview, type AdminReport, type ReportReason, type ReportResolution, type AdminUser, type Link, type OviApi, type Page } from "../api";
 import { Pager as PagerControls, Status } from "../components/LinksTable";
 import { ClicksChart, StatsDialog } from "../components/StatsDialog";
 import { useConfirm } from "../components/ui/Confirm";
@@ -22,7 +22,7 @@ interface Props {
 
 /** Admin dashboard: totals, every user, and every link. The server checks admin rights on each request. */
 export function AdminPage({ api, state, onLogIn, onUnauthorized }: Props) {
-  const [tab, setTab] = useState<"users" | "links">("users");
+  const [tab, setTab] = useState<"users" | "links" | "reports">("users");
   const [ownerFilter, setOwnerFilter] = useState<{ value: string; label: string } | null>(null);
 
   usePageTitle("Admin");
@@ -56,7 +56,7 @@ export function AdminPage({ api, state, onLogIn, onUnauthorized }: Props) {
 
           <section className="grid gap-4">
             <div className={`${segmentTrack} w-fit`} role="tablist" aria-label="Admin lists">
-              {(["users", "links"] as const).map((t) => (
+              {(["users", "links", "reports"] as const).map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -65,12 +65,14 @@ export function AdminPage({ api, state, onLogIn, onUnauthorized }: Props) {
                   className={segment(tab === t, "px-4")}
                   onClick={() => setTab(t)}
                 >
-                  {t === "users" ? "Users" : "Links"}
+                  {t === "users" ? "Users" : t === "links" ? "Links" : "Reports"}
                 </button>
               ))}
             </div>
             {tab === "users" ? (
               <UsersList api={api} onUnauthorized={onUnauthorized} onShowLinks={showLinksOf} />
+            ) : tab === "reports" ? (
+              <ReportsList api={api} onUnauthorized={onUnauthorized} />
             ) : (
               <LinksList
                 api={api}
@@ -489,6 +491,156 @@ function LinksList({
       )}
       <Pager page={page} data={data} onPage={setPage} />
       {statsFor && <StatsDialog api={api} link={statsFor} onClose={closeStats} onUnauthorized={onUnauthorized} />}
+    </div>
+  );
+}
+
+const REASON_LABELS: Record<ReportReason, string> = { phishing: "Phishing", malware: "Malware", spam: "Spam", other: "Other" };
+
+/** Links people have reported, worst first. Dismiss or mark actioned closes all of a link's open reports. */
+function ReportsList({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () => void }) {
+  const [page, setPage] = useState(1);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const load = useCallback(() => api.adminReports(page, PAGE_SIZE), [api, page]);
+  const { data, error, loading, reload } = useLoad(load, onUnauthorized);
+  const confirm = useConfirm();
+  const notify = useToast();
+
+  async function resolve(row: AdminReport, resolution: ReportResolution) {
+    setBusy(row.code);
+    setActionError(null);
+    try {
+      await api.resolveReports(row.code, resolution);
+      notify(resolution === "dismissed" ? `Dismissed reports of /${row.code}` : `Marked /${row.code} as actioned`);
+      await reload();
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) return onUnauthorized();
+      setActionError(err instanceof ApiError ? err.message : "Couldn't update the reports.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function remove(row: AdminReport) {
+    const ok = await confirm({
+      title: `Delete /${row.code}?`,
+      message: "It will stop working for everyone, and its reports are removed with it.",
+      confirmLabel: "Delete link",
+      destructive: true,
+    });
+    if (!ok) return;
+    setActionError(null);
+    try {
+      await api.remove(row.code);
+      notify(`Deleted /${row.code}`);
+      await reload();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Couldn't delete the link.");
+    }
+  }
+
+  async function suspend(row: AdminReport) {
+    if (!row.owner) return;
+    const who = row.owner.name || row.owner.email || `user ${row.owner.id}`;
+    const ok = await confirm({
+      title: `Suspend ${who}?`,
+      message: "They'll be signed out and their links will stop working. You can restore the account later.",
+      confirmLabel: "Suspend account",
+      destructive: true,
+    });
+    if (!ok) return;
+    setActionError(null);
+    try {
+      await api.setBlocked(row.owner.id, true);
+      notify(`Suspended ${who}`);
+      await reload();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Couldn't suspend the account.");
+    }
+  }
+
+  return (
+    <div className="grid gap-3">
+      <p className="flex items-center gap-2 text-[0.9375rem] font-semibold">
+        Reported links {data && <span className="rounded-full bg-subtle px-2 py-px text-xs font-medium text-muted tabular-nums">{data.total}</span>}
+      </p>
+      {(error || actionError) && (
+        <p className={errorBox} role="alert">
+          {error ?? actionError}
+        </p>
+      )}
+      {!data && !error && (
+        <div role="status" aria-label="Loading reports" className="grid gap-3">
+          <Skeleton className="h-24 rounded-xl" />
+          <Skeleton className="h-24 rounded-xl" />
+        </div>
+      )}
+      {data && data.items.length === 0 && !loading && <EmptyState icon={<Flag />} title="No open reports." />}
+      {data && data.items.length > 0 && (
+        <ul
+          className={`${card} overflow-hidden text-sm max-md:grid max-md:gap-3 max-md:rounded-none max-md:bg-transparent max-md:shadow-none`}
+          aria-label="Reported links"
+        >
+          {data.items.map((row) => {
+            const owner = row.owner ? `${row.owner.name ? `${row.owner.name} ` : ""}${row.owner.email ? `(${row.owner.email})` : `#${row.owner.id}`}`.trim() : row.anonymous ? "Anonymous" : "API key";
+            return (
+              <Row key={row.code}>
+                <div className="min-w-0">
+                  <p className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="font-mono text-[0.8125rem] font-semibold" title={row.shortUrl}>
+                      /{row.code}
+                    </span>
+                    <Badge tone="danger">
+                      {row.openReports} open {row.openReports === 1 ? "report" : "reports"}
+                    </Badge>
+                    {(Object.keys(REASON_LABELS) as ReportReason[])
+                      .filter((r) => row.reasons[r] > 0)
+                      .map((r) => (
+                        <Badge key={r}>
+                          {REASON_LABELS[r]} {row.reasons[r]}
+                        </Badge>
+                      ))}
+                  </p>
+                  {/* Shown as text on purpose: it may be dangerous, so nothing opens it by accident. */}
+                  <p className="break-all text-[0.8125rem] text-muted" title="Destination (not a link, since it may be harmful)">
+                    {row.url}
+                  </p>
+                  <p className="truncate text-xs text-muted">
+                    {owner} · latest <span title={formatDateTime(row.latestAt)}>{formatRelative(row.latestAt)}</span>
+                  </p>
+                  {row.details.length > 0 && (
+                    <ul className="mt-1.5 grid gap-1 text-xs text-ink" aria-label={`Details for /${row.code}`}>
+                      {row.details.map((d, i) => (
+                        <li key={i} className="break-words rounded-md bg-subtle px-2 py-1">
+                          {d}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2 md:max-w-[15rem] md:justify-end">
+                  <button type="button" className={button("default", "sm")} disabled={busy === row.code} onClick={() => void resolve(row, "dismissed")} aria-label={`Dismiss reports of /${row.code}`}>
+                    Dismiss
+                  </button>
+                  <button type="button" className={button("default", "sm")} disabled={busy === row.code} onClick={() => void resolve(row, "actioned")} aria-label={`Mark /${row.code} as actioned`}>
+                    Mark actioned
+                  </button>
+                  <button type="button" className={button("danger", "sm")} onClick={() => void remove(row)} aria-label={`Delete /${row.code}`}>
+                    Delete link
+                  </button>
+                  {row.owner && (
+                    <button type="button" className={button("danger", "sm")} onClick={() => void suspend(row)} aria-label={`Suspend owner of /${row.code}`}>
+                      Suspend owner
+                    </button>
+                  )}
+                </div>
+              </Row>
+            );
+          })}
+        </ul>
+      )}
+      <Pager page={page} data={data} onPage={setPage} />
     </div>
   );
 }

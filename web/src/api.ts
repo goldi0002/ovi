@@ -215,7 +215,8 @@ export class OviApi {
       },
     });
     if (!res.ok) throw await toError(res);
-    return (res.status === 204 ? undefined : await res.json()) as T;
+    // 204 and 202 (a report was accepted) have no body.
+    return (res.status === 204 || res.status === 202 ? undefined : await res.json()) as T;
   }
 
   session(): Promise<Session> {

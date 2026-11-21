@@ -100,9 +100,10 @@ export function ReportPage({ api }: { api: OviApi }) {
           </p>
         )}
 
-        <label className={field}>
-          Short link or code
+        <div className={field}>
+          <label htmlFor={`${id}-link`}>Short link or code</label>
           <input
+            id={`${id}-link`}
             ref={linkRef}
             className={input}
             value={link}
@@ -120,7 +121,7 @@ export function ReportPage({ api }: { api: OviApi }) {
               {errors.link}
             </span>
           )}
-        </label>
+        </div>
 
         <fieldset className="grid min-w-0 gap-2" aria-describedby={errors.reason ? `${id}-reason-error` : undefined}>
           <legend className="mb-1.5 text-[0.8125rem] font-medium">What's wrong with it?</legend>
@@ -146,11 +147,12 @@ export function ReportPage({ api }: { api: OviApi }) {
           )}
         </fieldset>
 
-        <label className={field}>
-          <span>
+        <div className={field}>
+          <label htmlFor={`${id}-details`}>
             Details <span className={hint}>(optional)</span>
-          </span>
+          </label>
           <textarea
+            id={`${id}-details`}
             ref={detailsRef}
             className={`${input} h-28 resize-y py-2`}
             value={details}
@@ -166,7 +168,7 @@ export function ReportPage({ api }: { api: OviApi }) {
               {errors.details}
             </span>
           )}
-        </label>
+        </div>
 
         <button type="submit" className={button("primary", "md", "justify-self-start")} disabled={busy}>
           {busy && <Spinner />}
