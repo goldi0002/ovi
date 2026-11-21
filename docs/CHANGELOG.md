@@ -4,6 +4,11 @@ User-facing changes to Ovi, newest first.
 
 ## Unreleased
 
+### Docker Compose
+
+- New `docker-compose.yml` and `.env.example`: run Ovi with its own Postgres database with `docker compose up -d`. Only three values are required: the public URL, the admin API key and the database password.
+- CI now smoke-tests the image through the compose file, including a restart, so the self-hosting path is checked on every change.
+
 ### Report a link
 
 - New **Report a link** page (`/report`, linked in the header). Anyone can report a short link as phishing, malware, spam or something else, with optional details of up to 500 characters. No account is needed, and a report stores no IP address, user agent or account.
