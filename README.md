@@ -41,7 +41,7 @@ A React app in [`web/`](web) (Vite, TypeScript, Tailwind CSS, Lucide icons) is t
   - the top links
   - every user, with their links and clicks; an admin can suspend or restore a user
   - every link, with its owner; filter by owner (anonymous, API key or one user), search, open its stats, or delete it
-  - a **Reports** tab listing links with open reports, most reported first: the number of reports, a count per reason, the latest details people wrote (up to 5), and the link's owner. Dismiss or mark as actioned closes all of a link's open reports; you can also delete the link or suspend its owner from there
+  - a **Reports** tab, with a badge showing the number of open reports, listing links with open reports, most reported first: the number of reports, a count per reason, the latest details people wrote (up to 5), and the link's owner. Dismiss or mark as actioned closes all of a link's open reports; you can also delete the link or suspend its owner from there
 - Open **Stats** on any link for its clicks per day over the last 7, 30 or 90 days, its top referrers, and the devices and browsers visitors used. Each click stores only the time, the referring site's name (no page path), and a device and browser category: no IP address or full user agent.
 
 Develop it with hot reload while the API runs on `:5080` (see above). Vite proxies `/api` calls to it:
@@ -279,7 +279,7 @@ curl -X POST localhost:5080/api/reports -H 'X-Ovi-Request: 1' -H 'content-type: 
 
 - `link` is an Ovi code or a short URL on this site's own host. Anything else gets 400 ("Enter an Ovi short link or its code.").
 - `reason` is `phishing`, `malware`, `spam` or `other`.
-- `details` is optional, trimmed, at most 500 characters. Line feeds and tabs are fine; other control characters (a carriage return too) and direction-override characters get 400 ("The details contain characters that can't be saved.").
+- `details` is optional, trimmed, at most 500 characters. Line breaks (`\n`, `\r\n` or `\r`, all saved as `\n`) and tabs are fine; any other control or direction-override character gets 400 ("The details contain characters that can't be saved."). More than 500 characters after that gives 400 ("Keep the details under 500 characters.").
 - Expired and disabled links can be reported. A deleted link gets 404.
 - Each link keeps at most 50 open reports. Later ones get 202 but are dropped, so one link can't flood the list.
 - A report stores the link, reason, details and time. It never stores the reporter's IP address, user agent or account.
