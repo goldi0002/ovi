@@ -1,67 +1,133 @@
 @import "tailwindcss";
 
-/* Ovi's design tokens, after macOS in its Graphite accent: black text on white, system greys,
-   hairline borders and soft shadows. Each colour becomes utilities such as bg-subtle and text-muted.
+/* Ovi's design tokens. A calm desktop-app look: neutral greys, white surfaces, hairline borders,
+   soft layered shadows and one accent, an indigo blue of Ovi's own. Each colour becomes utilities
+   such as bg-subtle, text-muted and bg-accent.
 
    Every colour is light-dark(light, dark), so it follows the page's color-scheme: the system
-   setting by default, or the header's theme toggle, which sets data-theme on <html> (before first
-   paint, from /theme.js). Components use the tokens and need no `dark:` classes. Text colours keep
+   setting by default, or the theme toggle, which sets data-theme on <html> (before first paint,
+   from /theme.js). Components use the tokens and need no `dark:` classes. Text colours keep
    WCAG AA (4.5:1) against page, surface and subtle in both schemes. */
 @theme {
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Mono", Menlo, Consolas, monospace;
 
-  --color-page: light-dark(#ffffff, #121213);
-  --color-surface: light-dark(#ffffff, #1c1c1e);
-  --color-ink: light-dark(#1d1d1f, #f5f5f7);
-  --color-muted: light-dark(#6e6e73, #a1a1a6);
-  --color-line: light-dark(rgb(0 0 0 / 10%), rgb(255 255 255 / 12%));
-  --color-line-strong: light-dark(rgb(0 0 0 / 22%), rgb(255 255 255 / 26%));
-  --color-subtle: light-dark(#f5f5f7, #2a2a2d);
+  /* Surfaces, from the back of the window to the front. */
+  --color-page: light-dark(#f5f5f7, #141416);
+  --color-surface: light-dark(#ffffff, #1c1c1f);
+  --color-raised: light-dark(#ffffff, #242428);
+  --color-subtle: light-dark(#efeff2, #2a2a2e);
+  /* The sidebar and toolbars: translucent over the page. */
+  --color-sidebar: light-dark(rgb(236 236 240 / 72%), rgb(30 30 33 / 72%));
+  --color-toolbar: light-dark(rgb(245 245 247 / 80%), rgb(20 20 22 / 80%));
+
+  /* Text. */
+  --color-ink: light-dark(#1d1d1f, #f2f2f4);
+  --color-muted: light-dark(#6b6b72, #a1a1a9);
+  --color-placeholder: light-dark(#9a9aa1, #77777f);
   --color-ink-hover: light-dark(#3a3a3c, #c7c7cc);
-  --color-danger: light-dark(#c41e1e, #ff7a72);
-  --color-error-bg: light-dark(#fff2f2, #3a1e1f);
-  --color-error-line: light-dark(rgb(196 30 30 / 25%), rgb(255 122 114 / 30%));
-  /* A done tick or count (bulk results). AA text: 5.3:1 on white, 4.9:1 on subtle; 7.1:1+ in dark. */
-  --color-success: light-dark(#1e7b34, #30d158);
 
-  /* Text and icons on an ink fill: badges, the brand tile, primary buttons. */
+  /* Hairlines. */
+  --color-line: light-dark(rgb(0 0 0 / 8%), rgb(255 255 255 / 9%));
+  --color-line-strong: light-dark(rgb(0 0 0 / 16%), rgb(255 255 255 / 18%));
+
+  /* The accent: primary buttons, the selected nav item, links, focus rings and charts.
+     #4b55d6 is 5.9:1 on white; #8f98ff is 6.6:1 on the dark surface. */
+  --color-accent: light-dark(#4b55d6, #5a63e8);
+  --color-accent-hover: light-dark(#4049c4, #6a73f0);
+  --color-accent-pressed: light-dark(#363eae, #4f58d8);
+  --color-accent-text: light-dark(#4b55d6, #8f98ff);
+  --color-accent-soft: light-dark(rgb(75 85 214 / 10%), rgb(143 152 255 / 14%));
+  --color-on-accent: #ffffff;
+  --color-on-danger: light-dark(#ffffff, #1d1d1f);
+
+  /* Status colours: text, and a soft fill behind it. */
+  --color-success: light-dark(#1d7a3a, #3fcf6e);
+  --color-success-soft: light-dark(rgb(29 122 58 / 10%), rgb(63 207 110 / 14%));
+  --color-warning: light-dark(#a15c00, #f0a640);
+  --color-warning-soft: light-dark(rgb(161 92 0 / 10%), rgb(240 166 64 / 14%));
+  --color-danger: light-dark(#b4231d, #ff7b72);
+  --color-error-bg: light-dark(#fdf1f0, #3a1e1f);
+  --color-error-line: light-dark(rgb(180 35 29 / 22%), rgb(255 123 114 / 30%));
+
+  /* Text and icons on an ink fill (tooltips, the brand tile). */
   --color-on-ink: light-dark(#ffffff, #1d1d1f);
-  /* The top of the primary button's gradient (the bottom is ink). */
-  --color-primary-top: light-dark(#48484a, #ffffff);
-  --color-primary-top-hover: light-dark(#5a5a5c, #ffffff);
-  /* Push buttons and text fields. */
-  --color-control: light-dark(#ffffff, #2e2e31);
-  --color-control-hover: light-dark(#f5f5f7, #3a3a3d);
-  --color-control-pressed: light-dark(#ebebed, #46464a);
-  --color-field: light-dark(#ffffff, #232326);
-  --color-placeholder: light-dark(#a1a1a6, #86868b);
-  /* Borderless (ghost, toolbar) buttons and chart columns under the pointer. */
-  --color-hover: light-dark(rgb(0 0 0 / 5%), rgb(255 255 255 / 8%));
-  --color-pressed: light-dark(rgb(0 0 0 / 10%), rgb(255 255 255 / 14%));
-  /* Segmented controls: the track and the selected segment. */
-  --color-segment: light-dark(rgb(0 0 0 / 6%), rgb(255 255 255 / 8%));
-  --color-segment-on: light-dark(#ffffff, #5a5a5e);
-  /* The sticky toolbar, translucent over the page. */
-  --color-toolbar: light-dark(rgb(255 255 255 / 75%), rgb(28 28 30 / 75%));
-  /* Behind a sheet. */
-  --color-backdrop: light-dark(rgb(0 0 0 / 25%), rgb(0 0 0 / 55%));
-  /* Focus rings use this at partial opacity. */
-  --color-focus: light-dark(#1d1d1f, #f5f5f7);
-  /* An "off" status dot (expired links). */
-  --color-dot-off: light-dark(#c7c7cc, #636366);
-  --color-selection: light-dark(rgb(0 0 0 / 12%), rgb(255 255 255 / 22%));
 
-  /* A window: a hairline outline plus a soft drop shadow. */
-  --shadow-window:
-    0 0 0 0.5px light-dark(rgb(0 0 0 / 12%), rgb(255 255 255 / 12%)), 0 1px 3px light-dark(rgb(0 0 0 / 5%), rgb(0 0 0 / 30%)),
-    0 8px 24px light-dark(rgb(0 0 0 / 5%), rgb(0 0 0 / 30%));
-  /* A sheet or popover floating above the window. */
-  --shadow-sheet: 0 0 0 0.5px light-dark(rgb(0 0 0 / 15%), rgb(255 255 255 / 16%)), 0 24px 64px light-dark(rgb(0 0 0 / 22%), rgb(0 0 0 / 60%));
-  /* A push button: a hairline and a 1px drop, like AppKit's bezel. */
-  --shadow-control: 0 0 0 0.5px light-dark(rgb(0 0 0 / 14%), rgb(255 255 255 / 16%)), 0 0.5px 1.5px light-dark(rgb(0 0 0 / 14%), rgb(0 0 0 / 40%));
+  /* Push buttons and text fields. */
+  --color-control: light-dark(#ffffff, #2c2c30);
+  --color-control-hover: light-dark(#f7f7f9, #35353a);
+  --color-control-pressed: light-dark(#ececef, #404045);
+  --color-field: light-dark(#ffffff, #202023);
+  /* Borderless (ghost, toolbar) buttons, list rows and chart columns under the pointer. */
+  --color-hover: light-dark(rgb(0 0 0 / 4.5%), rgb(255 255 255 / 7%));
+  --color-pressed: light-dark(rgb(0 0 0 / 9%), rgb(255 255 255 / 12%));
+  /* Segmented controls: the track and the selected segment. */
+  --color-segment: light-dark(rgb(0 0 0 / 5.5%), rgb(255 255 255 / 7%));
+  --color-segment-on: light-dark(#ffffff, #4a4a50);
+  /* Behind a sheet. */
+  --color-backdrop: light-dark(rgb(20 20 30 / 22%), rgb(0 0 0 / 55%));
+  /* An "off" status dot (expired links). */
+  --color-dot-off: light-dark(#b9b9c0, #5c5c63);
+  --color-selection: light-dark(rgb(75 85 214 / 18%), rgb(143 152 255 / 28%));
+  /* Skeletons while something loads. */
+  --color-skeleton: light-dark(rgb(0 0 0 / 6%), rgb(255 255 255 / 7%));
+
+  /* A card: a hairline outline plus a soft drop shadow. */
+  --shadow-card:
+    0 0 0 0.5px light-dark(rgb(0 0 0 / 9%), rgb(255 255 255 / 9%)), 0 1px 2px light-dark(rgb(0 0 0 / 4%), rgb(0 0 0 / 30%)),
+    0 4px 16px light-dark(rgb(0 0 0 / 3%), rgb(0 0 0 / 20%));
+  /* The same, lifted a little: a card under the pointer. */
+  --shadow-card-hover:
+    0 0 0 0.5px light-dark(rgb(0 0 0 / 11%), rgb(255 255 255 / 12%)), 0 2px 4px light-dark(rgb(0 0 0 / 5%), rgb(0 0 0 / 30%)),
+    0 10px 28px light-dark(rgb(0 0 0 / 6%), rgb(0 0 0 / 30%));
+  /* A sheet, menu or toast floating above the window. */
+  --shadow-sheet:
+    0 0 0 0.5px light-dark(rgb(0 0 0 / 12%), rgb(255 255 255 / 14%)), 0 12px 32px light-dark(rgb(0 0 0 / 14%), rgb(0 0 0 / 50%)),
+    0 32px 80px light-dark(rgb(0 0 0 / 12%), rgb(0 0 0 / 40%));
+  /* A push button: a hairline and a 1px drop. */
+  --shadow-control: 0 0 0 0.5px light-dark(rgb(0 0 0 / 14%), rgb(255 255 255 / 14%)), 0 0.5px 1.5px light-dark(rgb(0 0 0 / 12%), rgb(0 0 0 / 40%));
+  /* A primary button: the accent's own edge. */
+  --shadow-primary: inset 0 0.5px 0 rgb(255 255 255 / 18%), 0 0 0 0.5px light-dark(rgb(40 46 150 / 60%), rgb(0 0 0 / 40%)), 0 1px 2px light-dark(rgb(40 46 150 / 25%), rgb(0 0 0 / 40%));
   /* A text field's inset hairline. */
-  --shadow-field: inset 0 0 0 0.5px light-dark(rgb(0 0 0 / 22%), rgb(255 255 255 / 22%)), inset 0 0.5px 1px light-dark(rgb(0 0 0 / 8%), rgb(0 0 0 / 30%));
+  --shadow-field: inset 0 0 0 0.5px light-dark(rgb(0 0 0 / 18%), rgb(255 255 255 / 16%)), inset 0 0.5px 1px light-dark(rgb(0 0 0 / 5%), rgb(0 0 0 / 30%));
+
+  /* Motion: quick and settled, never bouncy. */
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-fade-in: fade-in 160ms var(--ease-out-soft);
+  --animate-sheet-in: sheet-in 200ms var(--ease-out-soft);
+  --animate-pop-in: pop-in 140ms var(--ease-out-soft);
+  --animate-toast-in: toast-in 220ms var(--ease-out-soft);
+  --animate-page-in: page-in 220ms var(--ease-out-soft);
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes sheet-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.985);
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+  }
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+    }
+  }
+  @keyframes page-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
 }
 
 @layer base {
@@ -76,12 +142,82 @@
     color-scheme: dark;
   }
 
-  /* No grey flash when tapping links and buttons on phones; selection in the system grey. */
+  /* No grey flash when tapping links and buttons on phones. */
   html {
     -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
   }
 
   ::selection {
     background-color: var(--color-selection);
+  }
+
+  /* Native checkboxes and the date picker take the accent. */
+  input,
+  progress {
+    accent-color: var(--color-accent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 1ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* A small label that appears above an element on hover or keyboard focus: <button class="tip" data-tip="Copy">.
+     The element keeps its own aria-label; the tip only repeats it for sighted pointer users. */
+  .tip {
+    position: relative;
+  }
+  .tip::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    z-index: 30;
+    translate: -50% 2px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--color-ink);
+    color: var(--color-on-ink);
+    font-size: 0.71875rem;
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition:
+      opacity 120ms ease,
+      translate 120ms ease;
+  }
+  .tip:hover::after,
+  .tip:focus-visible::after {
+    opacity: 1;
+    translate: -50% 0;
+    transition-delay: 350ms;
+  }
+  .tip:focus-visible::after {
+    transition-delay: 0ms;
+  }
+  /* Touch screens have no hover, and a tap would leave the tip stuck on. */
+  @media (hover: none) {
+    .tip::after {
+      display: none;
+    }
+  }
+
+  /* A FAQ entry's disclosure chevron turns when open. */
+  details[open] > summary .chevron {
+    rotate: 180deg;
+  }
+  summary::-webkit-details-marker {
+    display: none;
   }
 }

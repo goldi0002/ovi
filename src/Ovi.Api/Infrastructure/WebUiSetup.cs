@@ -8,8 +8,11 @@ namespace Ovi.Api.Infrastructure;
 /// </summary>
 public static class WebUiSetup
 {
-    /// <summary>Paths the React app handles itself; each returns index.html.</summary>
-    public static readonly string[] Pages = ["/", "/links", "/admin"];
+    /// <summary>
+    /// Paths the React app handles itself; each returns index.html. A one-segment page must also be a
+    /// reserved code (see CodeGenerator); pages under /links need not be, since codes never contain "/".
+    /// </summary>
+    public static readonly string[] Pages = ["/", "/links", "/links/analytics", "/links/qr-codes", "/admin"];
 
     public static void UseOviWebUi(this WebApplication app)
     {

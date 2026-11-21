@@ -1,9 +1,10 @@
-import { ChevronDown } from "lucide-react";
-import { useCallback, useState, type FormEvent } from "react";
+import { ArrowRight, ChevronDown, CircleAlert, Link as LinkIcon, SlidersHorizontal } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError, type Link, type OviApi } from "../api";
 import { isoToLocalInput, localInputToIso } from "../format";
-import { button, errorBox, field, focusRing, input } from "../ui";
+import { button, errorBox, field, focusRing, hint, input } from "../ui";
 import { BulkShortenForm } from "./BulkShortenForm";
+import { SegmentedControl, Spinner } from "./ui/primitives";
 
 type Mode = "one" | "many";
 const MODES: { value: Mode; label: string }[] = [
@@ -40,6 +41,12 @@ export function ShortenCard({ api, signedIn, ready, anonymousLinkDays, onLogIn, 
   const [expiresAt, setExpiresAt] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const urlRef = useRef<HTMLInputElement>(null);
+
+  // Arriving at /#shorten (the "New link" buttons) puts the cursor in the box.
+  useEffect(() => {
+    if (window.location.hash === "#shorten") urlRef.current?.focus();
+  }, []);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -69,21 +76,28 @@ export function ShortenCard({ api, signedIn, ready, anonymousLinkDays, onLogIn, 
 
   return (
     <div className="grid gap-4">
-      <div className="flex w-fit rounded-lg bg-segment p-0.5 max-sm:w-full" role="group" aria-label="How many links">
-        {MODES.map((m) => (
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SegmentedControl
+          label="How many links"
+          options={MODES}
+          value={mode}
+          onChange={setMode}
+          disabled={!ready || bulkBusy}
+          className="max-sm:flex max-sm:w-full max-sm:[&>button]:flex-1"
+        />
+        {mode === "one" && (
           <button
-            key={m.value}
             type="button"
-            className={`cursor-pointer rounded-md px-3 py-1 text-[0.8125rem] font-medium whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-45 max-sm:flex-1 max-sm:px-2 ${focusRing} ${
-              mode === m.value ? "bg-segment-on text-ink shadow-control" : "text-muted hover:not-disabled:text-ink"
-            }`}
-            aria-pressed={mode === m.value}
-            disabled={!ready || bulkBusy}
-            onClick={() => setMode(m.value)}
+            className={`inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-[0.8125rem] font-medium text-muted transition-colors hover:text-ink ${focusRing}`}
+            aria-expanded={showOptions}
+            aria-controls="shorten-options"
+            onClick={() => setShowOptions((v) => !v)}
           >
-            {m.label}
+            <SlidersHorizontal className="size-3.5" aria-hidden="true" />
+            Custom code and expiry
+            <ChevronDown className={`size-3.5 transition-transform duration-200 ${showOptions ? "rotate-180" : ""}`} aria-hidden="true" />
           </button>
-        ))}
+        )}
       </div>
 
       <div hidden={mode !== "many"}>
@@ -100,59 +114,69 @@ export function ShortenCard({ api, signedIn, ready, anonymousLinkDays, onLogIn, 
       <div hidden={mode !== "one"}>
         <form id="shorten" onSubmit={submit} aria-label="Create a short link" className="grid gap-3">
           <div className="flex gap-2 max-sm:flex-col">
-            <label className="min-w-0 flex-1">
+            <label className="relative min-w-0 flex-1">
               <span className="sr-only">Long URL</span>
+              <LinkIcon className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-placeholder" aria-hidden="true" />
               <input
+                ref={urlRef}
                 type="url"
                 inputMode="url"
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="https://example.com/a/very/long/link"
+                placeholder="Paste a long link, like https://example.com/a/very/long/page"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 required
                 maxLength={2048}
-                className={`${input} text-ellipsis`}
+                className={`${input} h-11 rounded-[10px] pl-10 text-[0.9375rem] text-ellipsis`}
               />
             </label>
-            <button className={button("primary", "md", "px-5")} type="submit" disabled={saving}>
-              {saving ? "Shortening…" : "Shorten URL"}
+            <button className={button("primary", "lg", "min-w-36")} type="submit" disabled={saving}>
+              {saving ? (
+                <>
+                  <Spinner />
+                  Shortening…
+                </>
+              ) : (
+                <>
+                  Shorten URL
+                  <ArrowRight />
+                </>
+              )}
             </button>
           </div>
 
-          <button
-            type="button"
-            className={`inline-flex cursor-pointer items-center gap-1 justify-self-start rounded py-0.5 text-[0.8125rem] text-muted hover:text-ink ${focusRing}`}
-            aria-expanded={showOptions}
-            aria-controls="shorten-options"
-            onClick={() => setShowOptions((v) => !v)}
-          >
-            Custom code and expiry
-            <ChevronDown className={`size-4 transition-transform ${showOptions ? "rotate-180" : ""}`} aria-hidden="true" />
-          </button>
-
           {showOptions && (
-            <div id="shorten-options" className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+            <div id="shorten-options" className="grid animate-pop-in grid-cols-2 gap-3 rounded-xl bg-subtle/70 p-3.5 max-sm:grid-cols-1">
               <label className={field}>
                 <span>
                   Custom code <span className="font-normal text-muted">(optional)</span>
                 </span>
-                <input
-                  type="text"
-                  placeholder="my-link"
-                  value={customCode}
-                  onChange={(e) => setCustomCode(e.target.value)}
-                  pattern="[A-Za-z0-9_\-]{3,32}"
-                  disabled={!signedIn}
-                  aria-describedby={signedIn ? undefined : "custom-code-note"}
-                  title="3–32 letters, digits, - or _"
-                  maxLength={32}
-                  autoComplete="off"
-                  spellCheck={false}
-                  className={`${input} disabled:cursor-not-allowed disabled:bg-subtle`}
-                />
-                {!signedIn && (
-                  <span id="custom-code-note" className="text-xs font-normal text-muted">
+                <span className={`flex min-w-0 items-center rounded-lg shadow-field ${signedIn ? "bg-field" : "bg-subtle"} focus-within:shadow-[inset_0_0_0_1px_var(--color-accent)] focus-within:ring-[3px] focus-within:ring-accent/25`}>
+                  <span className="pl-3 text-sm font-normal text-muted select-none" aria-hidden="true">
+                    /
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="my-link"
+                    value={customCode}
+                    onChange={(e) => setCustomCode(e.target.value)}
+                    pattern="[A-Za-z0-9_\-]{3,32}"
+                    disabled={!signedIn}
+                    aria-describedby={signedIn ? "custom-code-hint" : "custom-code-note"}
+                    title="3–32 letters, digits, - or _"
+                    maxLength={32}
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="h-9 w-full min-w-0 bg-transparent pr-3 pl-0.5 text-sm font-normal text-ink outline-none placeholder:text-placeholder disabled:cursor-not-allowed disabled:text-muted"
+                  />
+                </span>
+                {signedIn ? (
+                  <span id="custom-code-hint" className={hint}>
+                    3–32 letters, digits, hyphens or underscores.
+                  </span>
+                ) : (
+                  <span id="custom-code-note" className={hint}>
                     Log in to choose your own code.
                   </span>
                 )}
@@ -166,22 +190,27 @@ export function ShortenCard({ api, signedIn, ready, anonymousLinkDays, onLogIn, 
                   value={expiresAt}
                   onChange={(e) => setExpiresAt(e.target.value)}
                   max={signedIn ? undefined : anonymousMaxExpiry(anonymousLinkDays)}
-                  className={input}
+                  aria-describedby="expires-hint"
+                  className={`${input} font-normal`}
                 />
+                <span id="expires-hint" className={hint}>
+                  {signedIn ? "Leave empty to keep the link for good." : `At most ${anonymousLinkDays} days without an account.`}
+                </span>
               </label>
             </div>
           )}
 
           {error && (
-            <p className={errorBox} role="alert">
-              {error}
+            <p className={`${errorBox} flex items-start gap-2`} role="alert">
+              <CircleAlert className="mt-px size-4 shrink-0" aria-hidden="true" />
+              <span>{error}</span>
             </p>
           )}
 
           {!signedIn && (
-            <p className="border-t border-line pt-3 text-[0.8125rem] text-muted">
+            <p className="text-[0.8125rem] text-muted">
               Without an account, links expire after {anonymousLinkDays} days.{" "}
-              <button type="button" className={`rounded font-medium text-ink underline underline-offset-2 ${focusRing}`} onClick={onLogIn}>
+              <button type="button" className={`cursor-pointer rounded font-medium text-accent-text hover:underline underline-offset-2 ${focusRing}`} onClick={onLogIn}>
                 Log in
               </button>{" "}
               to keep links, pick custom codes and see click stats.

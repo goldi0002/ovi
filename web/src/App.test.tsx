@@ -5,14 +5,20 @@ import { fakeApi, link } from "./test/fakeApi";
 
 const ada = { name: "Ada Lovelace", email: "ada@example.com", provider: "google" as const, isAdmin: false };
 
-/** The header's Log in / Sign out button (the page can have other "Log in" buttons). */
+/** The header's Log in / Account button (the page can have other "Log in" buttons). */
 const headerButton = (name: string) => within(screen.getByRole("banner")).getByRole("button", { name });
 const findHeaderButton = async (name: string) => within(await screen.findByRole("banner")).findByRole("button", { name });
+
+/** Signs out from the account menu in the sidebar. */
+async function signOutFromMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(headerButton("Account"));
+  await user.click(within(screen.getByRole("menu", { name: "Account" })).getByRole("menuitem", { name: "Sign out" }));
+}
 
 /** Renders the app and waits until it knows who is signed in. */
 async function renderApp() {
   render(<App />);
-  await within(screen.getByRole("banner")).findByRole("button", { name: /^(Log in|Sign out)$/ });
+  await within(screen.getByRole("banner")).findByRole("button", { name: /^(Log in|Account)$/ });
   return userEvent.setup();
 }
 
@@ -29,8 +35,8 @@ async function adminSignIn(key = "good-key", remember = false) {
 
 /** Opens the Links page from the main navigation. */
 async function openLinks(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("link", { name: "Links" }));
-  return screen.findByRole("heading", { level: 1, name: "Your links" });
+  await user.click(screen.getByRole("link", { name: "My Links" }));
+  return screen.findByRole("heading", { level: 1, name: "My Links" });
 }
 
 describe("App", () => {
@@ -39,13 +45,13 @@ describe("App", () => {
     await adminSignIn("wrong-key");
 
     expect(await screen.findByRole("alert")).toHaveTextContent("That API key was rejected.");
-    expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Account" })).not.toBeInTheDocument();
   });
 
   it("signs the admin in, lists links and keeps the key for this tab only by default", async () => {
     fakeApi({ links: [link({ code: "docs", clicks: 3 })] });
     const user = await adminSignIn();
-    expect(await findHeaderButton("Sign out")).toBeInTheDocument();
+    expect(await findHeaderButton("Account")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument(); // the home page has no list
     await openLinks(user);
 
@@ -60,6 +66,7 @@ describe("App", () => {
   it("remembers the key on this device when asked", async () => {
     fakeApi();
     const user = await adminSignIn("good-key", true);
+    await findHeaderButton("Account");
     await openLinks(user);
 
     await screen.findByText(/No links yet/);
@@ -99,14 +106,22 @@ describe("App", () => {
 
   it("deletes a link after confirming", async () => {
     const { store } = fakeApi({ links: [link({ code: "gone" })], user: ada });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const user = await renderApp();
     await openLinks(user);
 
+    // Cancelling keeps the link.
     await user.click(await screen.findByRole("button", { name: "Delete /gone" }));
+    await user.click(within(screen.getByRole("dialog", { name: "Delete /gone?" })).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete /gone" })).toHaveFocus();
+    expect(store).toHaveLength(1);
+
+    await user.click(screen.getByRole("button", { name: "Delete /gone" }));
+    await user.click(within(screen.getByRole("dialog", { name: "Delete /gone?" })).getByRole("button", { name: "Delete link" }));
 
     await screen.findByText(/No links yet/);
     expect(store).toHaveLength(0);
+    expect(screen.getByText("Deleted /gone")).toBeInTheDocument();
   });
 
   it("shows a link's stats and switches the date range", async () => {
@@ -222,7 +237,7 @@ describe("App", () => {
     const { state } = fakeApi({ user: ada });
     const user = await renderApp();
 
-    await user.click(headerButton("Sign out"));
+    await signOutFromMenu(user);
     expect(await findHeaderButton("Log in")).toBeInTheDocument();
     expect(state.user).toBeNull();
     expect(screen.queryByText("Ada Lovelace")).not.toBeInTheDocument();
@@ -244,8 +259,8 @@ describe("App", () => {
     fakeApi({ links: [link({ code: "deep" })], user: ada });
     await renderApp();
 
-    expect(screen.getByRole("heading", { level: 1, name: "Your links" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Links" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("heading", { level: 1, name: "My Links" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "My Links" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByLabelText("Long URL")).not.toBeInTheDocument();
     expect(await within(await screen.findByRole("table")).findByRole("link", { name: "/deep" })).toBeInTheDocument();
   });
@@ -259,7 +274,7 @@ describe("App", () => {
     expect(await screen.findByLabelText("Long URL")).toBeInTheDocument();
     expect(window.location.pathname).toBe("/");
 
-    await user.click(screen.getByRole("link", { name: "Links" }));
+    await user.click(screen.getByRole("link", { name: "My Links" }));
     await user.click(screen.getByRole("link", { name: "New link" }));
     expect(await screen.findByLabelText("Long URL")).toBeInTheDocument();
     expect(window.location.pathname).toBe("/");

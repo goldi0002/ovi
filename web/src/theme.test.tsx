@@ -29,8 +29,8 @@ function systemScheme(dark: boolean) {
 /** The theme-color metas index.html has, one per scheme. */
 function addThemeColorMetas() {
   for (const [media, content] of [
-    ["(prefers-color-scheme: light)", "#ffffff"],
-    ["(prefers-color-scheme: dark)", "#121213"],
+    ["(prefers-color-scheme: light)", "#f5f5f7"],
+    ["(prefers-color-scheme: dark)", "#141416"],
   ]) {
     const meta = document.createElement("meta");
     meta.name = "theme-color";
@@ -64,7 +64,7 @@ describe("Theme toggle", () => {
 
     expect(toggle()).toHaveAccessibleName("Theme: System");
     expect(root.dataset.theme).toBe("dark");
-    expect(themeColors()).toEqual(["#ffffff", "#121213"]);
+    expect(themeColors()).toEqual(["#f5f5f7", "#141416"]);
 
     system.set(false);
     expect(root.dataset.theme).toBe("light");
@@ -79,19 +79,19 @@ describe("Theme toggle", () => {
     expect(toggle()).toHaveAccessibleName("Theme: Light");
     expect(root.dataset.theme).toBe("light");
     expect(localStorage.getItem("ovi.theme")).toBe("light");
-    expect(themeColors()).toEqual(["#ffffff", "#ffffff"]);
+    expect(themeColors()).toEqual(["#f5f5f7", "#f5f5f7"]);
 
     await user.click(toggle());
     expect(toggle()).toHaveAccessibleName("Theme: Dark");
     expect(root.dataset.theme).toBe("dark");
     expect(localStorage.getItem("ovi.theme")).toBe("dark");
-    expect(themeColors()).toEqual(["#121213", "#121213"]);
+    expect(themeColors()).toEqual(["#141416", "#141416"]);
 
     await user.click(toggle());
     expect(toggle()).toHaveAccessibleName("Theme: System");
     expect(root.dataset.theme).toBe("dark");
     expect(localStorage.getItem("ovi.theme")).toBeNull();
-    expect(themeColors()).toEqual(["#ffffff", "#121213"]);
+    expect(themeColors()).toEqual(["#f5f5f7", "#141416"]);
   });
 
   it("restores the saved choice and ignores the system while one is picked", () => {

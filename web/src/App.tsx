@@ -1,17 +1,20 @@
+import { CircleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ApiError, OviApi, type Link, type Session } from "./api";
-import { BulkResult } from "./components/BulkResult";
-import { BULK_TEXTAREA_ID } from "./components/BulkShortenForm";
-import { Header } from "./components/Header";
-import { Faq } from "./components/Faq";
-import { LinkResult } from "./components/LinkResult";
+import { ApiError, OviApi, type Session } from "./api";
+import { Header, type Account } from "./components/Header";
 import { LoginDialog } from "./components/LoginDialog";
-import { ShortenCard } from "./components/ShortenCard";
+import { SettingsDialog } from "./components/SettingsDialog";
+import { ConfirmProvider } from "./components/ui/Confirm";
+import { Spinner } from "./components/ui/primitives";
+import { ToastProvider } from "./components/ui/Toast";
 import { AdminPage } from "./pages/AdminPage";
+import { AnalyticsPage } from "./pages/AnalyticsPage";
+import { HomePage } from "./pages/HomePage";
 import { LinksPage } from "./pages/LinksPage";
-import { scrollAfterNavigation, usePath } from "./router";
+import { QrCodesPage } from "./pages/QrCodesPage";
+import { PAGES, scrollAfterNavigation, usePath } from "./router";
 import { clearApiKey, loadApiKey, saveApiKey } from "./storage";
-import { card, container, errorBox } from "./ui";
+import { container, errorBox } from "./ui";
 
 /** A sign-in that didn't work lands on /?login=failed (or =blocked); read and drop the flag. */
 function takeLoginFlag(): string | null {
@@ -24,31 +27,27 @@ function takeLoginFlag(): string | null {
 }
 
 export function App() {
+  return (
+    <ToastProvider>
+      <ConfirmProvider>
+        <OviApp />
+      </ConfirmProvider>
+    </ToastProvider>
+  );
+}
+
+function OviApp() {
   const [apiKey, setApiKey] = useState<string | null>(() => loadApiKey());
   const api = useMemo(() => new OviApi(apiKey), [apiKey]);
   // null while loading; "offline" when the server couldn't be reached.
   const [session, setSession] = useState<Session | "offline" | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(() =>
     ({ failed: "Sign-in didn't finish. Try again.", blocked: "This account is suspended." } as Record<string, string>)[
       takeLoginFlag() ?? ""
     ] ?? null,
   );
-  // The latest result on the home page: one link, or a bulk batch. Showing one clears the other.
-  const [created, setCreated] = useState<Link | null>(null);
-  const [bulk, setBulk] = useState<Link[] | null>(null);
-  const showCreated = useCallback((link: Link) => {
-    setBulk(null);
-    setCreated(link);
-  }, []);
-  const showBulk = useCallback((links: Link[]) => {
-    setCreated(null);
-    setBulk(links);
-  }, []);
-  const dismissBulk = useCallback(() => {
-    setBulk(null);
-    document.getElementById(BULK_TEXTAREA_ID)?.focus();
-  }, []);
   const path = usePath();
   const firstRender = useRef(true);
 
@@ -83,13 +82,17 @@ export function App() {
     void refreshSession();
   }, [refreshSession]);
 
+  const ready = session !== null;
   const current = session === "offline" ? null : session;
   const signedIn = current !== null && (current.admin || current.user !== null);
-  const accountName = current?.user?.name ?? (current?.admin ? "Admin" : null);
+  const account: Account | null = !signedIn
+    ? null
+    : current.user
+      ? { name: current.user.name, email: current.user.email, provider: current.user.provider }
+      : { name: "Admin", email: null, provider: null };
 
   const signOut = useCallback(async () => {
-    setCreated(null);
-    setBulk(null);
+    setSettingsOpen(false);
     if (api.isAdmin) {
       clearApiKey();
       setApiKey(null);
@@ -105,75 +108,83 @@ export function App() {
   // A list or stats call came back 401: the session ended (expired, or signed out in another tab).
   const onUnauthorized = useCallback(() => void refreshSession(), [refreshSession]);
   const openLogin = useCallback(() => setLoginOpen(true), []);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  const accountState = !ready ? "loading" : signedIn ? "signedIn" : "signedOut";
+
+  let page;
+  if (!ready) {
+    page = (
+      <main className="grid flex-1 place-items-center py-24 text-muted" aria-busy="true">
+        <Spinner className="size-5" />
+        <span className="sr-only">Loading…</span>
+      </main>
+    );
+  } else if (path === PAGES.admin) {
+    page = (
+      <AdminPage
+        api={api}
+        state={current?.admin ? "admin" : signedIn ? "notAdmin" : "signedOut"}
+        onLogIn={openLogin}
+        onUnauthorized={onUnauthorized}
+      />
+    );
+  } else if (path === PAGES.links) {
+    page = <LinksPage api={api} state={accountState} onLogIn={openLogin} onUnauthorized={onUnauthorized} />;
+  } else if (path === PAGES.analytics) {
+    page = <AnalyticsPage api={api} state={accountState} onLogIn={openLogin} onUnauthorized={onUnauthorized} />;
+  } else if (path === PAGES.qrCodes) {
+    page = <QrCodesPage api={api} state={accountState} onLogIn={openLogin} onUnauthorized={onUnauthorized} />;
+  } else {
+    page = (
+      <HomePage
+        api={api}
+        signedIn={signedIn}
+        greetingName={account ? (account.provider ? account.name.split(/\s+/)[0] : null) : null}
+        anonymousLinkDays={current?.anonymousLinkDays ?? 30}
+        onLogIn={openLogin}
+        onUnauthorized={onUnauthorized}
+      />
+    );
+  }
 
   return (
     <>
-      <div className="flex min-h-dvh flex-col">
+      <div className="min-h-dvh">
         <Header
           path={path}
-          ready={session !== null}
+          ready={ready}
           isAdmin={current?.admin ?? false}
-          accountName={accountName}
+          account={account}
           onLogIn={openLogin}
           onSignOut={() => void signOut()}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
 
-        {notice && (
-          <div className={`${container} pt-4`}>
-            <p className={`${errorBox} flex items-center justify-between gap-3`} role="alert">
-              {notice}
-              <button type="button" className="font-medium underline" onClick={() => setNotice(null)}>
-                Dismiss
-              </button>
-            </p>
-          </div>
-        )}
-
-        {path === "/admin" ? (
-          <AdminPage
-            api={api}
-            state={session === null ? "loading" : current?.admin ? "admin" : signedIn ? "notAdmin" : "signedOut"}
-            onLogIn={openLogin}
-            onUnauthorized={onUnauthorized}
-          />
-        ) : path === "/links" ? (
-          <LinksPage
-            api={api}
-            state={session === null ? "loading" : signedIn ? "signedIn" : "signedOut"}
-            onLogIn={openLogin}
-            onUnauthorized={onUnauthorized}
-          />
-        ) : (
-          <main className={`${container} max-w-2xl flex-1 py-12 sm:py-20`}>
-            <h1 className="text-center text-3xl font-semibold tracking-tight sm:text-[2.5rem]">Shorten a long link</h1>
-            <p className="mt-2 mb-8 text-center text-muted">Paste a URL to get a short link and a QR code. No account needed.</p>
-            <div className="grid gap-6">
-              <div className={`${card} p-4 sm:p-5`}>
-                <ShortenCard
-                  api={api}
-                  signedIn={signedIn}
-                  ready={session !== null}
-                  anonymousLinkDays={current?.anonymousLinkDays ?? 30}
-                  onLogIn={openLogin}
-                  onCreated={showCreated}
-                  onBulkCreated={showBulk}
-                  onUnauthorized={onUnauthorized}
-                />
-              </div>
-              {created && <LinkResult link={created} signedIn={signedIn} onDismiss={() => setCreated(null)} />}
-              {bulk && <BulkResult links={bulk} onDismiss={dismissBulk} />}
+        {/* The same element whether or not someone is signed in, so the page inside keeps its state. */}
+        <div className={`flex flex-col ${account ? "min-h-dvh max-lg:min-h-[calc(100dvh-3.5rem)] max-lg:pb-16 lg:pl-60" : "min-h-[calc(100dvh-3.5rem)]"}`}>
+          {notice && (
+            <div className={`${container} pt-4`}>
+              <p className={`${errorBox} flex items-center gap-3`} role="alert">
+                <CircleAlert className="size-4 shrink-0" aria-hidden="true" />
+                <span className="flex-1">{notice}</span>
+                <button type="button" className="cursor-pointer font-medium underline underline-offset-2" onClick={() => setNotice(null)}>
+                  Dismiss
+                </button>
+              </p>
             </div>
+          )}
 
-            <Faq />
-          </main>
-        )}
-
-        <footer>
-          <div className={`${container} flex flex-wrap items-center justify-between gap-2 py-6 text-xs text-muted`}>
-            <span>© {new Date().getFullYear()} Ovi</span>
-            <span>Self-hosted URL shortener</span>
+          <div key={path} className="flex flex-1 animate-page-in flex-col">
+            {page}
           </div>
-        </footer>
+
+          <footer>
+            <div className={`${container} flex flex-wrap items-center justify-between gap-2 py-6 text-xs text-muted`}>
+              <span>© {new Date().getFullYear()} Ovi</span>
+              <span>Self-hosted URL shortener</span>
+            </div>
+          </footer>
+        </div>
       </div>
 
       {loginOpen && (
@@ -188,6 +199,8 @@ export function App() {
           }}
         />
       )}
+
+      {settingsOpen && account && <SettingsDialog account={account} onClose={closeSettings} onSignOut={() => void signOut()} />}
     </>
   );
 }
