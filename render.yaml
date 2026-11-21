@@ -48,6 +48,9 @@ services:
         sync: false
       - key: Auth__GitHub__ClientSecret
         sync: false
+      # Google Safe Browsing key (see the README, "Abuse protection"). The check stays off until it's set.
+      - key: SafeBrowsing__ApiKey
+        sync: false
       # Comma-separated verified emails that get the Admin dashboard when signed in.
       - key: Auth__AdminEmails
         sync: false

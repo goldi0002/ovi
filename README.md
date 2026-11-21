@@ -125,6 +125,32 @@ How the role checks work:
   - Their links return 410 until an admin restores them.
   - Admins can't suspend themselves or another admin; take the email off the list first.
 
+## Abuse protection
+
+Ovi can check destination URLs against [Google Safe Browsing](https://developers.google.com/safe-browsing) before it shortens them. It's off until you set `SafeBrowsing__ApiKey`.
+
+What it does:
+- It checks a new link (`POST /api/links`), a bulk request (`POST /api/links/bulk`) and an edit (`PATCH /api/links/{code}`) when the edit changes the URL.
+- It looks for malware, social engineering (phishing), unwanted software and potentially harmful applications.
+- It runs after the normal URL rules and after the create rate limit, so it isn't a free lookup service.
+- A flagged URL gets 400 with `"This site is flagged as unsafe by Google Safe Browsing, so it can't be shortened."` under `url` (bulk: `urls[i]` or `items[i].url`).
+- A bulk request is one request to Google. If any line is flagged, every flagged line is listed and nothing is created.
+- Links that already exist are not checked again.
+
+If Google can't answer, Ovi allows the link (it fails open), so a Google outage doesn't stop shortening:
+- A timeout, network error, bad answer or other error status logs a warning.
+- Google answering 429 (quota used up) or 403 (key refused) logs an error, and the link is still allowed. Watch for these in your logs.
+- This means unsafe links can be made while Google is down or your quota is used up.
+
+To get a key:
+1. In the [Google Cloud Console](https://console.cloud.google.com), create or pick a project and enable the **Safe Browsing API**.
+2. Under **APIs & Services → Credentials**, create an API key and restrict it to the Safe Browsing API.
+3. Set it as `SafeBrowsing__ApiKey` (on Render, in the service's **Environment** tab).
+
+Notes:
+- Ovi sends the key as the `key` query parameter, which is how the Lookup API takes it. The HTTP client's request logging is removed and Ovi's own log lines never include the URL, so the key isn't logged.
+- Google's Safe Browsing API terms allow non-commercial use only. For commercial use, Google offers the Web Risk API, which Ovi doesn't use.
+
 ## Database (Neon)
 
 The production database is the `production` branch of a Neon project. Neon's config lives in [`neon.ts`](neon.ts); `neon deploy` applies it and pulls the branch's variables into `.env.local`.
@@ -143,6 +169,8 @@ Both accept Neon's `postgresql://…?sslmode=require&channel_binding=require` UR
 | `Auth:GitHub:ClientId` / `ClientSecret` | `Auth__GitHub__ClientId` / `Auth__GitHub__ClientSecret` | none | Turns on **Continue with GitHub** |
 | `Auth:AdminEmails` | `Auth__AdminEmails` | none | Comma-separated verified emails that are admins when signed in (case-insensitive) |
 | `Links:BlockedHosts` | `Links__BlockedHosts` | none | Comma-separated sites that can't be shortened (their subdomains too), e.g. to stop spam |
+| `SafeBrowsing:ApiKey` | `SafeBrowsing__ApiKey` | none | Google Safe Browsing API key. When it's missing or blank, the check is off. See [Abuse protection](#abuse-protection) |
+| `SafeBrowsing:TimeoutSeconds` | `SafeBrowsing__TimeoutSeconds` | `3` | How long to wait for Google before allowing the link. Minimum `1`; a value that isn't a whole number falls back to `3` |
 | `App:PublicBaseUrl` | `App__PublicBaseUrl` | none (`RENDER_EXTERNAL_URL` on Render) | **Set in production.** Base for short URLs and QR codes. If neither is set, they're built from the request's Host header, which clients control. |
 | — | `DATABASE_URL` | none | **Required in production.** Postgres URL or Npgsql connection string for app traffic (Neon: pooled endpoint) |
 | — | `DATABASE_URL_UNPOOLED` | `DATABASE_URL` | Connection used to run migrations (Neon: direct endpoint) |
@@ -200,7 +228,7 @@ Redirects and QR codes are public.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `POST` | `/api/links` | anyone | Create a link. Body: `{ "url": "https://...", "customCode": "optional", "expiresAt": "optional, e.g. 2030-01-01T00:00:00Z" }` |
-| `POST` | `/api/links/bulk` | user, key | Shorten 1 to 25 URLs in one request, all or nothing. Body: `{ "urls": ["https://...", "https://..."], "expiresAt": "optional, set on every link" }`, or `{ "items": [{ "url": "...", "customCode": "optional", "expiresAt": "optional" }] }` for a code and expiry per link. Without `customCode` codes are random; without `expiresAt` the links never expire. Returns 201 `{ "items": [link, ...] }` in input order, each in the same shape as `POST /api/links`. Any bad URL or expiry gives 400 and creates nothing. Counts as N links against the create rate limit (a 400 or 429 costs nothing). 503 "Couldn't make short codes; try again." means nothing was created and a retry is safe. See [Bulk create](#bulk-create) |
+| `POST` | `/api/links/bulk` | user, key | Shorten 1 to 25 URLs in one request, all or nothing. Body: `{ "urls": ["https://...", "https://..."], "expiresAt": "optional, set on every link" }`, or `{ "items": [{ "url": "...", "customCode": "optional", "expiresAt": "optional" }] }` for a code and expiry per link. Without `customCode` codes are random; without `expiresAt` the links never expire. Returns 201 `{ "items": [link, ...] }` in input order, each in the same shape as `POST /api/links`. Any bad URL or expiry gives 400 and creates nothing. Counts as N links against the create rate limit (a 400 or 429 costs nothing, except a 400 from the Safe Browsing check). 503 "Couldn't make short codes; try again." means nothing was created and a retry is safe. See [Bulk create](#bulk-create) |
 | `GET` | `/api/links?page=1&pageSize=50&q=&status=all` | user, key | List links, newest first. Returns `{ items, page, pageSize, total }`; `pageSize` max 100, `page` max 100000. Optional `q` searches code and URL (case-insensitive, max 100 characters); `status` is `all` (default), `active` or `expired` |
 | `GET` | `/api/links/{code}` | user, key | Show one link's details and click count |
 | `GET` | `/api/links/{code}/stats?days=30` | user, key | Click analytics for the last 1–365 days (UTC): clicks per day, top referrers, devices and browsers |
@@ -224,6 +252,7 @@ Validation rules:
 - The stored URL is the ASCII form: punycode host, percent-encoded path, so it is always safe to send in a `Location` header. Control characters and bidi overrides are refused.
 - A URL can't contain a user name or password (`https://bank.example@evil.example` is a phishing trick).
 - A URL can't point back at the shortener, or at a site in `Links:BlockedHosts`.
+- When `SafeBrowsing:ApiKey` is set, a URL that Google Safe Browsing flags as unsafe is refused with 400 under `url` (see [Abuse protection](#abuse-protection)).
 - A custom code is 3 to 32 characters of letters, digits, `-` or `_`, and only for signed-in users and the admin. It can't be a reserved word (`api`, `auth`, `swagger`, `openapi`, `health`, `qr`, `assets`, `links`, `admin`).
 - `expiresAt` must be in the future and at most 10 years away. Anonymous links expire after 30 days by default, and can't be set to last longer.
 - Request bodies over 64 KB are refused.
@@ -240,7 +269,7 @@ Click counting:
 Rate limits for making links:
 - Single create, edit (`PATCH`) and bulk create share one budget, counted in links: 30 a minute per signed-in user, or per IP for the API key (`RateLimits:CreatePerMinute`). Anonymous visitors get 20 links an hour per IP.
 - Single create and edit each cost 1, even when they fail validation. A bulk request of N URLs costs N.
-- A bulk request that fails validation (400) or is over the remaining budget (429) costs nothing.
+- A bulk request that fails validation (400) or is over the remaining budget (429) costs nothing. The exception is a batch refused by the Safe Browsing check: that check runs after the budget is taken, so the batch still costs N.
 
 Errors use RFC 7807 problem JSON:
 - 400: validation failed.
