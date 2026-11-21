@@ -58,7 +58,7 @@ After `npm run build`, the API serves the UI at http://localhost:5080/. The Dock
 
 ## Run with Docker Compose
 
-The quickest way to run your own Ovi: the app and a Postgres database, from the published image.
+The quickest way to run your own Ovi: the app and a Postgres database, from the published image. It runs on amd64 and ARM64 (a Raspberry Pi 4 or 5 with a 64-bit OS, or an ARM cloud server).
 
 ```bash
 curl -O https://raw.githubusercontent.com/goldi0002/ovi/main/docker-compose.yml
