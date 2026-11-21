@@ -118,6 +118,15 @@ jobs:
           # (e.g. "cache write denied: token has no writable scopes"), keep the build.
           cache-to: type=gha,mode=max,ignore-error=true
 
+      # Self-hosters run Ovi on ARM too (Raspberry Pi, ARM cloud servers). Build that image as well, without
+      # pushing, so a change that breaks it fails here and not in the publish job.
+      - name: Build for ARM64
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/arm64
+          cache-from: type=gha
+
       - name: Smoke test image
         run: |
           set -euo pipefail
@@ -179,6 +188,7 @@ jobs:
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
