@@ -9,6 +9,11 @@ User-facing changes to Ovi, newest first.
 - New `docker-compose.yml` and `.env.example`: run Ovi with its own Postgres database with `docker compose up -d`. Only three values are required: the public URL, the admin API key and the database password.
 - CI now smoke-tests the image through the compose file, including a restart, so the self-hosting path is checked on every change.
 
+### Open source under the AGPL-3.0
+
+- Ovi is now licensed under the [GNU Affero General Public License v3.0](../LICENSE). You can run, change and share it. If you run a changed version as a service for others, you must offer them its source code.
+- Settings has a new **About** section linking to the source code, and the FAQ answers "Is Ovi open source?".
+
 ### Report a link
 
 - New **Report a link** page (`/report`, linked in the header). Anyone can report a short link as phishing, malware, spam or something else, with optional details of up to 500 characters. No account is needed, and a report stores no IP address, user agent or account.

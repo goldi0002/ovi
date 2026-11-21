@@ -1,4 +1,4 @@
-import { Download, LogOut, Monitor, Moon, Share, Sun } from "lucide-react";
+import { Code, Download, LogOut, Monitor, Moon, Share, Sun } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ThemeChoice } from "../storage";
 import { useInstall } from "../pwa";
@@ -66,6 +66,19 @@ export function SettingsDialog({ account, onClose, onSignOut }: { account: Accou
           )}
         </Section>
       )}
+
+      <Section title="About">
+        <a
+          className={button("default", "md", "justify-self-start max-sm:w-full")}
+          href="https://github.com/goldi0002/ovi"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Code />
+          Source code
+        </a>
+        <p className="text-xs text-muted">Ovi is free software under the AGPL-3.0 licence. Anyone can read the code and run their own copy.</p>
+      </Section>
 
       <div className="flex justify-end border-t border-line pt-4">
         <button
