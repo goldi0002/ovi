@@ -56,7 +56,24 @@ npm run build        # type-checks, then builds into src/Ovi.Api/wwwroot
 
 After `npm run build`, the API serves the UI at http://localhost:5080/. The Docker image builds it automatically. `index.html` is sent with a strict Content-Security-Policy and `no-cache`, and the hashed files in `/assets` are cached for a year.
 
+## Run with Docker Compose
+
+The quickest way to run your own Ovi: the app and a Postgres database, from the published image.
+
+```bash
+curl -O https://raw.githubusercontent.com/goldi0002/ovi/main/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/goldi0002/ovi/main/.env.example
+# Edit .env: set OVI_PUBLIC_URL, OVI_API_KEY (openssl rand -hex 32) and POSTGRES_PASSWORD (openssl rand -hex 24)
+docker compose up -d
+```
+
+Ovi is then on http://localhost:8080. Sign in as the admin with **Log in → Admin? Use an API key** and the `OVI_API_KEY` value. The database lives in the `ovi-db` volume, and migrations run on start, so upgrading is `docker compose pull && docker compose up -d`.
+
+For a public site, put a reverse proxy with TLS in front of it (see [Deploying behind a reverse proxy](#deploying-behind-a-reverse-proxy)). Sign-in with Google or GitHub, admin emails and the Safe Browsing check are commented out in `docker-compose.yml`: uncomment the lines you need and set the values in `.env`.
+
 ## Run with Docker
+
+To use your own Postgres instead, build or pull the image and pass the settings yourself:
 
 ```bash
 docker build -t ovi .
