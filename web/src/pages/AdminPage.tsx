@@ -22,6 +22,10 @@ interface Props {
 
 /** Admin dashboard: totals, every user, and every link. The server checks admin rights on each request. */
 export function AdminPage({ api, state, onLogIn, onUnauthorized }: Props) {
+  const isAdmin = state === "admin";
+  const loadOverview = useCallback(() => (isAdmin ? api.adminOverview() : Promise.resolve(null)), [api, isAdmin]);
+  const overview = useLoad<AdminOverview | null>(loadOverview, onUnauthorized);
+  const openReports = overview.data?.openReports ?? 0;
   const [tab, setTab] = useState<"users" | "links" | "reports">("users");
   const [ownerFilter, setOwnerFilter] = useState<{ value: string; label: string } | null>(null);
 
@@ -52,7 +56,7 @@ export function AdminPage({ api, state, onLogIn, onUnauthorized }: Props) {
         />
       ) : (
         <div className="grid gap-8">
-          <Overview api={api} onUnauthorized={onUnauthorized} />
+          <Overview data={overview.data} error={overview.error} />
 
           <section className="grid gap-4">
             <div className={`${segmentTrack} w-fit`} role="tablist" aria-label="Admin lists">
@@ -62,17 +66,23 @@ export function AdminPage({ api, state, onLogIn, onUnauthorized }: Props) {
                   type="button"
                   role="tab"
                   aria-selected={tab === t}
+                  aria-label={t === "reports" && openReports > 0 ? `Reports, ${openReports} open` : undefined}
                   className={segment(tab === t, "px-4")}
                   onClick={() => setTab(t)}
                 >
                   {t === "users" ? "Users" : t === "links" ? "Links" : "Reports"}
+                  {t === "reports" && openReports > 0 && (
+                    <span className="ml-1.5 rounded-full bg-error-bg px-1.5 py-px text-xs font-medium text-danger tabular-nums" aria-hidden="true">
+                      {numbers.format(openReports)}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
             {tab === "users" ? (
               <UsersList api={api} onUnauthorized={onUnauthorized} onShowLinks={showLinksOf} />
             ) : tab === "reports" ? (
-              <ReportsList api={api} onUnauthorized={onUnauthorized} />
+              <ReportsList api={api} onUnauthorized={onUnauthorized} onChanged={() => void overview.reload()} />
             ) : (
               <LinksList
                 api={api}
@@ -114,10 +124,7 @@ function useLoad<T>(load: () => Promise<T>, onUnauthorized: () => void) {
   return { data, error, loading, reload };
 }
 
-function Overview({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () => void }) {
-  const load = useCallback(() => api.adminOverview(), [api]);
-  const { data, error } = useLoad<AdminOverview>(load, onUnauthorized);
-
+function Overview({ data, error }: { data: AdminOverview | null; error: string | null }) {
   if (error) return <p className={errorBox} role="alert">{error}</p>;
   if (!data)
     return (
@@ -498,14 +505,18 @@ function LinksList({
 const REASON_LABELS: Record<ReportReason, string> = { phishing: "Phishing", malware: "Malware", spam: "Spam", other: "Other" };
 
 /** Links people have reported, worst first. Dismiss or mark actioned closes all of a link's open reports. */
-function ReportsList({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () => void }) {
+function ReportsList({ api, onUnauthorized, onChanged }: { api: OviApi; onUnauthorized: () => void; onChanged: () => void }) {
   const [page, setPage] = useState(1);
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const load = useCallback(() => api.adminReports(page, PAGE_SIZE), [api, page]);
-  const { data, error, loading, reload } = useLoad(load, onUnauthorized);
+  const { data, error, loading, reload: reloadList } = useLoad(load, onUnauthorized);
   const confirm = useConfirm();
   const notify = useToast();
+  const reload = async () => {
+    onChanged();
+    await reloadList();
+  };
 
   async function resolve(row: AdminReport, resolution: ReportResolution) {
     setBusy(row.code);

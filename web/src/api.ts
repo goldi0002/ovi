@@ -62,8 +62,8 @@ export interface AdminOverview {
   totalClicks: number;
   dailyClicks: DailyCount[];
   dailySignups: DailyCount[];
-  /** Links with unresolved reports; absent from older servers. */
-  openReports?: number;
+  /** How many reports are still open (not dismissed or actioned). */
+  openReports: number;
   topLinks: { code: string; shortUrl: string; url: string; clicks: number; ownerName: string | null }[];
 }
 

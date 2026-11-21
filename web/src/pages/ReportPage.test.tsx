@@ -51,6 +51,16 @@ describe("Report a link", () => {
     expect(new Headers(init?.headers).get("X-Ovi-Request")).toBe("1");
   });
 
+  it("keeps newlines in the details it sends", async () => {
+    const { submitted } = fakeApi();
+    const user = await openReport("/report?link=scam1");
+    await user.click(screen.getByRole("radio", { name: "Spam" }));
+    await user.type(screen.getByLabelText(/Details/), "line one{Enter}line two");
+    await user.click(screen.getByRole("button", { name: "Send report" }));
+    await screen.findByText("Thanks. We'll take a look.");
+    expect(submitted[0].details).toBe("line one\nline two");
+  });
+
   it("asks for the link and a reason before sending anything", async () => {
     const { fetchMock } = fakeApi();
     const user = await openReport();
@@ -104,6 +114,13 @@ describe("Admin reports", () => {
     expect(within(list).getByText("Looks like a bank login")).toBeInTheDocument();
     expect(within(list).getByText("https://evil.example/login")).toBeInTheDocument();
     expect(within(list).queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("shows the open count on the Reports tab and hides it at zero", async () => {
+    const { user } = await openReports({ reports: [report()] });
+    expect(screen.getByRole("tab", { name: "Reports, 3 open" })).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Dismiss reports of /scam1" }));
+    expect(await screen.findByRole("tab", { name: "Reports" })).toBeInTheDocument();
   });
 
   it("dismisses a link's reports and shows the empty state", async () => {

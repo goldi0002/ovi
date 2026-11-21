@@ -18,7 +18,8 @@ Ovi runs on one address: the same site serves the app and the short links, so th
 - `/`: the shortener. No account needed.
 - `/links`: the signed-in user's links, with clicks, status and stats. Not indexed.
 - `/links/analytics` and `/links/qr-codes`: click stats and QR codes for those links. Not indexed.
-- `/admin`: the admin dashboard. Not indexed.
+- `/report`: report a harmful short link (phishing, malware, spam or other). No account needed; nothing about the reporter is stored.
+- `/admin`: the admin dashboard, including open reports. Not indexed.
 
 ## API
 
@@ -27,6 +28,7 @@ Ovi runs on one address: the same site serves the app and the short links, so th
 - `GET /api/links?page=1&pageSize=20` lists the caller's links.
 - `GET /api/links/{code}/stats?days=30` returns the click stats for one link.
 - `DELETE /api/links/{code}` deletes a link.
+- `POST /api/reports` with `{"link": "abc123", "reason": "phishing"}` reports a link as abusive. Optional: `details`. Needs the `X-Ovi-Request` header; no sign-in.
 - `GET /api/session` says who the caller is and which sign-in providers are turned on.
 - `GET /health` reports whether the database is reachable.
 

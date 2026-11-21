@@ -4,6 +4,14 @@ User-facing changes to Ovi, newest first.
 
 ## Unreleased
 
+### Report a link
+
+- New **Report a link** page (`/report`, linked in the header). Anyone can report a short link as phishing, malware, spam or something else, with optional details of up to 500 characters. No account is needed, and a report stores no IP address, user agent or account.
+- Admins get a **Reports** tab in the Admin page. It lists links with open reports, most reported first, with a count per reason and the latest details. Dismiss or mark as actioned closes a link's reports; delete the link or suspend its owner from the same row.
+- New API: `POST /api/reports` (public, needs the `X-Ovi-Request` header, 202 on success), `GET /api/admin/reports` and `POST /api/admin/reports/{code}/resolve`. `GET /api/admin/overview` now includes `openReports`.
+- Each client can send 10 reports an hour (`RateLimits__ReportPerHour`). A link keeps at most 50 open reports.
+- `report` is now a reserved code and can't be used as a custom code.
+
 ### Custom codes and expiries for many links
 
 - In **Many links**, upload a CSV file or paste CSV text whose first line is `url,code,expires_at`. Each row can have its own custom code and expiry; leave a cell empty for a random code or the batch expiry. The downloaded results file works too.

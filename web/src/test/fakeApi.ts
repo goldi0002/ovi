@@ -175,6 +175,7 @@ export function fakeApi({
           expiredLinks: 0,
           deletedLinks: 3,
           totalClicks: 42,
+          openReports: openReports.reduce((n, r) => n + r.openReports, 0),
           dailyClicks: stats("x", 14).daily.map((d) => ({ date: d.date, count: d.clicks })),
           dailySignups: stats("x", 14).daily.map((d) => ({ date: d.date, count: 0 })),
           topLinks: store.slice(0, 5).map((l) => ({ code: l.code, shortUrl: l.shortUrl, url: l.url, clicks: l.clicks, ownerName: "Ada Lovelace" })),
