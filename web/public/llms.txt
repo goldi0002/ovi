@@ -13,6 +13,7 @@ Ovi runs on one address: the same site serves the app and the short links, so th
 - Every link comes with a downloadable QR code.
 - Click stats show clicks per day over the last 7, 30 or 90 days, the top referring sites, and the devices and browsers visitors used. A click stores only the time, the referring site's name, a device category and a browser category: no IP address and no full user agent.
 - The server admin can sign in with an API key, see totals, every account and every link, and suspend an account.
+- Ovi is free software under the AGPL-3.0 licence. The source code is at https://github.com/goldi0002/ovi, and anyone can run their own copy.
 
 ## Pages
 

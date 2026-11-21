@@ -21,4 +21,8 @@ export const FAQ_ITEMS = [
     q: "What do the click stats show?",
     a: "Clicks per day for the last 7, 30 or 90 days, the site each click came from, and the device and browser used. Only the time, the referring site, the device and the browser are stored — never IP addresses or full user agents.",
   },
+  {
+    q: "Is Ovi open source?",
+    a: "Yes. Ovi is free software under the AGPL-3.0 licence. Its source code is at github.com/goldi0002/ovi, and anyone can run their own copy.",
+  },
 ];
