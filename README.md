@@ -205,7 +205,7 @@ Redirects and QR codes are public.
 | `GET` | `/api/links/{code}` | user, key | Show one link's details and click count |
 | `GET` | `/api/links/{code}/stats?days=30` | user, key | Click analytics for the last 1–365 days (UTC): clicks per day, top referrers, devices and browsers |
 | `PATCH` | `/api/links/{code}` | user, key | Edit a link's destination or expiry; the code, clicks and stats stay. Body (every field optional): `{ "url": "https://...", "expiresAt": "2030-01-01T00:00:00Z" }`, or `{ "clearExpiry": true }` to make it never expire. A missing or `null` field is left as it is. Checked like a new link; returns the updated link |
-| `DELETE` | `/api/links/{code}` | user, key | Delete a link (soft delete: the row is kept with `DeletedAt` set, and the link disappears from every endpoint) |
+| `DELETE` | `/api/links/{code}` | user, key | Delete a link (soft delete: the row is kept with `DeletedAt` set, and the link disappears from every endpoint). Counts as 1 link against the create rate limit, so a 429 with `Retry-After` follows a burst of deletes |
 | `GET` | `/api/admin/overview` | admin | Totals, clicks and sign-ups per day for 14 days, top links |
 | `GET` | `/api/admin/users?page=1&pageSize=20&q=` | admin | Every user with link and click counts; `q` searches name and email |
 | `GET` | `/api/admin/links?page=1&pageSize=20&q=&owner=` | admin | Every link with its owner; `owner` is `anonymous`, `apikey` or a user id; `q` searches code and URL |
@@ -248,7 +248,7 @@ Errors use RFC 7807 problem JSON:
 - 403: a cookie request that changes data is missing `X-Ovi-Request`, or the account is suspended.
 - 409: the code is already taken.
 - 413: the request body is over 64 KB.
-- 429: the client is over its rate limit. Link creation and edits also send a `Retry-After` header (in seconds).
+- 429: the client is over its rate limit. Link creation, edits and deletes also send a `Retry-After` header (in seconds).
 - 503: no free random code could be found. Nothing was created, so it's safe to retry.
 
 ```bash

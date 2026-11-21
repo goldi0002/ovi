@@ -140,6 +140,31 @@ public sealed class DeploymentTests
         CollectionAssert.AreEqual(new[] { HttpStatusCode.Created, HttpStatusCode.Created, HttpStatusCode.TooManyRequests }, statuses);
     }
 
+    [TestMethod]
+    public async Task Delete_is_rate_limited_with_retry_after_even_for_missing_codes()
+    {
+        using var factory = new OviApiFactory(new() { ["RateLimits:CreatePerMinute"] = "3" });
+        var client = factory.CreateAuthedClient();
+
+        for (var i = 0; i < 3; i++)
+            Assert.AreEqual(HttpStatusCode.NotFound, (await client.DeleteAsync("/api/links/nosuchcode")).StatusCode);
+        var refused = await client.DeleteAsync("/api/links/nosuchcode");
+
+        Assert.AreEqual(HttpStatusCode.TooManyRequests, refused.StatusCode);
+        Assert.IsNotNull(refused.Headers.RetryAfter, "429 should carry Retry-After");
+    }
+
+    [TestMethod]
+    public async Task Delete_shares_the_create_budget()
+    {
+        using var factory = new OviApiFactory(new() { ["RateLimits:CreatePerMinute"] = "2" });
+        var client = factory.CreateAuthedClient();
+
+        Assert.AreEqual(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/links", new CreateLinkRequest("https://example.com", "dl1"))).StatusCode);
+        Assert.AreEqual(HttpStatusCode.NoContent, (await client.DeleteAsync("/api/links/dl1")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.TooManyRequests, (await client.DeleteAsync("/api/links/dl1")).StatusCode);
+    }
+
     private static async Task<HttpClient> ClientWithLink(OviApiFactory factory)
     {
         var client = factory.CreateAuthedClient();

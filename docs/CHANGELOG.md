@@ -15,5 +15,6 @@ User-facing changes to Ovi, newest first.
 
 ### Fixes
 
+- Deleting a link now counts against the same per-minute limit as making and editing links (30 a minute by default). A burst of deletes gets 429 with a `Retry-After` header.
 - Links to sites with non-ASCII domain names (for example `https://bücher.example/`) are now stored with the punycode host (`xn--bcher-kva.example`), so visiting them redirects. Before, every visit gave a server error. Links made before this fix redirect too.
 - A request body that isn't valid JSON now gets 400, and a body over 64 KB gets 413, instead of a server error.
