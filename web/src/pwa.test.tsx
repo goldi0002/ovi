@@ -51,6 +51,14 @@ describe("Install", () => {
     return { user, dialog: screen.getByRole("dialog", { name: "Settings" }) };
   }
 
+  it("links to the source code from Settings, as the AGPL asks", async () => {
+    const { dialog } = await openSettings();
+    const link = within(dialog).getByRole("link", { name: "Source code" });
+    expect(link).toHaveAttribute("href", "https://github.com/goldi0002/ovi");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(within(dialog).getByText(/AGPL-3\.0/)).toBeInTheDocument();
+  });
+
   it("offers nothing where installing isn't possible", async () => {
     const { dialog } = await openSettings();
     expect(within(dialog).queryByRole("button", { name: "Install Ovi" })).not.toBeInTheDocument();
@@ -107,6 +115,15 @@ describe("Installable app files", () => {
 });
 
 describe("Public copy", () => {
+  it("says where the source code is, in the FAQ, its structured data and llms.txt", () => {
+    const item = FAQ_ITEMS.find((i) => i.q === "Is Ovi open source?")!;
+    expect(item.a).toContain("AGPL-3.0");
+    expect(item.a).toContain("github.com/goldi0002/ovi");
+    expect(indexHtml).toContain(`"name": "${item.q}"`);
+    expect(indexHtml).toContain(`"text": "${item.a}"`);
+    expect(llms).toContain("https://github.com/goldi0002/ovi");
+  });
+
   it("doesn't name the technology behind the site", () => {
     const stack = /asp\.?net|\.net\b|react|postgres|entity framework|ef core|swagger|openapi|self-hosted/i;
     const copy = [indexHtml.replace(/<script type="module".*?<\/script>/s, ""), llms, ...FAQ_ITEMS.flatMap((i) => [i.q, i.a])].join("\n");

@@ -400,3 +400,11 @@ node scripts/check-npm-licenses.mjs web/package-lock.json     # npm
 ```
 
 Allowed licenses are MIT, Apache-2.0 and PostgreSQL, set in `ALLOWED_LICENSES` in the script.
+
+## License
+
+Ovi is free software under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only).
+
+You can use, change and share it. If you run a modified Ovi as a network service, the AGPL requires you to offer its users the source of your version. Ovi links to its source from Settings → About and the FAQ, so point those links (`web/src/components/SettingsDialog.tsx`, `web/src/components/Faq.tsx`, `web/index.html`, `web/public/llms.txt`) at your own repository.
+
+All of Ovi's dependencies use permissive licences (MIT, Apache-2.0, ISC, PostgreSQL), which are compatible with the AGPL.
