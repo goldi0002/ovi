@@ -4,6 +4,15 @@ User-facing changes to Ovi, newest first.
 
 ## Unreleased
 
+## 1.0.0 — 2026-11-21
+
+The first release. Ovi can now be self-hosted from a published, versioned image: see "Run with Docker Compose" in the README.
+
+### Versioned releases
+
+- Images are tagged by version: `1.0.0`, `1.0` and `1`, plus `latest` for the newest release. `docker-compose.yml` uses `1`, so updates stay within 1.x. Builds from `main` are tagged `edge`.
+- Each release has a GitHub Release with its notes from this changelog.
+
 ### ARM64 image
 
 - The published image now runs on ARM64 as well as amd64, so Ovi works on a Raspberry Pi 4 or 5 (64-bit OS) and ARM cloud servers. `docker pull` picks the right one automatically.

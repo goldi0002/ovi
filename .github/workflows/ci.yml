@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
+    # Pushing a version tag (v1.2.3) publishes that release: semver image tags, `latest` and a GitHub Release.
+    tags: ["v*.*.*"]
   workflow_dispatch:
 
 concurrency:
@@ -50,6 +52,14 @@ jobs:
 
       - name: Check licenses and vulnerabilities
         run: python3 scripts/check-packages.py
+
+      - name: Test scripts
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
+      # A release can't go out without notes: fail before anything is built or published.
+      - name: Check release notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: python3 scripts/release-notes.py "${GITHUB_REF_NAME#v}"
 
       - name: Check EF migrations are up to date
         run: |
@@ -102,8 +112,13 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ghcr.io/${{ github.repository }}
+          flavor: latest=false
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=edge,branch=main
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') }}
             type=sha,format=short
 
       - name: Build
@@ -176,11 +191,12 @@ jobs:
         if: failure()
         run: docker compose logs || true
 
-  # Pushes only from main, and only this job can write packages.
+  # Pushes from main (`edge`) and from version tags (the release), only after the image passed its smoke tests,
+  # and only this job can write packages.
   publish:
     name: Publish image
-    needs: [test, web]
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [test, web, docker]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -203,8 +219,13 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ghcr.io/${{ github.repository }}
+          flavor: latest=false
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=edge,branch=main
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') }}
             type=sha,format=short
 
       - name: Build and push
@@ -217,3 +238,24 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max,ignore-error=true
+
+  release:
+    name: GitHub Release
+    needs: [publish]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release-notes.py "${GITHUB_REF_NAME#v}" > notes.md
+          prerelease=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then prerelease=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "Ovi $GITHUB_REF_NAME" --notes-file notes.md "${prerelease[@]}"
