@@ -4,6 +4,11 @@ User-facing changes to Ovi, newest first.
 
 ## Unreleased
 
+### ARM64 image
+
+- The published image now runs on ARM64 as well as amd64, so Ovi works on a Raspberry Pi 4 or 5 (64-bit OS) and ARM cloud servers. `docker pull` picks the right one automatically.
+- CI builds the ARM64 image on every change and runs it under emulation against the compose stack.
+
 ### Docker Compose
 
 - New `docker-compose.yml` and `.env.example`: run Ovi with its own Postgres database with `docker compose up -d`. Only three values are required: the public URL, the admin API key and the database password.
