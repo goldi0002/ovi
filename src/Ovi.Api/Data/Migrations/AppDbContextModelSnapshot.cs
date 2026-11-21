@@ -124,6 +124,44 @@ namespace Ovi.Api.Data.Migrations
                     b.ToTable("Links");
                 });
 
+            modelBuilder.Entity("Ovi.Api.Data.LinkReport", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("LinkId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Resolution")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LinkId")
+                        .HasFilter("\"ResolvedAt\" IS NULL");
+
+                    b.ToTable("LinkReports");
+                });
+
             modelBuilder.Entity("Ovi.Api.Data.User", b =>
                 {
                     b.Property<int>("Id")
@@ -190,6 +228,15 @@ namespace Ovi.Api.Data.Migrations
                         .WithMany()
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Ovi.Api.Data.LinkReport", b =>
+                {
+                    b.HasOne("Ovi.Api.Data.Link", null)
+                        .WithMany()
+                        .HasForeignKey("LinkId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

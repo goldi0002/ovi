@@ -12,6 +12,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     public DbSet<Link> Links => Set<Link>();
     public DbSet<Click> Clicks => Set<Click>();
+    public DbSet<LinkReport> LinkReports => Set<LinkReport>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
@@ -46,6 +47,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         click.Property(c => c.Referrer).HasMaxLength(Ovi.Api.Links.ClientInfo.MaxReferrerLength);
         click.Property(c => c.Device).HasMaxLength(16);
         click.Property(c => c.Browser).HasMaxLength(32);
+
+        var report = modelBuilder.Entity<LinkReport>();
+        report.HasOne<Link>().WithMany().HasForeignKey(r => r.LinkId).OnDelete(DeleteBehavior.Cascade);
+        report.Property(r => r.Reason).HasMaxLength(LinkReport.MaxReasonLength);
+        report.Property(r => r.Resolution).HasMaxLength(LinkReport.MaxReasonLength);
+        report.Property(r => r.Details).HasMaxLength(LinkReport.MaxDetailsLength);
+        // The admin queue and the per-link cap only look at open reports, so index just those rows.
+        report.HasIndex(r => r.LinkId).HasFilter("\"ResolvedAt\" IS NULL");
     }
 }
 

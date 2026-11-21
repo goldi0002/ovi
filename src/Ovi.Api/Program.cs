@@ -89,6 +89,7 @@ app.MapGet("/health", async (AppDbContext db) =>
 app.MapGet("/health/live", () => Results.Ok(new { status = "ok" })).WithTags("Health");
 app.MapAuthEndpoints();
 app.MapLinkEndpoints();
+app.MapReportEndpoints();
 app.MapAdminEndpoints();
 
 await app.RunAsync();

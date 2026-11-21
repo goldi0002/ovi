@@ -1,4 +1,4 @@
-import { ChartColumn, LayoutDashboard, Link2, LogOut, Monitor, Moon, QrCode, Settings, Shield, Sun } from "lucide-react";
+import { ChartColumn, Flag, LayoutDashboard, Link2, LogOut, Monitor, Moon, QrCode, Settings, Shield, Sun } from "lucide-react";
 import type { Provider } from "../api";
 import { AppLink, PAGES } from "../router";
 import type { ThemeChoice } from "../storage";
@@ -18,6 +18,7 @@ const NAV = [
   { href: PAGES.links, label: "My Links", short: "Links", icon: Link2 },
   { href: PAGES.analytics, label: "Analytics", short: "Analytics", icon: ChartColumn },
   { href: PAGES.qrCodes, label: "QR Codes", short: "QR", icon: QrCode },
+  { href: PAGES.report, label: "Report a link", short: "Report", icon: Flag, desktopOnly: true },
   { href: PAGES.admin, label: "Admin", short: "Admin", icon: Shield, adminOnly: true },
 ];
 
@@ -53,6 +54,14 @@ export function Header({ path, ready, isAdmin, account, onLogIn, onSignOut, onOp
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
           <Brand href={PAGES.home} />
           <div className="flex items-center gap-1.5">
+            <AppLink
+              href={PAGES.report}
+              aria-current={path === PAGES.report ? "page" : undefined}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[0.8125rem] font-medium text-muted hover:bg-hover hover:text-ink ${focusRing}`}
+            >
+              <Flag className="size-3.5" aria-hidden="true" />
+              Report a link
+            </AppLink>
             <ThemeToggle />
             {ready && (
               <button type="button" className={button("primary", "sm")} onClick={onLogIn}>
@@ -83,10 +92,10 @@ export function Header({ path, ready, isAdmin, account, onLogIn, onSignOut, onOp
           Workspace
         </p>
         <ul className="flex lg:grid lg:gap-0.5">
-          {items.map(({ href, label, short, icon: Icon }) => {
+          {items.map(({ href, label, short, icon: Icon, ...rest }) => {
             const active = path === href;
             return (
-              <li key={href} className="max-lg:flex-1">
+              <li key={href} className={`max-lg:flex-1 ${"desktopOnly" in rest && rest.desktopOnly ? "max-lg:hidden" : ""}`}>
                 <AppLink
                   href={href}
                   aria-current={active ? "page" : undefined}

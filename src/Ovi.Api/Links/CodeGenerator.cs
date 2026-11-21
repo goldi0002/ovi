@@ -12,12 +12,15 @@ public static partial class CodeGenerator
     {
         "api", "auth", "swagger", "openapi", "health", "qr", "assets",
         // Pages of the web UI (see WebUiSetup.Pages).
-        "links", "admin"
+        "links", "admin", "report"
     };
 
     public static string Generate(int length = 7) => RandomNumberGenerator.GetString(Alphabet, length);
 
-    public static bool IsValidCustomCode(string code) => ValidCode().IsMatch(code) && !Reserved.Contains(code);
+    public static bool IsValidCustomCode(string code) => IsValidCode(code) && !Reserved.Contains(code);
+
+    /// <summary>Has the shape of a code (3 to 32 letters, digits, - or _), reserved or not.</summary>
+    public static bool IsValidCode(string code) => ValidCode().IsMatch(code);
 
     [GeneratedRegex("^[A-Za-z0-9_-]{3,32}$")]
     private static partial Regex ValidCode();

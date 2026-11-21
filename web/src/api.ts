@@ -62,6 +62,8 @@ export interface AdminOverview {
   totalClicks: number;
   dailyClicks: DailyCount[];
   dailySignups: DailyCount[];
+  /** Links with unresolved reports; absent from older servers. */
+  openReports?: number;
   topLinks: { code: string; shortUrl: string; url: string; clicks: number; ownerName: string | null }[];
 }
 
@@ -84,6 +86,30 @@ export interface AdminLink {
   /** The account that made it; null for anonymous and API-key links. */
   owner: { id: number; name: string; email: string | null } | null;
   anonymous: boolean;
+}
+
+export type ReportReason = "phishing" | "malware" | "spam" | "other";
+export type ReportResolution = "dismissed" | "actioned";
+
+/** POST /api/reports (no sign-in needed). `link` is an Ovi code or a full short URL. */
+export interface ReportLinkInput {
+  link: string;
+  reason: ReportReason;
+  details?: string;
+}
+
+/** One link with open reports, as GET /api/admin/reports lists them. */
+export interface AdminReport {
+  code: string;
+  shortUrl: string;
+  url: string;
+  owner: { id: number; name?: string | null; email: string | null } | null;
+  anonymous: boolean;
+  openReports: number;
+  reasons: Record<ReportReason, number>;
+  latestAt: string;
+  /** The latest few non-empty details the reporters wrote. */
+  details: string[];
 }
 
 /** "anonymous", "apikey", a user id, or "" for every link. */
@@ -212,6 +238,20 @@ export class OviApi {
     return this.request(
       `/api/admin/links?page=${page}&pageSize=${pageSize}&q=${encodeURIComponent(q)}&owner=${encodeURIComponent(owner)}`,
     );
+  }
+
+  adminReports(page = 1, pageSize = 20): Promise<Page<AdminReport>> {
+    return this.request(`/api/admin/reports?page=${page}&pageSize=${pageSize}`);
+  }
+
+  /** Closes every open report of a link. */
+  resolveReports(code: string, resolution: ReportResolution): Promise<void> {
+    return this.request(`/api/admin/reports/${encodeURIComponent(code)}/resolve`, { method: "POST", body: JSON.stringify({ resolution }) });
+  }
+
+  /** Reports a link to the admin. Answers 202 with no body; 400 errors come back per field (link, reason, details). */
+  reportLink(input: ReportLinkInput): Promise<void> {
+    return this.request("/api/reports", { method: "POST", body: JSON.stringify(input) });
   }
 
   setBlocked(userId: number, blocked: boolean): Promise<void> {
