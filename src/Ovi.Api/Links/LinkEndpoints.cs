@@ -73,13 +73,15 @@ public static class LinkEndpoints
             .ProducesValidationProblem()
             .Produces(StatusCodes.Status404NotFound);
 
-        // Soft delete: the row stays, marked deleted, and disappears from every other endpoint.
+        // Soft delete: the row stays, marked deleted, and disappears from every other endpoint. Each delete is a write,
+        // so it is charged to the same per-caller budget as making and editing links.
         api.MapDelete("/{code}", async (string code, HttpContext http, AppDbContext db, TimeProvider time) =>
             Caller.From(http) is not { SignedIn: true } caller ? SignInRequired()
             : await db.Links.VisibleTo(caller).Where(l => l.Code == code)
                 .ExecuteUpdateAsync(s => s.SetProperty(l => l.DeletedAt, time.GetUtcNow().UtcDateTime)) > 0
                 ? Results.NoContent()
                 : Results.NotFound())
+            .RequireCreateBudget()
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound);
 
