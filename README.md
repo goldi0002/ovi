@@ -67,7 +67,7 @@ curl -o .env https://raw.githubusercontent.com/goldi0002/ovi/main/.env.example
 docker compose up -d
 ```
 
-Ovi is then on http://localhost:8080. Sign in as the admin with **Log in → Admin? Use an API key** and the `OVI_API_KEY` value. The database lives in the `ovi-db` volume, and migrations run on start, so upgrading is `docker compose pull && docker compose up -d`.
+Ovi is then on http://localhost:8080. Sign in as the admin with **Log in → Admin? Use an API key** and the `OVI_API_KEY` value. The database lives in the `ovi-db` volume, and migrations run on start, so upgrading is `docker compose pull && docker compose up -d`. The compose file uses the `1` image tag, so that picks up every 1.x release but never a 2.0 that could need changes on your side (see [Image tags](#image-tags)).
 
 For a public site, put a reverse proxy with TLS in front of it (see [Deploying behind a reverse proxy](#deploying-behind-a-reverse-proxy)). Sign-in with Google or GitHub, admin emails and the Safe Browsing check are commented out in `docker-compose.yml`: uncomment the lines you need and set the values in `.env`.
 
@@ -393,19 +393,38 @@ Tests use MSTest and `WebApplicationFactory` with a fake clock (`FakeTimeProvide
 
 ## CI
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every pull request and on pushes to `main`. It:
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every pull request, on pushes to `main` and on version tags. It:
 
 1. Builds in Release mode and runs the tests. Results are uploaded as a `test-results` artifact.
-2. Checks every NuGet package, including transitive ones, for a disallowed license or a known vulnerability (`scripts/check-packages.py`).
+2. Checks every NuGet package, including transitive ones, for a disallowed license or a known vulnerability (`scripts/check-packages.py`), and tests the scripts in `scripts/`.
 3. Fails if the EF model has changed without a migration.
 4. Type-checks, tests and builds the web UI, checks npm licenses, and fails on high or critical npm advisories (`scripts/check-npm-audit.mjs`, which prints any advisory it accepts because it has no fix and can't reach shipped code).
-5. Builds the Docker image for every change and smoke-tests it against a Postgres next to it. A separate job pushes the image to GitHub Container Registry, only from `main`, so the build and smoke-test jobs never hold push permission. Actions are pinned to commit SHAs and the Docker base images to digests, so a moved tag can't change what runs or ships:
+5. Builds the Docker image for every change and smoke-tests it through `docker-compose.yml`. It also builds the ARM64 image and runs it under emulation against the same database.
+6. Pushes the image to GitHub Container Registry for amd64 and ARM64, only from `main` and version tags, and only after the smoke tests pass. The build and smoke-test jobs never hold push permission. Actions are pinned to commit SHAs and the Docker base images to digests, so a moved tag can't change what runs or ships.
+
+### Image tags
+
+| Tag | Points at |
+|---|---|
+| `1`, `1.2`, `1.2.3` | Releases. `1` follows every 1.x release; `docker-compose.yml` uses it |
+| `latest` | The newest release (never a pre-release) |
+| `edge` | The newest commit on `main`, untested by a release |
+| `sha-<short commit>` | One exact build |
 
 ```bash
-docker pull ghcr.io/goldi0002/ovi:latest   # or :sha-<short commit>
+docker pull ghcr.io/goldi0002/ovi:1
 ```
 
-The package is private by default. To make it public, change its visibility in the package's settings on GitHub.
+### Making a release
+
+1. In `docs/CHANGELOG.md`, rename `## Unreleased` to `## 1.2.3 — YYYY-MM-DD` and start a new, empty `## Unreleased` above it. Use [semantic versioning](https://semver.org): a major version for changes self-hosters must act on.
+2. Merge that, then tag the commit on `main` and push the tag:
+
+   ```bash
+   git tag v1.2.3 && git push origin v1.2.3
+   ```
+
+CI then runs every check, publishes the image tags above, and creates the GitHub Release with that version's changelog section as its notes. If the changelog has no section for the version, CI fails before anything is published. A tag with a suffix, such as `v1.3.0-rc.1`, becomes a pre-release: it gets its own tag but doesn't move `1`, `1.3` or `latest`.
 
 ## Dependencies and licenses
 

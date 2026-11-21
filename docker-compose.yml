@@ -11,7 +11,7 @@ name: ovi
 
 services:
   ovi:
-    image: ${OVI_IMAGE:-ghcr.io/goldi0002/ovi:latest}
+    image: ${OVI_IMAGE:-ghcr.io/goldi0002/ovi:1}
     restart: unless-stopped
     depends_on:
       db:
