@@ -35,9 +35,9 @@ public sealed class SafeBrowsingUrlThreatCheck(
         var key = config["SafeBrowsing:ApiKey"];
         if (string.IsNullOrWhiteSpace(key) || urls.Count == 0) return none;
 
-        var seconds = config.GetValue("SafeBrowsing:TimeoutSeconds", DefaultTimeoutSeconds);
+        var seconds = int.TryParse(config["SafeBrowsing:TimeoutSeconds"], out var configured) ? Math.Max(1, configured) : DefaultTimeoutSeconds;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(TimeSpan.FromSeconds(seconds > 0 ? seconds : DefaultTimeoutSeconds));
+        timeout.CancelAfter(TimeSpan.FromSeconds(seconds));
 
         try
         {
@@ -48,7 +48,10 @@ public sealed class SafeBrowsingUrlThreatCheck(
             using var response = await client.PostAsJsonAsync($"{Endpoint}?key={Uri.EscapeDataString(key.Trim())}", body, timeout.Token);
             if (!response.IsSuccessStatusCode)
             {
-                logger.LogWarning("Safe Browsing check skipped: the service answered {Status}.", (int)response.StatusCode);
+                // 429 (quota used up) and 403 (key refused) need the owner's attention, so they log as errors.
+                var level = response.StatusCode is System.Net.HttpStatusCode.TooManyRequests or System.Net.HttpStatusCode.Forbidden
+                    ? LogLevel.Error : LogLevel.Warning;
+                logger.Log(level, "Safe Browsing check skipped: the service answered {Status}.", (int)response.StatusCode);
                 return none;
             }
 
@@ -80,6 +83,8 @@ public sealed class SafeBrowsingUrlThreatCheck(
         var keys = sent.Select(u => (Url: u, Key: Key(u))).ToList();
         foreach (var r in reported)
         {
+            // An exact match is the usual case (Google echoes what was sent); it flags only that URL.
+            if (sent.Contains(r, StringComparer.Ordinal)) { flagged.Add(r); continue; }
             var rk = Key(r);
             var hits = keys.Where(k => k.Key == rk || k.Key.StartsWith(rk + "/", StringComparison.Ordinal)).ToList();
             if (hits.Count == 0)
