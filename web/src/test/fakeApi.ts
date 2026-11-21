@@ -57,6 +57,8 @@ interface FakeOptions {
   providers?: Provider[];
   /** Accounts listed in the admin dashboard. */
   users?: AdminUser[];
+  /** Make POST /api/links/bulk answer 429, as when the create budget is used up. */
+  bulkRateLimited?: boolean;
 }
 
 export function adminUser(overrides: Partial<AdminUser> = {}): AdminUser {
@@ -82,10 +84,12 @@ export function fakeApi({
   user = null,
   providers = ["google", "github"],
   users = [],
+  bulkRateLimited = false,
 }: FakeOptions = {}) {
   const store = [...links];
   const accounts = [...users];
-  const state = { user };
+  const state = { user, bulkRateLimited };
+  let bulkCount = 0;
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = new URL(String(input), "http://localhost");
     const headers = new Headers(init.headers);
@@ -107,6 +111,25 @@ export function fakeApi({
       const created = link({ code: "anon123", url: body.url, expiresAt: "2026-12-17T12:00:00Z" });
       store.unshift(created);
       return json(201, created);
+    }
+    if (method === "POST" && url.pathname === "/api/links/bulk") {
+      if (!signedIn) return json(401, { title: "Sign in to shorten many links at once." });
+      if (state.bulkRateLimited) return json(429, { title: "You've made too many links in the last minute; try again shortly." });
+      const body = JSON.parse(String(init.body)) as { urls?: string[]; expiresAt?: string };
+      const urls = body.urls ?? [];
+      if (urls.length === 0) return json(400, { title: "One or more validation errors occurred.", errors: { urls: ["Add at least one URL."] } });
+      if (urls.length > 25)
+        return json(400, { title: "One or more validation errors occurred.", errors: { urls: ["You can shorten at most 25 URLs at once."] } });
+      const errors: Record<string, string[]> = {};
+      urls.forEach((u, i) => {
+        if (!/^https?:\/\/\S+$/.test(u)) errors[`urls[${i}]`] = ["Enter a full web address starting with http:// or https://."];
+      });
+      if (body.expiresAt !== undefined && new Date(body.expiresAt) <= new Date())
+        errors.expiresAt = ["The expiry date must be in the future."];
+      if (Object.keys(errors).length > 0) return json(400, { title: "One or more validation errors occurred.", errors });
+      const items = urls.map((u) => link({ code: `bulk${++bulkCount}`, url: u, expiresAt: body.expiresAt ?? null }));
+      store.unshift(...[...items].reverse());
+      return json(201, { items });
     }
     if (!signedIn) return json(401, { title: "Sign in to see and manage your links." });
 

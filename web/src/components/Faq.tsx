@@ -14,6 +14,10 @@ const ITEMS = [
     a: "Yes, once you sign in with Google or GitHub. Codes are 3 to 32 letters, digits, hyphens or underscores.",
   },
   {
+    q: "Can I shorten many links at once?",
+    a: "Yes, once you sign in. Choose Many links, paste up to 25 URLs, one per line, and shorten them in one go. If any line is wrong, nothing is shortened and each bad line is listed so you can fix it. You can copy all the new links at once or download them as a CSV file.",
+  },
+  {
     q: "What do the click stats show?",
     a: "Clicks per day for the last 7, 30 or 90 days, the site each click came from, and the device and browser used. Only the time, the referring site, the device and the browser are stored — never IP addresses or full user agents.",
   },

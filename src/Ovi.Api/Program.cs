@@ -13,6 +13,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ShortUrlBuilder>();
+builder.Services.AddSingleton<CodeSource>();
 builder.Services.AddSingleton<ClickRecorder>();
 builder.Services.AddHostedService<ClickRetentionService>();
 builder.Services.AddOviRateLimits(builder.Configuration);
@@ -60,7 +61,12 @@ app.Use((ctx, next) =>
     ctx.Response.Headers.XFrameOptions = "DENY";
     return next(ctx);
 });
-app.UseExceptionHandler();
+// A body that can't be read (bad JSON, wrong types, too large) is the client's mistake: answer with its own status
+// (400, 413), not 500. In Development the framework throws these instead of answering itself.
+app.UseExceptionHandler(new ExceptionHandlerOptions
+{
+    StatusCodeSelector = ex => ex is BadHttpRequestException bad ? bad.StatusCode : StatusCodes.Status500InternalServerError,
+});
 app.UseStatusCodePages();
 if (!app.Environment.IsDevelopment()) app.UseHsts();
 app.UseOviWebUi();

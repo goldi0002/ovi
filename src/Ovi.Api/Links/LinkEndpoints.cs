@@ -16,6 +16,12 @@ public static class LinkEndpoints
     public const int TopN = 8;
     public const string DirectReferrer = "Direct";
 
+    /// <summary>The most URLs one bulk request may shorten (25 x 2048 characters fits the 64 KB body limit).</summary>
+    public const int MaxBulkUrls = 25;
+
+    /// <summary>Rounds of picking new random codes before giving up (each round replaces only the taken ones).</summary>
+    public const int MaxCodeRounds = 5;
+
     // Codes never contain dots, so files like /favicon.svg don't match and reach the static-file middleware.
     private const string CodeRoute = "{code:regex(^[A-Za-z0-9_-]+$)}";
 
@@ -27,11 +33,21 @@ public static class LinkEndpoints
             .AddEndpointFilter<CallerFilter>();
 
         api.MapPost("/", CreateLink)
-            .RequireRateLimiting(RateLimits.Create)
+            .RequireCreateBudget()
             .Produces<LinkResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem()
             .Produces(StatusCodes.Status409Conflict)
-            .Produces(StatusCodes.Status429TooManyRequests);
+            .Produces(StatusCodes.Status503ServiceUnavailable);
+
+        // No per-request limit: the handler charges one permit per URL from the same budget, after validating.
+        api.MapPost("/bulk", CreateLinks)
+            .Produces<BulkCreateLinksResponse>(StatusCodes.Status201Created)
+            .ProducesValidationProblem()
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status413PayloadTooLarge)
+            .Produces(StatusCodes.Status429TooManyRequests)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
         api.MapGet("/", ListLinks)
             .Produces<PagedResponse<LinkResponse>>()
@@ -52,11 +68,10 @@ public static class LinkEndpoints
             .Produces(StatusCodes.Status404NotFound);
 
         api.MapPatch("/{code}", UpdateLink)
-            .RequireRateLimiting(RateLimits.Create)
+            .RequireCreateBudget()
             .Produces<LinkResponse>()
             .ProducesValidationProblem()
-            .Produces(StatusCodes.Status404NotFound)
-            .Produces(StatusCodes.Status429TooManyRequests);
+            .Produces(StatusCodes.Status404NotFound);
 
         // Soft delete: the row stays, marked deleted, and disappears from every other endpoint.
         api.MapDelete("/{code}", async (string code, HttpContext http, AppDbContext db, TimeProvider time) =>
@@ -104,7 +119,7 @@ public static class LinkEndpoints
                     log.LogWarning(ex, "Couldn't record a click on {Code}", code);
                 }
             }
-            return Results.Redirect(link.Url);
+            return Results.Redirect(LinkRules.RedirectTarget(link.Url));
         })
         .Produces(StatusCodes.Status302Found)
         .Produces(StatusCodes.Status404NotFound)
@@ -245,7 +260,8 @@ public static class LinkEndpoints
     }
 
     private static async Task<IResult> CreateLink(
-        CreateLinkRequest? request, HttpContext http, AppDbContext db, ShortUrlBuilder urls, TimeProvider time, IConfiguration config)
+        CreateLinkRequest? request, HttpContext http, AppDbContext db, ShortUrlBuilder urls, TimeProvider time, IConfiguration config,
+        CodeSource codeSource)
     {
         if (request is null)
             return Results.ValidationProblem(new Dictionary<string, string[]> { ["body"] = ["Send a JSON body with a url."] });
@@ -281,23 +297,12 @@ public static class LinkEndpoints
             if (await allLinks.Where(l => l.Code == code).Select(l => new { l.DeletedAt }).FirstOrDefaultAsync() is { } existing)
                 return existing.DeletedAt is null ? Taken(code) : TakenByDeleted(code);
         }
+        else if (await NewCodesAsync(db, 1, codeSource.Next) is [var generated])
+            code = generated;
         else
-        {
-            do { code = CodeGenerator.Generate(); }
-            while (await allLinks.AnyAsync(l => l.Code == code));
-        }
+            return NoCodes();
 
-        var link = new Link
-        {
-            Code = code,
-            // AbsoluteUri stays ASCII: punycode hosts and percent-encoded paths. ToString() decodes them, and Kestrel
-            // refuses to send a non-ASCII Location header, so such links would 500 on every visit.
-            Url = uri!.AbsoluteUri,
-            CreatedAt = now,
-            ExpiresAt = expiresAt,
-            OwnerId = caller.AccountId,
-            Anonymous = anonymous,
-        };
+        var link = NewLink(uri!, code, now, expiresAt, caller);
         db.Links.Add(link);
         try
         {
@@ -311,6 +316,108 @@ public static class LinkEndpoints
 
         return Results.Created($"/api/links/{code}", LinkResponse.From(link, urls));
     }
+
+    /// <summary>
+    /// Shortens up to <see cref="MaxBulkUrls"/> URLs, all or nothing, for signed-in callers. Checks run in a fixed order:
+    /// caller, body shape, every URL and the expiry (all errors reported), then the create budget (one permit per URL,
+    /// none taken unless all are granted), then one transaction. See docs/decisions/0002-bulk-link-creation.md.
+    /// </summary>
+    private static async Task<IResult> CreateLinks(
+        BulkCreateLinksRequest? request, HttpContext http, AppDbContext db, ShortUrlBuilder urls, TimeProvider time,
+        IConfiguration config, CreateBudget budget, CodeSource codeSource)
+    {
+        var caller = Caller.From(http);
+        if (!caller.SignedIn)
+            return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Sign in to shorten many links at once.");
+
+        if (request?.Urls is not { Count: > 0 } input)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["urls"] = ["Add at least one URL."] });
+        // A batch can never take more permits than the budget holds, so a lower configured limit lowers the batch size.
+        var max = Math.Min(MaxBulkUrls, budget.PermitLimit);
+        if (input.Count > max)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["urls"] = [$"You can shorten at most {max} URLs at once."] });
+
+        var now = time.GetUtcNow().UtcDateTime;
+        var errors = new Dictionary<string, string[]>();
+        var uris = new Uri[input.Count];
+        for (var i = 0; i < input.Count; i++)
+        {
+            if (LinkRules.UrlProblem(input[i], urls, config, out var uri) is { } urlProblem)
+                errors[$"urls[{i}]"] = [urlProblem];
+            else
+                uris[i] = uri!;
+        }
+        var expiresAt = request.ExpiresAt?.UtcDateTime;
+        if (LinkRules.ExpiryProblem(expiresAt, now, anonymous: false) is { } expiryProblem)
+            errors["expiresAt"] = [expiryProblem];
+        if (errors.Count > 0) return Results.ValidationProblem(errors);
+
+        if (!budget.TryAcquire(http, input.Count, out var retryAfter))
+            return CreateBudget.TooMany(http, retryAfter);
+
+        var codes = await NewCodesAsync(db, input.Count, codeSource.Next);
+        if (codes.Count < input.Count) return NoCodes();
+
+        var links = uris.Select((uri, i) => NewLink(uri, codes[i], now, expiresAt, caller)).ToList();
+        db.Links.AddRange(links);
+        try
+        {
+            // One SaveChanges is one transaction: either every link is stored or none is.
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // A concurrent request took one of the codes after it was checked. Nothing was stored, so a retry is safe.
+            return NoCodes();
+        }
+
+        return Results.Json(new BulkCreateLinksResponse(links.Select(l => LinkResponse.From(l, urls)).ToList()),
+            statusCode: StatusCodes.Status201Created);
+    }
+
+    /// <summary>
+    /// Picks <paramref name="count"/> distinct random codes that no link uses, deleted links included (they keep their
+    /// codes). Each round checks the whole set in one query and replaces only the taken ones. Returns fewer than
+    /// <paramref name="count"/> codes if it gives up after <see cref="MaxCodeRounds"/> rounds.
+    /// </summary>
+    /// <param name="generate">Makes one candidate code; <see cref="CodeGenerator.Generate"/> unless a test supplies one.</param>
+    public static async Task<List<string>> NewCodesAsync(AppDbContext db, int count, Func<string>? generate = null)
+    {
+        generate ??= () => CodeGenerator.Generate();
+        var free = new List<string>(count);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var allLinks = db.Links.IgnoreQueryFilters();
+        for (var round = 0; round < MaxCodeRounds && free.Count < count; round++)
+        {
+            var candidates = new List<string>();
+            // Repeats within the batch are dropped; a bounded number of tries keeps a broken generator from spinning.
+            for (var tries = 0; candidates.Count < count - free.Count && tries < 4 * count; tries++)
+            {
+                var c = generate();
+                if (seen.Add(c)) candidates.Add(c);
+            }
+            if (candidates.Count == 0) continue;
+            var taken = await allLinks.Where(l => candidates.Contains(l.Code)).Select(l => l.Code).ToListAsync();
+            free.AddRange(candidates.Except(taken, StringComparer.Ordinal));
+        }
+        return free;
+    }
+
+    /// <summary>A new link row, built the same way for single and bulk create.</summary>
+    private static Link NewLink(Uri uri, string code, DateTime now, DateTime? expiresAt, Caller caller) => new()
+    {
+        Code = code,
+        // LinkRules.UrlProblem gives a punycode host, and AbsoluteUri percent-encodes the rest, so this is ASCII. Kestrel
+        // refuses to send a non-ASCII Location header, so such links would 500 on every visit.
+        Url = uri.AbsoluteUri,
+        CreatedAt = now,
+        ExpiresAt = expiresAt,
+        OwnerId = caller.AccountId,
+        Anonymous = caller is Caller.Anonymous,
+    };
+
+    private static IResult NoCodes() =>
+        Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "Couldn't make short codes; try again.");
 
     private enum StatusFilter { All, Active, Expired }
 
