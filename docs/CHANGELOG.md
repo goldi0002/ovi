@@ -4,6 +4,11 @@ User-facing changes to Ovi, newest first.
 
 ## Unreleased
 
+### Docker Compose
+
+- New `docker-compose.yml` and `.env.example`: run Ovi with its own Postgres database with `docker compose up -d`. Only three values are required: the public URL, the admin API key and the database password.
+- CI now smoke-tests the image through the compose file, including a restart, so the self-hosting path is checked on every change.
+
 ### Open source under the AGPL-3.0
 
 - Ovi is now licensed under the [GNU Affero General Public License v3.0](../LICENSE). You can run, change and share it. If you run a changed version as a service for others, you must offer them its source code.

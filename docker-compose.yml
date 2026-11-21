@@ -1,0 +1,52 @@
+# Ovi with its own Postgres database.
+#
+#   cp .env.example .env     # then fill in the three required values
+#   docker compose up -d
+#
+# Ovi is then on http://localhost:8080 (change OVI_PORT in .env). Put a reverse proxy with TLS
+# (Caddy, nginx, Traefik) in front of it for a public site; see "Deploying behind a reverse proxy" in the README.
+# Upgrade with: docker compose pull && docker compose up -d. Migrations run on start.
+
+name: ovi
+
+services:
+  ovi:
+    image: ${OVI_IMAGE:-ghcr.io/goldi0002/ovi:latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${OVI_PORT:-8080}:8080"
+    environment:
+      DATABASE_URL: "Host=db;Database=ovi;Username=ovi;Gss Encryption Mode=Disable;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
+      Auth__ApiKey: ${OVI_API_KEY:?Set OVI_API_KEY in .env (at least 32 characters)}
+      App__PublicBaseUrl: ${OVI_PUBLIC_URL:?Set OVI_PUBLIC_URL in .env, e.g. https://links.example.com}
+      # Optional. Uncomment the ones you use and set them in .env. Every setting is listed under
+      # "Configuration" in the README.
+      # Auth__Google__ClientId: ${GOOGLE_CLIENT_ID}
+      # Auth__Google__ClientSecret: ${GOOGLE_CLIENT_SECRET}
+      # Auth__GitHub__ClientId: ${GITHUB_CLIENT_ID}
+      # Auth__GitHub__ClientSecret: ${GITHUB_CLIENT_SECRET}
+      # Auth__AdminEmails: ${ADMIN_EMAILS}
+      # SafeBrowsing__ApiKey: ${SAFE_BROWSING_API_KEY}
+      # Behind a reverse proxy in this compose project, trust the Docker networks so rate limits see real client IPs:
+      # ReverseProxy__KnownNetworks__0: 172.16.0.0/12
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ovi
+      POSTGRES_DB: ovi
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - ovi-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ovi -d ovi"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ovi-db:
