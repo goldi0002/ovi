@@ -48,6 +48,23 @@ public sealed class WebUiTests
     }
 
     [TestMethod]
+    [DataRow("/sw.js", "text/javascript")]
+    [DataRow("/manifest.webmanifest", "application/manifest+json")]
+    public async Task Service_worker_and_manifest_are_served_and_always_revalidated(string path, string contentType)
+    {
+        var root = FakeBuiltUi();
+        File.WriteAllText(Path.Combine(root, "sw.js"), "self.addEventListener('fetch', () => {})");
+        File.WriteAllText(Path.Combine(root, "manifest.webmanifest"), "{\"name\":\"Ovi\"}");
+        using var factory = new OviApiFactory(webRoot: root);
+        var res = await factory.CreateUnauthedClient().GetAsync(path);
+
+        Assert.AreEqual(HttpStatusCode.OK, res.StatusCode);
+        Assert.AreEqual(contentType, res.Content.Headers.ContentType!.MediaType);
+        Assert.AreEqual("no-cache", res.Headers.CacheControl!.ToString());
+        Assert.AreEqual("nosniff", res.Headers.GetValues("X-Content-Type-Options").Single());
+    }
+
+    [TestMethod]
     [DataRow("/links/analytics")]
     [DataRow("/links/qr-codes")]
     public async Task Pages_under_links_serve_the_ui_without_being_indexed(string path)

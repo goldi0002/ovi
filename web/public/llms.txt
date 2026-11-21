@@ -1,8 +1,8 @@
 # Ovi
 
-> Ovi is a fast, self-hosted URL shortener. Paste a long URL, get a short link and a QR code, then see how often it was clicked. Shortening a link needs no account.
+> Ovi is a fast URL shortener. Paste a long URL, get a short link and a QR code, then see how often it was clicked. Shortening a link needs no account.
 
-Ovi is a small ASP.NET Core web app with a React interface. It runs on one address: the same server serves the UI and the JSON API, so there is no CORS setup and no separate short domain.
+Ovi runs on one address: the same site serves the app and the short links, so there is no separate short domain.
 
 ## What it does
 
@@ -12,14 +12,13 @@ Ovi is a small ASP.NET Core web app with a React interface. It runs on one addre
 - Every link comes with a downloadable QR code.
 - Click stats show clicks per day over the last 7, 30 or 90 days, the top referring sites, and the devices and browsers visitors used. A click stores only the time, the referring site's name, a device category and a browser category: no IP address and no full user agent.
 - The server admin can sign in with an API key, see totals, every account and every link, and suspend an account.
-- Links are stored in PostgreSQL. The API uses .NET 10, EF Core and minimal APIs.
 
 ## Pages
 
 - `/`: the shortener. No account needed.
 - `/links`: the signed-in user's links, with clicks, status and stats. Not indexed.
+- `/links/analytics` and `/links/qr-codes`: click stats and QR codes for those links. Not indexed.
 - `/admin`: the admin dashboard. Not indexed.
-- `/openapi/v1.json`: the OpenAPI document for the API.
 
 ## API
 
@@ -34,4 +33,3 @@ Ovi is a small ASP.NET Core web app with a React interface. It runs on one addre
 ## Notes
 
 - There is no advertising, no tracking pixel and no third-party analytics.
-- The app can be self-hosted; see the repository on GitHub for setup.

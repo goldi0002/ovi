@@ -28,8 +28,12 @@ public static class WebUiSetup
             OnPrepareResponse = ctx =>
             {
                 ctx.Context.Response.Headers[HeaderNames.XContentTypeOptions] = "nosniff";
-                if (ctx.Context.Request.Path.StartsWithSegments("/assets"))
+                var path = ctx.Context.Request.Path;
+                if (path.StartsWithSegments("/assets"))
                     ctx.Context.Response.Headers[HeaderNames.CacheControl] = "public, max-age=31536000, immutable";
+                // The service worker and the manifest must always be revalidated, or an update can't reach installed copies.
+                else if (path.Equals("/sw.js", StringComparison.Ordinal) || path.Equals("/manifest.webmanifest", StringComparison.Ordinal))
+                    ctx.Context.Response.Headers[HeaderNames.CacheControl] = "no-cache";
             }
         });
 
