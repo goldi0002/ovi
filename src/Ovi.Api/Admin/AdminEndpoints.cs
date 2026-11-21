@@ -111,7 +111,7 @@ public static class AdminEndpoints
             Days(clicksPerDay),
             Days(signupsPerDay),
             top.Select(t => new AdminTopLink(t.Code, urls.For(t.Code), t.Url, t.Clicks, t.OwnerName)).ToList(),
-            await OpenReportedLinks(db).CountAsync()));
+            await OpenReports(db).CountAsync()));
     }
 
     private static async Task<IResult> ListUsers(AppDbContext db, IConfiguration config, int page = 1, int pageSize = 20, string? q = null)
@@ -180,8 +180,6 @@ public static class AdminEndpoints
     /// <summary>Open reports on links that still exist (deleted links are hidden by the Links query filter).</summary>
     private static IQueryable<LinkReport> OpenReports(AppDbContext db) =>
         db.LinkReports.Where(r => r.ResolvedAt == null && db.Links.Any(l => l.Id == r.LinkId));
-
-    private static IQueryable<int> OpenReportedLinks(AppDbContext db) => OpenReports(db).Select(r => r.LinkId).Distinct();
 
     private const int DetailsPerLink = 5;
 

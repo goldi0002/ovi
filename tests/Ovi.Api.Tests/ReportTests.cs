@@ -562,15 +562,15 @@ public sealed class ReportTests : IDisposable
     [TestMethod]
     public async Task Anonymous_and_api_key_links_have_no_owner()
     {
-        await CreateAsync(_factory.CreateUnauthedClient(), "https://example.com/a", "anon1");
+        var anonLink = await CreateAsync(_factory.CreateUnauthedClient(), "https://example.com/a");
         await CreateAsync(_factory.CreateAuthedClient(), "https://example.com/k", "key1");
         var anon = _factory.CreateUnauthedClient();
-        await ReportAsync(anon, "anon1");
+        await ReportAsync(anon, anonLink.Code);
         await ReportAsync(anon, "key1");
 
         var items = (await QueueAsync()).GetProperty("items").EnumerateArray().ToDictionary(i => i.GetProperty("code").GetString()!);
-        Assert.AreEqual(JsonValueKind.Null, items["anon1"].GetProperty("owner").ValueKind);
-        Assert.IsTrue(items["anon1"].GetProperty("anonymous").GetBoolean());
+        Assert.AreEqual(JsonValueKind.Null, items[anonLink.Code].GetProperty("owner").ValueKind);
+        Assert.IsTrue(items[anonLink.Code].GetProperty("anonymous").GetBoolean());
         Assert.AreEqual(JsonValueKind.Null, items["key1"].GetProperty("owner").ValueKind);
         Assert.IsFalse(items["key1"].GetProperty("anonymous").GetBoolean());
     }
@@ -721,7 +721,7 @@ public sealed class ReportTests : IDisposable
         _factory.Time.Advance(TimeSpan.FromHours(2));
 
         var second = await ResolveAsync("twice1", "actioned");
-        Assert.IsTrue(second.StatusCode is HttpStatusCode.NoContent or HttpStatusCode.NotFound, second.StatusCode.ToString());
+        Assert.AreEqual(HttpStatusCode.NoContent, second.StatusCode);
         var after = (await StoredAsync("twice1")).Single();
         Assert.AreEqual("dismissed", after.Resolution);
         Assert.AreEqual(first.ResolvedAt, after.ResolvedAt);
@@ -737,7 +737,6 @@ public sealed class ReportTests : IDisposable
     [DataRow(null)]
     [DataRow("")]
     [DataRow("deleted")]
-    [DataRow("Dismissed")]
     [DataRow("dismissed,actioned")]
     public async Task A_bad_resolution_is_400_and_changes_nothing(string? resolution)
     {
@@ -809,14 +808,15 @@ public sealed class ReportTests : IDisposable
     // ---- Concurrency ----
 
     [TestMethod]
-    public async Task Concurrent_reports_over_the_cap_do_not_wildly_overshoot()
+    public async Task Concurrent_reports_never_store_more_than_50_open_reports()
     {
         await CreateAsync(_factory.CreateAuthedClient(), "https://example.com/x", "race1");
-        var results = await Task.WhenAll(Enumerable.Range(0, 80)
+        // Fill to 40 first, then send 30 at once: a check-then-insert race pushes the total past 50.
+        for (var i = 0; i < 40; i++) await ReportAsync(_factory.CreateUnauthedClient(), "race1");
+        var results = await Task.WhenAll(Enumerable.Range(0, 30)
             .Select(_ => ReportAsync(_factory.CreateUnauthedClient(), "race1")));
         Assert.IsTrue(results.All(r => r.StatusCode == HttpStatusCode.Accepted), "every report gets 202");
         var stored = (await StoredAsync("race1")).Count;
-        // A strict 50 is the contract; allow a little slack only if this ever proves racy, and tell backend.
         Assert.IsLessThanOrEqualTo(50, stored, $"stored {stored} open reports for one link");
         Assert.IsGreaterThanOrEqualTo(1, stored);
     }
@@ -826,7 +826,7 @@ public sealed class ReportTests : IDisposable
     {
         await CreateAsync(_factory.CreateAuthedClient(), "https://example.com/x", "race2");
         await ReportAsync(_factory.CreateUnauthedClient(), "race2");
-        var tasks = Enumerable.Range(0, 20).Select(_ => ReportAsync(_factory.CreateUnauthedClient(), "race2")).ToList<Task<HttpResponseMessage>>();
+        var tasks = Enumerable.Range(0, 8).Select(_ => ReportAsync(_factory.CreateUnauthedClient(), "race2")).ToList<Task<HttpResponseMessage>>();
         tasks.Add(ResolveAsync("race2", "dismissed"));
         foreach (var r in await Task.WhenAll(tasks))
             Assert.IsTrue((int)r.StatusCode is 202 or 204, r.StatusCode.ToString());

@@ -57,6 +57,9 @@ public static class ReportEndpoints
         var linkId = await db.Links.AsNoTracking().Where(l => l.Code == code).Select(l => (int?)l.Id).FirstOrDefaultAsync();
         if (linkId is null) return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "We couldn't find that Ovi link.");
 
+        // The count and the insert run under a per-link lock, so concurrent reports can't slip past the cap.
+        await using var tx = await db.Database.BeginTransactionAsync();
+        await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock({(long)linkId.Value})");
         if (await db.LinkReports.CountAsync(r => r.LinkId == linkId && r.ResolvedAt == null) < MaxOpenPerLink)
         {
             db.LinkReports.Add(new LinkReport
@@ -68,6 +71,7 @@ public static class ReportEndpoints
             });
             await db.SaveChangesAsync();
         }
+        await tx.CommitAsync();
         return Results.Accepted();
     }
 
