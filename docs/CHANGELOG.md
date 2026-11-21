@@ -12,6 +12,12 @@ User-facing changes to Ovi, newest first.
 - Each client can send 10 reports an hour (`RateLimits__ReportPerHour`). A link keeps at most 50 open reports.
 - `report` is now a reserved code and can't be used as a custom code.
 
+### Unsafe sites are refused
+
+- Ovi can now check destination URLs with Google Safe Browsing when you set `SafeBrowsing__ApiKey`. A site flagged for malware, phishing, unwanted software or harmful apps gets 400 with "This site is flagged as unsafe by Google Safe Browsing, so it can't be shortened."
+- It applies to making a link, making many links (nothing is created if any line is flagged) and editing a link's URL. Existing links aren't re-checked.
+- If Google is slow or down, the link is allowed. See the README's "Abuse protection" section.
+
 ### Custom codes and expiries for many links
 
 - In **Many links**, upload a CSV file or paste CSV text whose first line is `url,code,expires_at`. Each row can have its own custom code and expiry; leave a cell empty for a random code or the batch expiry. The downloaded results file works too.
