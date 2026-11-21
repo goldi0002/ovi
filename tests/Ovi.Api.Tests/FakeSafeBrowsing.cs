@@ -21,6 +21,9 @@ public sealed class FakeSafeBrowsing : HttpMessageHandler
     /// <summary>Decides the response; takes the request body. Default: <c>{}</c> (nothing flagged).</summary>
     public Func<string, HttpResponseMessage> Respond { get; set; } = _ => Json("{}");
 
+    /// <summary>When set, used instead of <see cref="Respond"/>; gets the body and the cancellation token (for timeout tests).</summary>
+    public Func<string, CancellationToken, Task<HttpResponseMessage>>? RespondAsync { get; set; }
+
     public static HttpResponseMessage Json(string json, HttpStatusCode status = HttpStatusCode.OK) =>
         new(status) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
 
@@ -45,7 +48,7 @@ public sealed class FakeSafeBrowsing : HttpMessageHandler
     {
         var body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
         _calls.Enqueue(new SafeBrowsingCall(request.RequestUri!, body));
-        return Respond(body);
+        return RespondAsync is { } a ? await a(body, cancellationToken) : Respond(body);
     }
 }
 

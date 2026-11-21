@@ -76,7 +76,7 @@ public sealed class SafeBrowsingUrlThreatCheck(
     /// reported host/path as covering anything below it. A match that can't be placed on any sent URL still means Google
     /// found something bad, so fail closed: flag the URLs on the reported host, else every URL sent.
     /// </summary>
-    internal static HashSet<string> Attribute(IReadOnlyCollection<string> sent, IReadOnlyList<string> reported)
+    public static HashSet<string> Attribute(IReadOnlyCollection<string> sent, IReadOnlyList<string> reported)
     {
         var flagged = new HashSet<string>(StringComparer.Ordinal);
         if (sent.Count == 1) { flagged.UnionWith(sent); return flagged; }

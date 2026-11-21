@@ -139,7 +139,7 @@ public sealed class SafeBrowsingTests : IDisposable
 
     private static IEnumerable<object[]> Failures() =>
     [
-        ["timeout"], ["http500"], ["http503"], ["http403"], ["garbage"], ["emptybody"], ["throws"],
+        ["timeout"], ["http500"], ["http503"], ["garbage"], ["emptybody"], ["throws"],
     ];
 
     [TestMethod]
@@ -153,7 +153,6 @@ public sealed class SafeBrowsingTests : IDisposable
             "throws" => throw new HttpRequestException("boom " + Key),
             "http500" => FakeSafeBrowsing.Json("{}", HttpStatusCode.InternalServerError),
             "http503" => FakeSafeBrowsing.Json("{\"error\":\"x\"}", HttpStatusCode.ServiceUnavailable),
-            "http403" => FakeSafeBrowsing.Json("{\"error\":{\"message\":\"API key not valid\"}}", HttpStatusCode.Forbidden),
             "garbage" => FakeSafeBrowsing.Json("<html>not json"),
             "emptybody" => FakeSafeBrowsing.Json(""),
             _ => FakeSafeBrowsing.Json("{}"),
@@ -421,8 +420,108 @@ public sealed class SafeBrowsingTests : IDisposable
         f.SafeBrowsing.Flag(u => u.Contains("evil"), reported: _ => "http://evil.example.net/");
         var c = await f.CreateUserClientAsync();
         var res = await Bulk(c, "https://example.com/1", "https://EVIL.example.net/x#f");
-        Assert.AreEqual(HttpStatusCode.BadRequest, res.StatusCode);
+        var errors = await ErrorsAsync(res);
+        CollectionAssert.AreEqual(new[] { "urls[1]" }, errors.Keys.ToArray());
+        CollectionAssert.AreEqual(new[] { Message }, errors["urls[1]"]);
         Assert.AreEqual(0, await CountAsync(f));
+    }
+
+    private const string Ours = "Ovi.Api.Security.SafeBrowsingUrlThreatCheck";
+
+    [TestMethod]
+    public async Task Bulk_items_with_a_differently_normalised_match_flags_only_that_item()
+    {
+        var f = Factory();
+        f.SafeBrowsing.Flag(u => u.Contains("evil"), reported: _ => "http://evil.example.net/");
+        var c = await f.CreateUserClientAsync();
+        var res = await c.PostAsJsonAsync(Route + "/bulk", new BulkCreateLinksRequest(null, null,
+            [new("https://example.com/1"), new("https://EVIL.example.net/x#f", "my-code")]));
+        var errors = await ErrorsAsync(res);
+        CollectionAssert.AreEqual(new[] { "items[1].url" }, errors.Keys.ToArray());
+        Assert.AreEqual(0, await CountAsync(f));
+    }
+
+    [TestMethod]
+    public async Task Bulk_same_host_and_path_different_query_flags_only_the_exact_match()
+    {
+        var f = Factory();
+        f.SafeBrowsing.Flag(u => u == "https://a.com/x?id=1");
+        var c = await f.CreateUserClientAsync();
+        var errors = await ErrorsAsync(await Bulk(c, "https://a.com/x?id=2", "https://a.com/x?id=1", "https://a.com/x?id=3"));
+        CollectionAssert.AreEqual(new[] { "urls[1]" }, errors.Keys.ToArray());
+    }
+
+    [TestMethod]
+    public async Task Bulk_exact_match_on_one_path_leaves_a_clean_sibling_path_alone()
+    {
+        var f = Factory();
+        f.SafeBrowsing.Flag(u => u == "https://a.com/x");
+        var c = await f.CreateUserClientAsync();
+        var errors = await ErrorsAsync(await Bulk(c, "https://a.com/y", "https://a.com/x"));
+        CollectionAssert.AreEqual(new[] { "urls[1]" }, errors.Keys.ToArray());
+    }
+
+    [TestMethod]
+    public async Task Bulk_with_a_match_that_fits_no_line_fails_closed()
+    {
+        var f = Factory();
+        f.SafeBrowsing.Respond = _ => FakeSafeBrowsing.Json("{\"matches\":[{\"threat\":{\"url\":\"http://unrelated.example.org/zzz\"}}]}");
+        var c = await f.CreateUserClientAsync();
+        var res = await Bulk(c, "https://example.com/1", "https://example.com/2");
+        Assert.AreEqual(HttpStatusCode.BadRequest, res.StatusCode, await res.Content.ReadAsStringAsync());
+        Assert.AreEqual(0, await CountAsync(f));
+    }
+
+    // ---- Timeout setting and Google refusing us ----
+
+    [TestMethod]
+    public async Task A_real_timeout_lets_the_link_through_with_a_warning()
+    {
+        var f = Factory(extra: new() { ["SafeBrowsing:TimeoutSeconds"] = "1" });
+        f.SafeBrowsing.RespondAsync = async (_, ct) => { await Task.Delay(Timeout.Infinite, ct); return FakeSafeBrowsing.Json("{}"); };
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var res = await Post(f.CreateAuthedClient(), Bad);
+        Assert.AreEqual(HttpStatusCode.Created, res.StatusCode, await res.Content.ReadAsStringAsync());
+        Assert.IsLessThan(10_000, sw.ElapsedMilliseconds, "the 1 second timeout must apply");
+        Assert.IsTrue(f.Logs.Entries.Any(e => e.Level == Microsoft.Extensions.Logging.LogLevel.Warning && e.Category == Ours));
+    }
+
+    [TestMethod]
+    [DataRow("abc")]
+    [DataRow("")]
+    [DataRow("-5")]
+    [DataRow("0")]
+    public async Task A_bad_timeout_setting_does_not_break_creating_links(string value)
+    {
+        var f = Factory(extra: new() { ["SafeBrowsing:TimeoutSeconds"] = value });
+        var res = await Post(f.CreateAuthedClient(), "https://example.com/ok");
+        Assert.AreEqual(HttpStatusCode.Created, res.StatusCode, await res.Content.ReadAsStringAsync());
+    }
+
+    [TestMethod]
+    [DataRow(HttpStatusCode.TooManyRequests)]
+    [DataRow(HttpStatusCode.Forbidden)]
+    public async Task Google_refusing_our_key_or_quota_creates_the_link_and_logs_an_error_without_the_key(HttpStatusCode status)
+    {
+        var f = Factory();
+        f.SafeBrowsing.Respond = _ => FakeSafeBrowsing.Json("{\"error\":{\"message\":\"key " + Key + " rejected\"}}", status);
+        var res = await Post(f.CreateAuthedClient(), Bad);
+        Assert.AreEqual(HttpStatusCode.Created, res.StatusCode);
+        Assert.IsTrue(f.Logs.Entries.Any(e => e.Level == Microsoft.Extensions.Logging.LogLevel.Error && e.Category == Ours),
+            "429/403 mean our setup is broken, so log at Error");
+        Assert.IsFalse(f.Logs.Entries.Any(e => e.Text.Contains(Key)));
+        Assert.IsFalse((await res.Content.ReadAsStringAsync()).Contains(Key));
+    }
+
+    [TestMethod]
+    public async Task Google_500_stays_a_warning_not_an_error()
+    {
+        var f = Factory();
+        f.SafeBrowsing.Respond = _ => FakeSafeBrowsing.Json("{}", HttpStatusCode.InternalServerError);
+        await Post(f.CreateAuthedClient(), Bad);
+        var ours = f.Logs.Entries.Where(e => e.Category == Ours).ToList();
+        Assert.IsTrue(ours.Any(e => e.Level == Microsoft.Extensions.Logging.LogLevel.Warning));
+        Assert.IsFalse(ours.Any(e => e.Level >= Microsoft.Extensions.Logging.LogLevel.Error));
     }
 
     [TestMethod]
