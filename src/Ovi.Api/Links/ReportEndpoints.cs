@@ -46,10 +46,16 @@ public static class ReportEndpoints
         var reason = request?.Reason?.Trim().ToLowerInvariant();
         if (reason is null || !Reasons.Contains(reason)) errors["reason"] = ["Choose a reason."];
 
-        var details = request?.Details?.Trim();
+        var details = request?.Details?.Replace("\r\n", "\n").Replace('\r', '\n').Trim();
         if (string.IsNullOrEmpty(details)) details = null;
-        if (details is not null && (details.Length > LinkReport.MaxDetailsLength || LinkRules.HasUnsafeCharacters(details)))
-            errors["details"] = ["Keep the details under 500 characters."];
+        if (details is not null)
+        {
+            if (details.Length > LinkReport.MaxDetailsLength)
+                errors["details"] = ["Keep the details under 500 characters."];
+            // Line breaks and tabs are fine in a note; any other control or bidi character is not.
+            else if (LinkRules.HasUnsafeCharacters(details.Replace("\n", "").Replace("\t", "")))
+                errors["details"] = ["The details contain characters that can't be saved."];
+        }
 
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 

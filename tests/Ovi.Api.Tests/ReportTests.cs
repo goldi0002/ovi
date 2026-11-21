@@ -274,8 +274,40 @@ public sealed class ReportTests : IDisposable
     {
         await CreateAsync(_factory.CreateAuthedClient(), "https://example.com/x", "ctl1");
         var errors = await ErrorsAsync(await ReportAsync(_factory.CreateUnauthedClient(), "ctl1", "spam", details));
-        Assert.IsTrue(errors.ContainsKey("details"));
+        CollectionAssert.AreEqual(new[] { "The details contain characters that can't be saved." }, errors["details"]);
         Assert.IsEmpty(await StoredAsync("ctl1"));
+    }
+
+    [TestMethod]
+    [DataRow("line one\nline two", "line one\nline two")]
+    [DataRow("line one\r\nline two", "line one\nline two")]
+    [DataRow("line one\rline two", "line one\nline two")]
+    [DataRow("a\n\nb", "a\n\nb")]
+    [DataRow("col1\tcol2", "col1\tcol2")]
+    public async Task Newlines_and_tabs_inside_details_are_accepted_and_line_breaks_stored_as_LF(string details, string expected)
+    {
+        await CreateAsync(_factory.CreateAuthedClient(), "https://example.com/x", "nl1");
+        Assert.AreEqual(HttpStatusCode.Accepted, (await ReportAsync(_factory.CreateUnauthedClient(), "nl1", "spam", details)).StatusCode);
+        Assert.AreEqual(expected, (await StoredAsync("nl1")).Single().Details);
+    }
+
+    [TestMethod]
+    public async Task The_500_character_limit_counts_after_line_breaks_are_normalised()
+    {
+        await CreateAsync(_factory.CreateAuthedClient(), "https://example.com/x", "nl2");
+        var anon = _factory.CreateUnauthedClient();
+        var fits = new string('a', 499) + "\r\n" + "b"; // 502 raw, 501 normalised: rejected
+        var errors = await ErrorsAsync(await ReportAsync(anon, "nl2", "spam", fits));
+        CollectionAssert.AreEqual(new[] { DetailsError }, errors["details"]);
+
+        var crlf = string.Concat(Enumerable.Repeat("\r\n", 250)); // 500 raw, 250 normalised: accepted either way
+        Assert.AreEqual(HttpStatusCode.Accepted, (await ReportAsync(anon, "nl2", "spam", "x" + crlf)).StatusCode);
+        // 498 chars + CRLF + 1 = 501 raw but 500 normalised: accepted only if the limit applies after normalising.
+        var edge = new string('a', 498) + "\r\n" + "b";
+        Assert.AreEqual(HttpStatusCode.Accepted, (await ReportAsync(anon, "nl2", "spam", edge)).StatusCode);
+        var stored = await StoredAsync("nl2");
+        Assert.AreEqual(500, stored[^1].Details!.Length);
+        Assert.AreEqual(new string('a', 498) + "\nb", stored[^1].Details);
     }
 
     [TestMethod]
