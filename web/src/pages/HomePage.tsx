@@ -122,11 +122,10 @@ function Hero() {
   return (
     <div className="mx-auto max-w-2xl px-4 pt-8 pb-6 text-center sm:px-6 sm:pt-20 sm:pb-10">
       <h1 className="text-[2rem] leading-[1.1] font-semibold tracking-[-0.03em] text-balance sm:text-[3rem]">
-        Long link in.{" "}
-        <span className="inline-block">Short link and QR code out.</span>
+        Make any link short enough to share.
       </h1>
       <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-pretty text-muted sm:mt-4 sm:text-[1.0625rem]">
-        No account needed. Sign in later to keep your links, pick your own codes and see who clicks.
+        Get a short link and a QR code in a second. No account needed.
       </p>
     </div>
   );

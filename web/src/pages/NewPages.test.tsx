@@ -71,7 +71,7 @@ describe("Dashboard", () => {
   it("shows visitors the shortener, the features and the FAQ instead", async () => {
     fakeApi();
     await renderAt("/");
-    expect(screen.getByRole("heading", { level: 1, name: "Long link in. Short link and QR code out." })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Make any link short enough to share." })).toBeInTheDocument();
     expect(screen.getByLabelText("Long URL")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Good to know" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Overview" })).not.toBeInTheDocument();
