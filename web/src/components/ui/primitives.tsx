@@ -187,7 +187,7 @@ export function StatTile({ label, value, note, icon, loading = false }: { label:
       <dd className="mt-2 text-[1.75rem] leading-none font-semibold tracking-[-0.02em] tabular-nums">
         {loading ? <Skeleton className="h-7 w-16" /> : value}
       </dd>
-      {note && <dd className="mt-2 truncate text-xs text-muted">{note}</dd>}
+      {note && <dd className="mt-2 line-clamp-2 text-xs text-muted">{note}</dd>}
     </div>
   );
 }
