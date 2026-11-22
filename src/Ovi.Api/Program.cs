@@ -15,6 +15,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ShortUrlBuilder>();
 builder.Services.AddSingleton<CodeSource>();
 builder.Services.AddSingleton<ClickRecorder>();
+builder.Services.AddSingleton<RedirectCache>();
 builder.Services.AddHostedService<ClickRetentionService>();
 builder.Services.AddOviRateLimits(builder.Configuration);
 builder.Services.AddOviAuth(builder.Configuration, builder.Environment);

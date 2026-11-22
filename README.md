@@ -202,6 +202,7 @@ Both accept Neon's `postgresql://…?sslmode=require&channel_binding=require` UR
 | `RateLimits:ApiKeyFailuresPerMinute` | `RateLimits__ApiKeyFailuresPerMinute` | `10` | Wrong `X-Api-Key` attempts per client per minute before 429, so a key can't be guessed online |
 | `Clicks:DedupeSeconds` | `Clicks__DedupeSeconds` | `30` | Repeat visits from the same client to the same link within this window count once |
 | `Clicks:MaxRecordedPerMinute` | `Clicks__MaxRecordedPerMinute` | `1000` | Clicks recorded per minute across the whole site; beyond it, visitors are still redirected but not counted |
+| `Links:RedirectCacheSeconds` | `Links__RedirectCacheSeconds` | `15` | How long a followed link is remembered in memory before the database is asked again. Edits, deletes and suspensions clear it at once; if the database is unreachable, a remembered link keeps working for up to an hour. `0` turns it off |
 | `Clicks:RetentionDays` | `Clicks__RetentionDays` | `400` | Click rows older than this are deleted every 6 hours (never below 366, so stats stay complete); `0` keeps them forever. All-time counts are kept on each link |
 | `RateLimits:RedirectPerMinute` | `RateLimits__RedirectPerMinute` | `300` | Per client IP, covers redirects and QR codes |
 | `ReverseProxy:KnownProxies` | `ReverseProxy__KnownProxies__0` | none | IPs of your reverse proxy / load balancer. Needed so rate limits see real client IPs |
