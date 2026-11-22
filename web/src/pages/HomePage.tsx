@@ -1,4 +1,4 @@
-import { ArrowRight, ChartColumn, ChevronDown, Clock3, Link2, MousePointerClick, QrCode, ShieldCheck, Sparkles, TimerOff } from "lucide-react";
+import { ArrowRight, ChartColumn, ChevronDown, Clock3, Link2, MousePointerClick, QrCode, ShieldCheck, TimerOff } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, isExpired, type Link, type OviApi } from "../api";
 import { BulkResult } from "../components/BulkResult";
@@ -8,7 +8,7 @@ import { InstallBanner } from "../components/InstallBanner";
 import { FAQ_ITEMS } from "../components/Faq";
 import { LinkResult } from "../components/LinkResult";
 import { ShortenCard } from "../components/ShortenCard";
-import { Badge, EmptyState, Skeleton, StatTile } from "../components/ui/primitives";
+import { EmptyState, Skeleton, StatTile } from "../components/ui/primitives";
 import { displayUrl, formatDateTime, formatRelative } from "../format";
 import { AppLink, PAGES } from "../router";
 import { button, card, container, errorBox, focusRing } from "../ui";
@@ -120,42 +120,61 @@ function CreatePanel({
 
 function Hero() {
   return (
-    <div className="mx-auto max-w-2xl px-4 pt-14 pb-8 text-center sm:px-6 sm:pt-20 sm:pb-10">
-      <Badge tone="accent">
-        <Sparkles className="size-3" aria-hidden="true" />
-        Free, and no account needed
-      </Badge>
-      <h1 className="mt-4 text-[2.25rem] leading-[1.1] font-semibold tracking-[-0.03em] text-balance sm:text-[3rem]">
-        Short links, simply made.
+    <div className="mx-auto max-w-2xl px-4 pt-8 pb-6 text-center sm:px-6 sm:pt-20 sm:pb-10">
+      <h1 className="text-[2rem] leading-[1.1] font-semibold tracking-[-0.03em] text-balance sm:text-[3rem]">
+        Long link in.{" "}
+        <span className="inline-block">Short link and QR code out.</span>
       </h1>
-      <p className="mx-auto mt-4 max-w-lg text-[1.0625rem] leading-relaxed text-pretty text-muted">
-        Paste a URL to get a short link and a QR code in a second. Sign in to keep your links, choose your own codes and
-        see who clicks.
+      <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-pretty text-muted sm:mt-4 sm:text-[1.0625rem]">
+        No account needed. Sign in later to keep your links, pick your own codes and see who clicks.
       </p>
     </div>
   );
 }
 
-const FEATURES = [
-  { icon: QrCode, title: "A QR code for every link", text: "Download a crisp PNG for print, slides or packaging. It always points to your short link." },
-  { icon: ChartColumn, title: "Clicks, without tracking people", text: "See clicks per day, referring sites, devices and browsers. Never IP addresses." },
-  { icon: Clock3, title: "Your codes, your expiry", text: "Pick a memorable code like /launch, or let a link expire on the date you choose." },
+const BENEFITS = [
+  { icon: QrCode, title: "A QR code with every link", text: "Download a sharp PNG for print, slides or packaging. It always points to your short link." },
+  { icon: ChartColumn, title: "Clicks, without tracking people", text: "See clicks per day, where they came from, and which devices and browsers. Never IP addresses." },
+  { icon: Clock3, title: "Your code, your expiry", text: "Pick a code you can say out loud, like /launch, and set the day the link stops working." },
 ];
+
+/** What a finished link looks like, so a visitor sees the result before they try. */
+function Example() {
+  return (
+    <figure className={`${card} grid gap-4 p-5 sm:p-6`} aria-label="Example of a short link">
+      <p className="line-clamp-1 text-[0.8125rem] break-all text-muted">https://example.com/products/spring-launch?utm_source=newsletter&ref=…</p>
+      <div className="flex items-center gap-4">
+        <div className="min-w-0 flex-1">
+          <p className="font-mono text-base font-semibold tracking-[-0.01em] break-words text-accent-text min-[400px]:text-xl sm:text-2xl">{window.location.host}/launch</p>
+          <p className="mt-1 text-xs text-muted">128 clicks this week</p>
+        </div>
+        <span className="grid size-20 shrink-0 place-items-center rounded-xl bg-white text-black shadow-control" aria-hidden="true">
+          <QrCode className="size-14" strokeWidth={1.5} />
+        </span>
+      </div>
+    </figure>
+  );
+}
 
 function LandingDetails() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-16 sm:px-6">
-      <ul className="mt-16 grid gap-4 sm:mt-20 sm:grid-cols-3">
-        {FEATURES.map(({ icon: Icon, title, text }) => (
-          <li key={title} className="rounded-xl p-5">
-            <span className="grid size-10 place-items-center rounded-xl bg-accent-soft text-accent-text" aria-hidden="true">
-              <Icon className="size-5" />
-            </span>
-            <h2 className="mt-4 text-[0.9375rem] font-semibold">{title}</h2>
-            <p className="mt-1.5 text-sm leading-relaxed text-muted">{text}</p>
-          </li>
-        ))}
-      </ul>
+      <div className="mt-12 grid items-center gap-8 sm:mt-20 lg:grid-cols-2 lg:gap-12">
+        <Example />
+        <ul className="grid gap-5">
+          {BENEFITS.map(({ icon: Icon, title, text }) => (
+            <li key={title} className="flex gap-3.5">
+              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-text" aria-hidden="true">
+                <Icon className="size-[18px]" />
+              </span>
+              <div>
+                <h2 className="text-[0.9375rem] font-semibold">{title}</h2>
+                <p className="mt-0.5 text-sm leading-relaxed text-muted">{text}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
       <Faq />
     </div>
   );
@@ -166,7 +185,7 @@ function Faq() {
   return (
     <section aria-labelledby="faq-title" className="mx-auto mt-16 max-w-2xl sm:mt-20">
       <h2 id="faq-title" className="text-center text-xl font-semibold tracking-[-0.01em]">
-        Questions, answered
+        Good to know
       </h2>
       <div className={`${card} mt-6 divide-y divide-line`}>
         {FAQ_ITEMS.map(({ q, a }) => (
@@ -199,7 +218,7 @@ function DashboardHeader({ name }: { name: string | null }) {
         {greeting()}
         {name ? `, ${name}` : ""}
       </h1>
-      <p className="mt-1 text-sm text-muted">Shorten a link, or see how your links are doing.</p>
+      <p className="mt-1 text-sm text-muted">Make a new link, or check how your links are doing.</p>
     </div>
   );
 }
@@ -287,7 +306,7 @@ function Dashboard({ api, version, onUnauthorized }: { api: OviApi; version: num
       )}
 
       <section aria-label="Overview">
-        <dl className="grid grid-cols-4 gap-3 max-lg:grid-cols-2 sm:gap-4">
+        <dl className="grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:-mx-4 max-sm:flex max-sm:snap-x max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 max-sm:[&>*]:min-w-[10rem] max-sm:[&>*]:shrink-0 max-sm:[&>*]:snap-start sm:gap-4">
           <StatTile
             icon={<Link2 />}
             label="Total links"
@@ -403,7 +422,7 @@ function Dashboard({ api, version, onUnauthorized }: { api: OviApi; version: num
         </div>
       )}
 
-      <nav aria-label="Shortcuts" className="grid gap-3 sm:grid-cols-3">
+      <nav aria-label="Shortcuts" className="grid gap-3 max-sm:hidden sm:grid-cols-3">
         {[
           { href: PAGES.links, icon: Link2, title: "Manage links", text: "Search, edit and delete" },
           { href: PAGES.analytics, icon: ChartColumn, title: "See analytics", text: "Clicks, referrers, devices" },

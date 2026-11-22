@@ -10,7 +10,7 @@ const soon = new Date(Date.now() + 2 * 86_400_000).toISOString();
 async function renderAt(path: string) {
   window.history.replaceState(null, "", path);
   render(<App />);
-  await within(screen.getByRole("banner")).findByRole("button", { name: /^(Log in|Account)$/ });
+  await within(screen.getByRole("banner")).findByRole("button", { name: /^(Sign in|Account)$/ });
   return userEvent.setup();
 }
 
@@ -71,9 +71,9 @@ describe("Dashboard", () => {
   it("shows visitors the shortener, the features and the FAQ instead", async () => {
     fakeApi();
     await renderAt("/");
-    expect(screen.getByRole("heading", { level: 1, name: "Short links, simply made." })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Long link in. Short link and QR code out." })).toBeInTheDocument();
     expect(screen.getByLabelText("Long URL")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Questions, answered" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Good to know" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Overview" })).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Main" })).not.toBeInTheDocument();
   });
@@ -111,10 +111,10 @@ describe("Analytics page", () => {
     expect(await screen.findByText("That link isn't here")).toBeInTheDocument();
   });
 
-  it("asks visitors to log in", async () => {
+  it("asks visitors to sign in", async () => {
     const { fetchMock } = fakeApi();
     await renderAt("/links/analytics");
-    expect(screen.getByRole("heading", { name: "Log in to see your analytics" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sign in to see your analytics" })).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([u]) => String(u).startsWith("/api/links"))).toBe(false);
   });
 });
@@ -211,7 +211,7 @@ describe("Account menu and Settings", () => {
 
     await user.click(within(screen.getByRole("banner")).getByRole("button", { name: "Settings" }));
     await user.click(within(screen.getByRole("dialog", { name: "Settings" })).getByRole("button", { name: "Sign out" }));
-    expect(await within(screen.getByRole("banner")).findByRole("button", { name: "Log in" })).toBeInTheDocument();
+    expect(await within(screen.getByRole("banner")).findByRole("button", { name: "Sign in" })).toBeInTheDocument();
     expect(state.user).toBeNull();
   });
 
