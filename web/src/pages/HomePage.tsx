@@ -286,7 +286,7 @@ function Dashboard({ api, version, onUnauthorized }: { api: OviApi; version: num
       )}
 
       <section aria-label="Overview">
-        <dl className="grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:-mx-4 max-sm:flex max-sm:snap-x max-sm:scroll-px-4 max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 max-sm:[&>*]:min-w-[10rem] max-sm:[&>*]:shrink-0 max-sm:[&>*]:snap-start sm:gap-4">
+        <dl className="grid grid-cols-4 gap-3 max-lg:grid-cols-2 sm:gap-4">
           <StatTile
             icon={<Link2 />}
             label="Total links"
