@@ -198,11 +198,15 @@ Both accept Neon's `postgresql://…?sslmode=require&channel_binding=require` UR
 | `RateLimits:AnonymousCreatePerHour` | `RateLimits__AnonymousCreatePerHour` | `20` | Links made per IP without signing in |
 | `RateLimits:AuthPerMinute` | `RateLimits__AuthPerMinute` | `20` | Sign-in starts per IP |
 | `RateLimits:StatsPerMinute` | `RateLimits__StatsPerMinute` | `60` | Stats requests per user (or per IP) |
+| `RateLimits:ReadsPerMinute` | `RateLimits__ReadsPerMinute` | `120` | Link list, link lookup and session requests per user (or per IP) |
+| `RateLimits:HealthPerMinute` | `RateLimits__HealthPerMinute` | `30` | `/health` (the database check) requests per IP; `/health/live` is not limited |
 | `RateLimits:ReportPerHour` | `RateLimits__ReportPerHour` | `10` | Reports sent per client IP per hour |
 | `RateLimits:ApiKeyFailuresPerMinute` | `RateLimits__ApiKeyFailuresPerMinute` | `10` | Wrong `X-Api-Key` attempts per client per minute before 429, so a key can't be guessed online |
 | `Clicks:DedupeSeconds` | `Clicks__DedupeSeconds` | `30` | Repeat visits from the same client to the same link within this window count once |
 | `Clicks:MaxRecordedPerMinute` | `Clicks__MaxRecordedPerMinute` | `1000` | Clicks recorded per minute across the whole site; beyond it, visitors are still redirected but not counted |
 | `Links:RedirectCacheSeconds` | `Links__RedirectCacheSeconds` | `15` | How long a followed link is remembered in memory before the database is asked again. Edits, deletes and suspensions clear it at once; if the database is unreachable, a remembered link keeps working for up to an hour. `0` turns it off |
+| `Clicks:MaxRecordedPerLinkPerMinute` | `Clicks__MaxRecordedPerLinkPerMinute` | `60` | Clicks recorded per link per minute, so one busy or attacked link can't use up the site's budget; `0` turns it off |
+| `Clicks:MaxRecordedPerDay` | `Clicks__MaxRecordedPerDay` | `50000` | Clicks recorded per day across the whole site, which bounds how fast the Clicks table grows; `0` turns it off |
 | `Clicks:RetentionDays` | `Clicks__RetentionDays` | `400` | Click rows older than this are deleted every 6 hours (never below 366, so stats stay complete); `0` keeps them forever. All-time counts are kept on each link |
 | `RateLimits:RedirectPerMinute` | `RateLimits__RedirectPerMinute` | `300` | Per client IP, covers redirects and QR codes |
 | `ReverseProxy:KnownProxies` | `ReverseProxy__KnownProxies__0` | none | IPs of your reverse proxy / load balancer. Needed so rate limits see real client IPs |

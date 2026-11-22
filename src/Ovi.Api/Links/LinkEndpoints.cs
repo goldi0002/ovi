@@ -50,6 +50,7 @@ public static class LinkEndpoints
             .Produces(StatusCodes.Status503ServiceUnavailable);
 
         api.MapGet("/", ListLinks)
+            .RequireRateLimiting(RateLimits.Read)
             .Produces<PagedResponse<LinkResponse>>()
             .ProducesValidationProblem();
 
@@ -58,6 +59,7 @@ public static class LinkEndpoints
             : await db.Links.AsNoTracking().VisibleTo(caller).FirstOrDefaultAsync(l => l.Code == code) is { } link
                 ? Results.Ok(LinkResponse.From(link, urls))
                 : Results.NotFound())
+            .RequireRateLimiting(RateLimits.Read)
             .Produces<LinkResponse>()
             .Produces(StatusCodes.Status404NotFound);
 

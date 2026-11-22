@@ -41,6 +41,7 @@ public static class AuthEndpoints
             }
             return Results.Ok(new SessionResponse(user, caller is Caller.Admin, AuthSetup.EnabledProviders(config), LinkRules.AnonymousLinkDays));
         })
+        .RequireRateLimiting(RateLimits.Read)
         .Produces<SessionResponse>();
 
         // A session is a self-contained cookie, so clearing the browser's copy isn't enough: a copied cookie would keep
