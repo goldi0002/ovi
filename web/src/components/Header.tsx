@@ -45,7 +45,7 @@ interface Props {
 
 /**
  * The window chrome. Signed in: a translucent sidebar with the pages and the account (on phones, a top bar
- * plus a tab bar along the bottom). Signed out: a slim top bar with the name, the theme and Log in.
+ * plus a tab bar along the bottom). Signed out: a slim top bar with the name, the theme and Sign in.
  */
 export function Header({ path, ready, isAdmin, account, onLogIn, onSignOut, onOpenSettings }: Props) {
   if (!account) {
@@ -65,7 +65,7 @@ export function Header({ path, ready, isAdmin, account, onLogIn, onSignOut, onOp
             <ThemeToggle />
             {ready && (
               <button type="button" className={button("primary", "sm")} onClick={onLogIn}>
-                Log in
+                Sign in
               </button>
             )}
           </div>

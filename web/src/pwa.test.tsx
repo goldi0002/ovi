@@ -8,6 +8,7 @@ import manifestJson from "../public/manifest.webmanifest?raw";
 import serviceWorker from "../public/sw.js?raw";
 import llms from "../public/llms.txt?raw";
 import { FAQ_ITEMS } from "./components/Faq";
+import { sharedUrl } from "./components/ShortenCard";
 
 const icons = Object.keys(import.meta.glob("../public/icons/*.png", { query: "?url" })).map((path) => path.replace("../public", ""));
 
@@ -83,6 +84,35 @@ describe("Install", () => {
   });
 });
 
+describe("Install banner", () => {
+  afterEach(() => localStorage.clear());
+
+  it("invites visitors to install once the browser allows it, and remembers when they say not now", async () => {
+    fakeApi({ user: null });
+    window.history.replaceState(null, "", "/");
+    const { unmount } = render(<App />);
+    const user = userEvent.setup();
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.queryByRole("region", { name: "Install Ovi" })).not.toBeInTheDocument();
+
+    const prompt = vi.fn().mockResolvedValue(undefined);
+    act(() => void window.dispatchEvent(Object.assign(new Event("beforeinstallprompt", { cancelable: true }), { prompt, userChoice: Promise.resolve({ outcome: "accepted" }) })));
+    const banner = screen.getByRole("region", { name: "Install Ovi" });
+    await user.click(within(banner).getByRole("button", { name: "Install" }));
+    expect(prompt).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("region", { name: "Install Ovi" })).not.toBeInTheDocument();
+
+    // Offered again (the browser can announce it again); closing it sticks across visits.
+    act(() => void window.dispatchEvent(Object.assign(new Event("beforeinstallprompt", { cancelable: true }), { prompt, userChoice: Promise.resolve({ outcome: "dismissed" }) })));
+    await user.click(within(screen.getByRole("region", { name: "Install Ovi" })).getByRole("button", { name: "Not now" }));
+    expect(screen.queryByRole("region", { name: "Install Ovi" })).not.toBeInTheDocument();
+    unmount();
+    render(<App />);
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.queryByRole("region", { name: "Install Ovi" })).not.toBeInTheDocument();
+  });
+});
+
 describe("Installable app files", () => {
   const manifest = JSON.parse(manifestJson);
 
@@ -91,6 +121,16 @@ describe("Installable app files", () => {
     const sizes = manifest.icons.map((i: { sizes: string; purpose: string }) => `${i.sizes}:${i.purpose}`);
     expect(sizes).toEqual(expect.arrayContaining(["192x192:any", "512x512:any", "512x512:maskable"]));
     for (const icon of manifest.icons) expect(icons).toContain(icon.src);
+  });
+
+  it("accepts links shared from other apps, and the page puts them in the box", () => {
+    expect(manifest.share_target).toEqual({ action: "/", method: "GET", params: { title: "title", text: "text", url: "url" } });
+    expect(Object.values(PAGES)).toContain(manifest.share_target.action);
+    expect(sharedUrl("?url=https%3A%2F%2Fexample.com%2Fa")).toBe("https://example.com/a");
+    // Android apps often put the link inside the shared text.
+    expect(sharedUrl("?title=Hi&text=Look%20at%20https%3A%2F%2Fexample.com%2Fb%20now")).toBe("https://example.com/b");
+    expect(sharedUrl("?text=no%20link%20here")).toBe("");
+    expect(sharedUrl("")).toBe("");
   });
 
   it("only offers shortcuts to pages that exist", () => {

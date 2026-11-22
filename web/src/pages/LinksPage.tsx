@@ -33,7 +33,7 @@ export function LinksPage({ api, state, onLogIn, onUnauthorized }: Props) {
       {state === "loading" ? null : state === "signedIn" ? (
         <LinksTable api={api} onUnauthorized={onUnauthorized} />
       ) : (
-        <SignedOutPanel title="Log in to see your links" onLogIn={onLogIn} />
+        <SignedOutPanel title="Sign in to see your links" onLogIn={onLogIn} />
       )}
     </main>
   );

@@ -27,7 +27,7 @@ export function QrCodesPage({ api, state, onLogIn, onUnauthorized }: Props) {
       {state === "loading" ? null : state === "signedIn" ? (
         <QrGrid api={api} onUnauthorized={onUnauthorized} />
       ) : (
-        <SignedOutPanel title="Log in to see your QR codes" onLogIn={onLogIn} />
+        <SignedOutPanel title="Sign in to see your QR codes" onLogIn={onLogIn} />
       )}
     </main>
   );

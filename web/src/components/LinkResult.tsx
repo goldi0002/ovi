@@ -23,7 +23,7 @@ export function LinkResult({ link, signedIn, onDismiss }: { link: Link; signedIn
         </p>
         <div className="grid min-w-0 gap-1">
           <a
-            className="text-xl font-semibold tracking-[-0.01em] break-all text-accent-text underline-offset-4 hover:underline sm:text-2xl"
+            className="font-mono text-xl font-semibold tracking-[-0.02em] break-all text-accent-text underline-offset-4 hover:underline sm:text-2xl"
             href={link.shortUrl}
             target="_blank"
             rel="noreferrer"
@@ -37,7 +37,7 @@ export function LinkResult({ link, signedIn, onDismiss }: { link: Link; signedIn
           </p>
           {link.expiresAt && <p className="text-xs text-muted">Expires {formatDateTime(link.expiresAt)}</p>}
         </div>
-        <div className="mt-1 flex flex-wrap gap-2 max-sm:grid max-sm:grid-cols-2">
+        <div className="mt-1 flex flex-wrap gap-2 max-sm:grid max-sm:grid-cols-2 max-sm:[&>:first-child]:col-span-2">
           <CopyButton text={link.shortUrl} primary size="md" />
           <a className={button("default", "md")} href={link.shortUrl} target="_blank" rel="noreferrer">
             <ExternalLink />

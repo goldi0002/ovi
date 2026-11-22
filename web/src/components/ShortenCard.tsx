@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronDown, CircleAlert, Link as LinkIcon, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, ChevronDown, CircleAlert, ClipboardPaste, Link as LinkIcon, SlidersHorizontal } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError, type Link, type OviApi } from "../api";
 import { isoToLocalInput, localInputToIso } from "../format";
@@ -26,6 +26,13 @@ interface Props {
   onUnauthorized: () => void;
 }
 
+/** The link another app shared to Ovi (the manifest's share target sends ?url= and ?text=), if there is one. */
+export function sharedUrl(search: string): string {
+  const params = new URLSearchParams(search);
+  const found = /https?:\/\/[^\s]+/.exec(`${params.get("url") ?? ""} ${params.get("text") ?? ""}`);
+  return found ? found[0] : "";
+}
+
 /** The latest expiry the server accepts without an account, as a datetime-local value. */
 function anonymousMaxExpiry(days: number): string {
   return isoToLocalInput(new Date(Date.now() + days * 86_400_000).toISOString());
@@ -35,7 +42,8 @@ export function ShortenCard({ api, signedIn, ready, anonymousLinkDays, onLogIn, 
   const [mode, setMode] = useState<Mode>("one");
   const [bulkBusy, setBulkBusy] = useState(false);
   const onBusyChange = useCallback((busy: boolean) => setBulkBusy(busy), []);
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(() => sharedUrl(window.location.search));
+  const [canPaste] = useState(() => typeof navigator.clipboard?.readText === "function");
   const [showOptions, setShowOptions] = useState(false);
   const [customCode, setCustomCode] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
@@ -47,6 +55,16 @@ export function ShortenCard({ api, signedIn, ready, anonymousLinkDays, onLogIn, 
   useEffect(() => {
     if (window.location.hash === "#shorten") urlRef.current?.focus();
   }, []);
+
+  async function pasteFromClipboard() {
+    try {
+      const text = (await navigator.clipboard.readText()).trim();
+      if (text) setUrl(text);
+      urlRef.current?.focus();
+    } catch {
+      // The person declined the browser's paste prompt: they can still paste by hand.
+    }
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -65,9 +83,9 @@ export function ShortenCard({ api, signedIn, ready, anonymousLinkDays, onLogIn, 
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         onUnauthorized();
-        setError("You were signed out. Log in again, or shorten without an account.");
+        setError("You were signed out. Sign in again, or shorten without an account.");
       } else {
-        setError(err instanceof ApiError ? err.message : "Couldn't create the link. Try again.");
+        setError(err instanceof ApiError ? err.message : "Couldn't shorten that link. Check your connection and try again.");
       }
     } finally {
       setSaving(false);
@@ -123,13 +141,23 @@ export function ShortenCard({ api, signedIn, ready, anonymousLinkDays, onLogIn, 
                 inputMode="url"
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="Paste a long link, like https://example.com/a/very/long/page"
+                placeholder="Paste a long link"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 required
                 maxLength={2048}
-                className={`${input} h-11 rounded-[10px] pl-10 text-[0.9375rem] text-ellipsis`}
+                className={`${input} h-11 rounded-[10px] pl-10 text-[0.9375rem] text-ellipsis ${canPaste && !url ? "pr-[5.5rem]" : ""}`}
               />
+              {canPaste && !url && (
+                <button
+                  type="button"
+                  className={`absolute top-1/2 right-1.5 inline-flex h-8 -translate-y-1/2 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-[0.8125rem] font-medium text-accent-text hover:bg-accent-soft ${focusRing}`}
+                  onClick={() => void pasteFromClipboard()}
+                >
+                  <ClipboardPaste className="size-3.5" aria-hidden="true" />
+                  Paste
+                </button>
+              )}
             </label>
             <button className={button("primary", "lg", "min-w-36")} type="submit" disabled={saving}>
               {saving ? (
@@ -177,7 +205,7 @@ export function ShortenCard({ api, signedIn, ready, anonymousLinkDays, onLogIn, 
                   </span>
                 ) : (
                   <span id="custom-code-note" className={hint}>
-                    Log in to choose your own code.
+                    Sign in to choose your own code.
                   </span>
                 )}
               </label>
@@ -209,11 +237,11 @@ export function ShortenCard({ api, signedIn, ready, anonymousLinkDays, onLogIn, 
 
           {!signedIn && (
             <p className="text-[0.8125rem] text-muted">
-              Without an account, links expire after {anonymousLinkDays} days.{" "}
+              Free, no account needed. Links last {anonymousLinkDays} days.{" "}
               <button type="button" className={`cursor-pointer rounded font-medium text-accent-text hover:underline underline-offset-2 ${focusRing}`} onClick={onLogIn}>
-                Log in
+                Sign in
               </button>{" "}
-              to keep links, pick custom codes and see click stats.
+              to keep them, choose your own codes and see clicks.
             </p>
           )}
         </form>

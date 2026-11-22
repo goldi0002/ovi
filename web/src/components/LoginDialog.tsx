@@ -21,7 +21,7 @@ interface Props {
   onCancel: () => void;
 }
 
-/** Log in or sign up with Google or GitHub (the first sign-in creates the account), or, for the admin, an API key. */
+/** Sign in or sign up with Google or GitHub (the first sign-in creates the account), or, for the admin, an API key. */
 export function LoginDialog({ providers, returnTo, onApiKey, onCancel }: Props) {
   const [mode, setMode] = useState<"providers" | "apiKey">("providers");
 
@@ -30,7 +30,7 @@ export function LoginDialog({ providers, returnTo, onApiKey, onCancel }: Props) 
       size="sm"
       onClose={onCancel}
       icon={<BrandMark className="mb-4 size-10 rounded-[11px]" />}
-      title={mode === "providers" ? "Log in or sign up" : "Admin sign-in"}
+      title={mode === "providers" ? "Sign in or sign up" : "Admin sign-in"}
       description={
         mode === "providers"
           ? "Keep your links, choose custom codes and see click stats. New to Ovi? Your account is created the first time you sign in."

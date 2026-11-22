@@ -47,3 +47,14 @@ export function saveTheme(choice: ThemeChoice): void {
     else localStorage.setItem(THEME_KEY, choice);
   }, undefined);
 }
+
+const INSTALL_KEY = "ovi.installDismissed";
+
+/** Whether the person closed the "Install Ovi" banner on this device. */
+export function loadInstallDismissed(): boolean {
+  return safe(() => localStorage.getItem(INSTALL_KEY) === "1", false);
+}
+
+export function saveInstallDismissed(): void {
+  safe(() => localStorage.setItem(INSTALL_KEY, "1"), undefined);
+}

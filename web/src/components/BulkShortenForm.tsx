@@ -69,7 +69,7 @@ export function BulkShortenForm({ api, signedIn, onLogIn, onCreated, onUnauthori
     if (signedIn) setSignedOutWithDraft(false);
   }, [signedIn]);
 
-  // After a 401 the submit button is replaced by Log in; move focus there so it isn't lost to <body>.
+  // After a 401 the submit button is replaced by Sign in; move focus there so it isn't lost to <body>.
   useEffect(() => {
     if (signedOutWithDraft && !signedIn) logInRef.current?.focus();
   }, [signedOutWithDraft, signedIn]);
@@ -116,7 +116,7 @@ export function BulkShortenForm({ api, signedIn, onLogIn, onCreated, onUnauthori
         setError("Couldn't shorten the links. Try again.");
       } else if (err.status === 401) {
         setSignedOutWithDraft(true);
-        setError("You were signed out. Copy your list first, then log in again to shorten many links.");
+        setError("You were signed out. Copy your list first, then sign in again to shorten many links.");
         onUnauthorized();
       } else if (err.status === 429) {
         setError("You've made a lot of links in the last minute. Try again in a minute.");
@@ -190,7 +190,7 @@ export function BulkShortenForm({ api, signedIn, onLogIn, onCreated, onUnauthori
           description="Shortening many links at once needs an account. It's free with Google or GitHub."
           action={
             <button type="button" className={button("primary", "md")} onClick={onLogIn}>
-              Log in
+              Sign in
             </button>
           }
         />
@@ -348,7 +348,7 @@ export function BulkShortenForm({ api, signedIn, onLogIn, onCreated, onUnauthori
       ) : (
         // The alert above already says to copy the list first, so this is just the button.
         <button type="button" ref={logInRef} className={button("primary", "md", "justify-self-end")} onClick={onLogIn}>
-          Log in
+          Sign in
         </button>
       )}
     </form>

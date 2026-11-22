@@ -24,7 +24,7 @@ function report(overrides: Partial<AdminReport> = {}): AdminReport {
 async function openReport(path = "/report") {
   window.history.replaceState(null, "", path);
   render(<App />);
-  await within(screen.getByRole("banner")).findByRole("button", { name: /^(Log in|Account)$/ });
+  await within(screen.getByRole("banner")).findByRole("button", { name: /^(Sign in|Account)$/ });
   return userEvent.setup();
 }
 

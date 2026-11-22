@@ -126,7 +126,7 @@ describe("ApiError.fromServer", () => {
     await expect(new OviApi().createMany({ urls: ["https://a.test"] })).rejects.toMatchObject({
       status: 503,
       fromServer: false,
-      message: "Request failed (503).",
+      message: "Ovi couldn't finish that (error 503). Try again in a moment.",
     });
   });
 });

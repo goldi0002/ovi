@@ -38,7 +38,7 @@ curl -o .env https://raw.githubusercontent.com/goldi0002/ovi/main/.env.example
 docker compose up -d
 ```
 
-Ovi is then on http://localhost:8080. Sign in as the admin with **Log in → Admin? Use an API key** and the `OVI_API_KEY` value. The database lives in the `ovi-db` volume, and migrations run on start, so upgrading is `docker compose pull && docker compose up -d`. The compose file uses the `1` image tag, so that picks up every 1.x release but never a 2.0 that could need changes on your side (see [Image tags](#image-tags)).
+Ovi is then on http://localhost:8080. Sign in as the admin with **Sign in → Admin? Use an API key** and the `OVI_API_KEY` value. The database lives in the `ovi-db` volume, and migrations run on start, so upgrading is `docker compose pull && docker compose up -d`. The compose file uses the `1` image tag, so that picks up every 1.x release but never a 2.0 that could need changes on your side (see [Image tags](#image-tags)).
 
 For a public site, put a reverse proxy with TLS in front of it. With [Caddy](https://caddyserver.com), which gets the certificate for you, a `Caddyfile` of
 
@@ -72,8 +72,8 @@ The web app is served by the API itself at `/`, so there's one address and no CO
 - A simple design after macOS: black text on white, the system font, a translucent toolbar with a Shorten / Links segmented control, and sheet-style dialogs. It works from 320px phones up, and long URLs and codes are cut off or wrapped instead of stretching the page.
 - The home page is just the shortener.
 - Anyone can paste a URL and press **Shorten URL**, no account needed. Those links get a random code and expire after 30 days.
-- **Log in** with Google or GitHub. The first sign-in creates the account, so there's no separate sign-up. Signed-in users can pick a custom code and expiry (or none), and see their links and stats.
-- The admin can choose **Admin? Use an API key** in the Log in dialog. The key is kept for the browser tab, or on the device with **Remember on this device**, and gives access to every link.
+- **Sign in** with Google or GitHub. The first sign-in creates the account, so there's no separate sign-up. Signed-in users can pick a custom code and expiry (or none), and see their links and stats.
+- The admin can choose **Admin? Use an API key** in the Sign in dialog. The key is kept for the browser tab, or on the device with **Remember on this device**, and gives access to every link.
 - Copy the result or download its QR code.
 - Signed-in users can switch the form to **Many links** and paste up to 25 URLs, one per line, with one optional expiry for all of them. Blank lines are skipped. To choose a custom code and expiry per link, upload a CSV (or paste one) whose first line is `url,code,expires_at`. If any line is wrong, nothing is shortened and each bad line is listed with its line number. The results can be copied all at once (one short URL per line, in input order) or downloaded as a CSV file (`url,short_url,code,expires_at`).
 - The **Links** page (`/links`) lists your links (every link for the admin) (a table on wide screens, cards on phones) with clicks, creation time and status (active, expiring, expired); page through them and delete them. Its address works directly, so you can bookmark it.
