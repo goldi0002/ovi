@@ -198,6 +198,8 @@ Both accept Neon's `postgresql://…?sslmode=require&channel_binding=require` UR
 | `RateLimits:AnonymousCreatePerHour` | `RateLimits__AnonymousCreatePerHour` | `20` | Links made per IP without signing in |
 | `RateLimits:AuthPerMinute` | `RateLimits__AuthPerMinute` | `20` | Sign-in starts per IP |
 | `RateLimits:StatsPerMinute` | `RateLimits__StatsPerMinute` | `60` | Stats requests per user (or per IP) |
+| `RateLimits:ReadsPerMinute` | `RateLimits__ReadsPerMinute` | `120` | Link list, link lookup and session requests per user (or per IP) |
+| `RateLimits:HealthPerMinute` | `RateLimits__HealthPerMinute` | `30` | `/health` (the database check) requests per IP; `/health/live` is not limited |
 | `RateLimits:ReportPerHour` | `RateLimits__ReportPerHour` | `10` | Reports sent per client IP per hour |
 | `RateLimits:ApiKeyFailuresPerMinute` | `RateLimits__ApiKeyFailuresPerMinute` | `10` | Wrong `X-Api-Key` attempts per client per minute before 429, so a key can't be guessed online |
 | `Clicks:DedupeSeconds` | `Clicks__DedupeSeconds` | `30` | Repeat visits from the same client to the same link within this window count once |

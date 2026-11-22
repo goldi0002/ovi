@@ -88,7 +88,8 @@ app.MapGet("/health", async (AppDbContext db) =>
         await db.Database.CanConnectAsync()
             ? Results.Ok(new { status = "ok" })
             : Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "Database unavailable"))
-    .WithTags("Health");
+    .WithTags("Health")
+    .RequireRateLimiting(RateLimits.Health);
 // Liveness only: answers without touching the database, so keep-alive pings don't wake Neon.
 app.MapGet("/health/live", () => Results.Ok(new { status = "ok" })).WithTags("Health");
 app.MapAuthEndpoints();

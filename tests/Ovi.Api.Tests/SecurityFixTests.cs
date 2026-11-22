@@ -155,6 +155,30 @@ public sealed class SecurityFixTests
     }
 
     [TestMethod]
+    public async Task Listing_and_reading_links_and_the_session_share_a_read_limit()
+    {
+        using var factory = new OviApiFactory(new() { ["RateLimits:ReadsPerMinute"] = "3" });
+        await CreateAsync(factory, "https://example.com", "readme");
+        var client = factory.CreateAuthedClient();
+        Assert.AreEqual(HttpStatusCode.OK, (await client.GetAsync("/api/links")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, (await client.GetAsync("/api/links/readme")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, (await client.GetAsync("/api/session")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.TooManyRequests, (await client.GetAsync("/api/links?q=x")).StatusCode);
+    }
+
+    [TestMethod]
+    public async Task The_database_health_check_is_rate_limited_but_liveness_is_not()
+    {
+        using var factory = new OviApiFactory(new() { ["RateLimits:HealthPerMinute"] = "2" });
+        var client = factory.CreateUnauthedClient();
+        Assert.AreEqual(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.TooManyRequests, (await client.GetAsync("/health")).StatusCode);
+        for (var i = 0; i < 5; i++)
+            Assert.AreEqual(HttpStatusCode.OK, (await client.GetAsync("/health/live")).StatusCode);
+    }
+
+    [TestMethod]
     [DataRow("203.0.113.9", "203.0.113.9")]
     [DataRow("::ffff:203.0.113.9", "203.0.113.9")]
     [DataRow("2001:db8:1:2:aaaa:bbbb:cccc:dddd", "2001:db8:1:2::/64")]

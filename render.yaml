@@ -12,7 +12,7 @@ services:
     branch: main
     # Deploy a new commit on main only after its GitHub checks (CI) pass.
     autoDeployTrigger: checksPass
-    healthCheckPath: /health
+    healthCheckPath: /health/live
     numInstances: 1
     envVars:
       - key: PORT
