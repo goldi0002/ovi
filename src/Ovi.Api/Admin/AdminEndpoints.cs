@@ -70,11 +70,11 @@ public static class AdminEndpoints
         admin.MapGet("/reports", ListReports).Produces<PagedResponse<AdminReport>>().ProducesValidationProblem();
         admin.MapPost("/reports/{code}/resolve", ResolveReports)
             .Produces(StatusCodes.Status204NoContent).ProducesValidationProblem().Produces(StatusCodes.Status404NotFound);
-        admin.MapPost("/users/{id:int}/block", (int id, HttpContext http, AppDbContext db, TimeProvider time, IConfiguration config) =>
-                SetBlockedAsync(id, block: true, http, db, time, config))
+        admin.MapPost("/users/{id:int}/block", (int id, HttpContext http, AppDbContext db, TimeProvider time, IConfiguration config, RedirectCache cache) =>
+                SetBlockedAsync(id, block: true, http, db, time, config, cache))
             .Produces(StatusCodes.Status204NoContent).ProducesValidationProblem().Produces(StatusCodes.Status404NotFound);
-        admin.MapPost("/users/{id:int}/unblock", (int id, HttpContext http, AppDbContext db, TimeProvider time, IConfiguration config) =>
-                SetBlockedAsync(id, block: false, http, db, time, config))
+        admin.MapPost("/users/{id:int}/unblock", (int id, HttpContext http, AppDbContext db, TimeProvider time, IConfiguration config, RedirectCache cache) =>
+                SetBlockedAsync(id, block: false, http, db, time, config, cache))
             .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound);
     }
 
@@ -236,7 +236,7 @@ public static class AdminEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> SetBlockedAsync(int id, bool block, HttpContext http, AppDbContext db, TimeProvider time, IConfiguration config)
+    private static async Task<IResult> SetBlockedAsync(int id, bool block, HttpContext http, AppDbContext db, TimeProvider time, IConfiguration config, RedirectCache cache)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id);
         if (user is null) return Results.NotFound();
@@ -258,6 +258,8 @@ public static class AdminEndpoints
         }
 
         await db.SaveChangesAsync();
+        // Every link of this account changes status, so forget what the redirects have remembered.
+        cache.Clear();
         return Results.NoContent();
     }
 

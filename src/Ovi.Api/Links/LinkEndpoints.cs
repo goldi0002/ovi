@@ -77,12 +77,14 @@ public static class LinkEndpoints
 
         // Soft delete: the row stays, marked deleted, and disappears from every other endpoint. Each delete is a write,
         // so it is charged to the same per-caller budget as making and editing links.
-        api.MapDelete("/{code}", async (string code, HttpContext http, AppDbContext db, TimeProvider time) =>
-            Caller.From(http) is not { SignedIn: true } caller ? SignInRequired()
-            : await db.Links.VisibleTo(caller).Where(l => l.Code == code)
-                .ExecuteUpdateAsync(s => s.SetProperty(l => l.DeletedAt, time.GetUtcNow().UtcDateTime)) > 0
-                ? Results.NoContent()
-                : Results.NotFound())
+        api.MapDelete("/{code}", async (string code, HttpContext http, AppDbContext db, TimeProvider time, RedirectCache cache) =>
+        {
+            if (Caller.From(http) is not { SignedIn: true } caller) return SignInRequired();
+            var deleted = await db.Links.VisibleTo(caller).Where(l => l.Code == code)
+                .ExecuteUpdateAsync(s => s.SetProperty(l => l.DeletedAt, time.GetUtcNow().UtcDateTime));
+            cache.Remove(code);
+            return deleted > 0 ? Results.NoContent() : Results.NotFound();
+        })
             .RequireCreateBudget()
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound);
@@ -90,13 +92,33 @@ public static class LinkEndpoints
         var pub = app.MapGroup("/").WithTags("Public").RequireRateLimiting(RateLimits.Redirect);
 
         pub.MapGet("/" + CodeRoute, async (string code, HttpRequest request, AppDbContext db, TimeProvider time,
-            IConfiguration config, ClickRecorder recorder, ILogger<Link> log) =>
+            IConfiguration config, ClickRecorder recorder, RedirectCache cache, ILogger<Link> log) =>
         {
             var now = time.GetUtcNow().UtcDateTime;
-            var link = await db.Links.AsNoTracking().FirstOrDefaultAsync(l => l.Code == code);
+            var cached = cache.Get(code);
+            Link? link;
+            bool ownerBlocked;
+            if (cached is not null && cache.IsFresh(cached))
+                (link, ownerBlocked) = (cached.Link, cached.OwnerBlocked);
+            else
+            {
+                try
+                {
+                    link = await db.Links.AsNoTracking().FirstOrDefaultAsync(l => l.Code == code);
+                    ownerBlocked = link?.OwnerId is { } owner && await db.Users.AnyAsync(u => u.Id == owner && u.BlockedAt != null);
+                }
+                catch (Exception ex) when (cached is not null && ex is not OperationCanceledException)
+                {
+                    // The database is struggling: keep an already-known link working rather than failing it.
+                    log.LogWarning(ex, "Serving {Code} from the cache; the database didn't answer", code);
+                    (link, ownerBlocked) = (cached.Link, cached.OwnerBlocked);
+                }
+                if (link is null) cache.Remove(code);
+                else if (!ReferenceEquals(link, cached?.Link)) cache.Set(code, link, ownerBlocked);
+            }
             if (link is null) return Results.NotFound();
             if (link.IsExpired(now)) return Expired();
-            if (await UnavailableAsync(db, link, config)) return Disabled();
+            if (ownerBlocked || LinkRules.IsBlockedUrl(link.Url, config)) return Disabled();
 
             var (device, browser) = ClientInfo.ParseUserAgent(request.Headers.UserAgent);
             if (recorder.ShouldRecord(ClientKey.For(request.HttpContext.Connection.RemoteIpAddress), link.Id, device))
@@ -483,7 +505,7 @@ public static class LinkEndpoints
     /// </summary>
     private static async Task<IResult> UpdateLink(
         string code, UpdateLinkRequest? request, HttpContext http, AppDbContext db, ShortUrlBuilder urls, TimeProvider time,
-        IConfiguration config, IUrlThreatCheck threats)
+        IConfiguration config, IUrlThreatCheck threats, RedirectCache cache)
     {
         if (Caller.From(http) is not { SignedIn: true } caller) return SignInRequired();
         if (request is null || (request.Url is null && request.ExpiresAt is null && !request.ClearExpiry))
@@ -522,6 +544,7 @@ public static class LinkEndpoints
         else if (expiresAt is not null) link.ExpiresAt = expiresAt;
         // Only the changed columns are written, so clicks counted meanwhile aren't lost.
         await db.SaveChangesAsync();
+        cache.Remove(code);
 
         return Results.Ok(LinkResponse.From(link, urls));
     }

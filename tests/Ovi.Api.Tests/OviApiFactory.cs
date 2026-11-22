@@ -79,6 +79,8 @@ public class OviApiFactory(Dictionary<string, string?>? settings = null, IPAddre
         builder.UseSetting("RateLimits:HealthPerMinute", "1000");
         // Count every click, so tests can click a link repeatedly; ClickFloodTests turn this back on.
         builder.UseSetting("Clicks:DedupeSeconds", "0");
+        // Tests change rows directly in the database, so redirects must read it every time; RedirectCacheTests turn it on.
+        builder.UseSetting("Links:RedirectCacheSeconds", "0");
         foreach (var (key, value) in settings ?? []) builder.UseSetting(key, value);
 
         builder.ConfigureLogging(l => l.AddProvider(Logs));
