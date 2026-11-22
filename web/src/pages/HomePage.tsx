@@ -4,6 +4,7 @@ import { ApiError, isExpired, type Link, type OviApi } from "../api";
 import { BulkResult } from "../components/BulkResult";
 import { BULK_TEXTAREA_ID } from "../components/BulkShortenForm";
 import { CopyButton } from "../components/CopyButton";
+import { InstallBanner } from "../components/InstallBanner";
 import { FAQ_ITEMS } from "../components/Faq";
 import { LinkResult } from "../components/LinkResult";
 import { ShortenCard } from "../components/ShortenCard";
@@ -108,6 +109,7 @@ function CreatePanel({
           onUnauthorized={onUnauthorized}
         />
       </section>
+      {!created && !bulk && <InstallBanner />}
       {created && <LinkResult link={created} signedIn={signedIn} onDismiss={() => setCreated(null)} />}
       {bulk && <BulkResult links={bulk} onDismiss={dismissBulk} />}
     </div>
