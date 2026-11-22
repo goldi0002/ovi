@@ -9,6 +9,8 @@ export const PAGES = {
   qrCodes: "/links/qr-codes",
   admin: "/admin",
   report: "/report",
+  privacy: "/privacy",
+  terms: "/terms",
 } as const;
 
 const NAVIGATE = "ovi:navigate";

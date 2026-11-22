@@ -12,7 +12,7 @@ public static partial class CodeGenerator
     {
         "api", "auth", "swagger", "openapi", "health", "qr", "assets",
         // Pages of the web UI (see WebUiSetup.Pages).
-        "links", "admin", "report"
+        "links", "admin", "report", "privacy", "terms"
     };
 
     public static string Generate(int length = 7) => RandomNumberGenerator.GetString(Alphabet, length);
