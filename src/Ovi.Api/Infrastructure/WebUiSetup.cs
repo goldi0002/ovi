@@ -26,6 +26,11 @@ public static class WebUiSetup
             return;
         }
 
+        // The build is part of the deployed image and doesn't change while the server runs, so read it once rather than
+        // from disk on every page request.
+        string indexHtml;
+        using (var reader = new StreamReader(index.CreateReadStream())) indexHtml = reader.ReadToEnd();
+
         app.UseStaticFiles(new StaticFileOptions
         {
             OnPrepareResponse = ctx =>
@@ -53,8 +58,7 @@ public static class WebUiSetup
 
             // The head's canonical link and og:url must be absolute, and the address differs per
             // deployment, so they are added here rather than baked into the build.
-            using var reader = new StreamReader(index.CreateReadStream());
-            var html = reader.ReadToEnd();
+            var html = indexHtml;
             if (isHome)
             {
                 var origin = Origin(ctx);
