@@ -13,10 +13,15 @@ public sealed class ClickRecorder(TimeProvider time, IConfiguration config)
 
     private readonly TimeSpan _window = TimeSpan.FromSeconds(Math.Max(0, config.GetValue("Clicks:DedupeSeconds", 30)));
     private readonly int _maxPerMinute = config.GetValue("Clicks:MaxRecordedPerMinute", 1000);
+    private readonly int _maxPerLinkPerMinute = config.GetValue("Clicks:MaxRecordedPerLinkPerMinute", 60);
+    private readonly int _maxPerDay = config.GetValue("Clicks:MaxRecordedPerDay", 50_000);
     private readonly ConcurrentDictionary<(string Client, int LinkId), DateTime> _recent = new();
+    private readonly ConcurrentDictionary<int, (long Minute, int Used)> _perLink = new();
     private readonly Lock _budgetLock = new();
     private long _budgetMinute;
     private int _budgetUsed;
+    private long _budgetDay;
+    private int _dayUsed;
 
     public bool ShouldRecord(string client, int linkId, string device)
     {
@@ -36,8 +41,22 @@ public sealed class ClickRecorder(TimeProvider time, IConfiguration config)
                 _budgetMinute = minute;
                 _budgetUsed = 0;
             }
-            if (_budgetUsed >= _maxPerMinute) return false;
+            var day = now.Ticks / TimeSpan.TicksPerDay;
+            if (day != _budgetDay)
+            {
+                _budgetDay = day;
+                _dayUsed = 0;
+            }
+            if (_budgetUsed >= _maxPerMinute || (_maxPerDay > 0 && _dayUsed >= _maxPerDay)) return false;
+
+            // One busy (or attacked) link can't use the whole site's budget.
+            var linkMinute = _perLink.TryGetValue(linkId, out var seen) && seen.Minute == minute ? seen : (minute, 0);
+            if (_maxPerLinkPerMinute > 0 && linkMinute.Item2 >= _maxPerLinkPerMinute) return false;
+            _perLink[linkId] = (minute, linkMinute.Item2 + 1);
+            if (_perLink.Count > MaxTracked) _perLink.Clear();
+
             _budgetUsed++;
+            _dayUsed++;
             return true;
         }
     }

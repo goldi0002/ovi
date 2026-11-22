@@ -79,6 +79,41 @@ public sealed class SecurityFixTests
     }
 
     [TestMethod]
+    public async Task One_link_cannot_use_more_than_its_share_of_the_clicks_budget()
+    {
+        using var factory = new OviApiFactory(new() { ["Clicks:MaxRecordedPerLinkPerMinute"] = "2" });
+        await CreateAsync(factory, "https://example.com", "hot");
+        await CreateAsync(factory, "https://example.org", "calm");
+
+        for (var i = 0; i < 5; i++) await VisitAsync(factory, "hot");
+        await VisitAsync(factory, "calm");
+        Assert.AreEqual((2, 2), await CountsAsync(factory, "hot"));
+        Assert.AreEqual((1, 1), await CountsAsync(factory, "calm"));
+
+        factory.Time.Advance(TimeSpan.FromMinutes(1));
+        await VisitAsync(factory, "hot");
+        Assert.AreEqual((3, 3), await CountsAsync(factory, "hot"));
+    }
+
+    [TestMethod]
+    public async Task Only_so_many_clicks_are_recorded_per_day_overall()
+    {
+        using var factory = new OviApiFactory(new() { ["Clicks:MaxRecordedPerDay"] = "2" });
+        await CreateAsync(factory, "https://example.com", "daily");
+
+        for (var i = 0; i < 4; i++)
+        {
+            await VisitAsync(factory, "daily");
+            factory.Time.Advance(TimeSpan.FromMinutes(1));
+        }
+        Assert.AreEqual((2, 2), await CountsAsync(factory, "daily"));
+
+        factory.Time.Advance(TimeSpan.FromDays(1));
+        await VisitAsync(factory, "daily");
+        Assert.AreEqual((3, 3), await CountsAsync(factory, "daily"));
+    }
+
+    [TestMethod]
     public async Task Old_clicks_are_deleted_and_recent_ones_kept()
     {
         using var factory = new OviApiFactory();
