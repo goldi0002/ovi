@@ -137,43 +137,22 @@ const BENEFITS = [
   { icon: Clock3, title: "Your code, your expiry", text: "Pick a code you can say out loud, like /launch, and set the day the link stops working." },
 ];
 
-/** What a finished link looks like, so a visitor sees the result before they try. */
-function Example() {
-  return (
-    <figure className={`${card} grid gap-4 p-5 sm:p-6`} aria-label="Example of a short link">
-      <p className="line-clamp-1 text-[0.8125rem] break-all text-muted">https://example.com/products/spring-launch?utm_source=newsletter&ref=…</p>
-      <div className="flex items-center gap-4">
-        <div className="min-w-0 flex-1">
-          <p className="font-mono text-base font-semibold tracking-[-0.01em] break-words text-accent-text min-[400px]:text-xl sm:text-2xl">{window.location.host}/launch</p>
-          <p className="mt-1 text-xs text-muted">128 clicks this week</p>
-        </div>
-        <span className="grid size-20 shrink-0 place-items-center rounded-xl bg-white text-black shadow-control" aria-hidden="true">
-          <QrCode className="size-14" strokeWidth={1.5} />
-        </span>
-      </div>
-    </figure>
-  );
-}
-
 function LandingDetails() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-16 sm:px-6">
-      <div className="mt-12 grid items-center gap-8 sm:mt-20 lg:grid-cols-2 lg:gap-12">
-        <Example />
-        <ul className="grid gap-5">
-          {BENEFITS.map(({ icon: Icon, title, text }) => (
-            <li key={title} className="flex gap-3.5">
-              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-text" aria-hidden="true">
-                <Icon className="size-[18px]" />
-              </span>
-              <div>
-                <h2 className="text-[0.9375rem] font-semibold">{title}</h2>
-                <p className="mt-0.5 text-sm leading-relaxed text-muted">{text}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
+      <ul className="mt-12 grid gap-5 sm:mt-20 sm:grid-cols-3 sm:gap-8">
+        {BENEFITS.map(({ icon: Icon, title, text }) => (
+          <li key={title} className="flex gap-3.5 sm:grid sm:content-start sm:gap-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-text" aria-hidden="true">
+              <Icon className="size-[18px]" />
+            </span>
+            <div>
+              <h2 className="text-[0.9375rem] font-semibold">{title}</h2>
+              <p className="mt-0.5 text-sm leading-relaxed text-muted">{text}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
       <Faq />
     </div>
   );
