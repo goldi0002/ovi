@@ -8,7 +8,7 @@ const ada = { name: "Ada Lovelace", email: "ada@example.com", provider: "google"
 /** Renders the app, waits for the session, and switches the home page to "Many links". */
 async function openBulk() {
   render(<App />);
-  await within(screen.getByRole("banner")).findByRole("button", { name: /^(Log in|Account)$/ });
+  await within(screen.getByRole("banner")).findByRole("button", { name: /^(Sign in|Account)$/ });
   const user = userEvent.setup();
   const toggle = screen.getByRole("group", { name: "How many links" });
   await waitFor(() => expect(within(toggle).getByRole("button", { name: "Many links" })).toBeEnabled());
@@ -24,13 +24,13 @@ function bulkCalls(fetchMock: ReturnType<typeof fakeApi>["fetchMock"]) {
 }
 
 describe("Bulk shortening", () => {
-  it("asks signed-out visitors to log in and sends nothing", async () => {
+  it("asks signed-out visitors to sign in and sends nothing", async () => {
     const { fetchMock } = fakeApi();
     const user = await openBulk();
 
     expect(screen.getByText(/Shortening many links at once needs an account/)).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: /Long URLs/ })).not.toBeInTheDocument();
-    await user.click(within(screen.getByRole("main")).getByRole("button", { name: "Log in" }));
+    await user.click(within(screen.getByRole("main")).getByRole("button", { name: "Sign in" }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(bulkCalls(fetchMock)).toHaveLength(0);
   });
@@ -222,7 +222,7 @@ describe("Bulk shortening", () => {
     expect(textarea()).toHaveValue("https://a.test");
   });
 
-  it("keeps the text on screen when the session has expired, with a Log in button instead of submit", async () => {
+  it("keeps the text on screen when the session has expired, with a Sign in button instead of submit", async () => {
     const { state } = fakeApi({ user: ada });
     const user = await openBulk();
     await user.click(textarea());
@@ -231,16 +231,16 @@ describe("Bulk shortening", () => {
 
     await user.click(screen.getByRole("button", { name: "Shorten 1 URL" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("You were signed out. Copy your list first, then log in again to shorten many links.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("You were signed out. Copy your list first, then sign in again to shorten many links.");
     const form = screen.getByRole("form", { name: "Shorten many links" });
-    await waitFor(() => expect(within(form).getByRole("button", { name: "Log in" })).toHaveFocus());
+    await waitFor(() => expect(within(form).getByRole("button", { name: "Sign in" })).toHaveFocus());
     // The instruction appears once, in the alert; no note repeats it beside the button.
     expect(screen.queryByText(/Your list stays here/)).not.toBeInTheDocument();
     expect(within(form).getAllByText(/Copy your list first/)).toHaveLength(1);
-    await within(screen.getByRole("banner")).findByRole("button", { name: "Log in" });
+    await within(screen.getByRole("banner")).findByRole("button", { name: "Sign in" });
     expect(textarea()).toHaveValue("https://a.test");
     expect(screen.queryByRole("button", { name: /^Shorten/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("form", { name: "Shorten many links" })).toContainElement(screen.getAllByRole("button", { name: "Log in" })[1]);
+    expect(screen.getByRole("form", { name: "Shorten many links" })).toContainElement(screen.getAllByRole("button", { name: "Sign in" })[1]);
   });
 
   it("submits with Ctrl+Enter, while Enter alone adds a line", async () => {

@@ -83,9 +83,9 @@ export function ShortenCard({ api, signedIn, ready, anonymousLinkDays, onLogIn, 
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         onUnauthorized();
-        setError("You were signed out. Log in again, or shorten without an account.");
+        setError("You were signed out. Sign in again, or shorten without an account.");
       } else {
-        setError(err instanceof ApiError ? err.message : "Couldn't create the link. Try again.");
+        setError(err instanceof ApiError ? err.message : "Couldn't shorten that link. Check your connection and try again.");
       }
     } finally {
       setSaving(false);
@@ -205,7 +205,7 @@ export function ShortenCard({ api, signedIn, ready, anonymousLinkDays, onLogIn, 
                   </span>
                 ) : (
                   <span id="custom-code-note" className={hint}>
-                    Log in to choose your own code.
+                    Sign in to choose your own code.
                   </span>
                 )}
               </label>
@@ -237,11 +237,11 @@ export function ShortenCard({ api, signedIn, ready, anonymousLinkDays, onLogIn, 
 
           {!signedIn && (
             <p className="text-[0.8125rem] text-muted">
-              Without an account, links expire after {anonymousLinkDays} days.{" "}
+              Free, no account needed. Links last {anonymousLinkDays} days.{" "}
               <button type="button" className={`cursor-pointer rounded font-medium text-accent-text hover:underline underline-offset-2 ${focusRing}`} onClick={onLogIn}>
-                Log in
+                Sign in
               </button>{" "}
-              to keep links, pick custom codes and see click stats.
+              to keep them, choose your own codes and see clicks.
             </p>
           )}
         </form>

@@ -184,7 +184,7 @@ async function toError(res: Response): Promise<ApiError> {
   const fieldMessages = Object.values(fieldErrors).flat();
   const serverMessage = fieldMessages[0] ?? problem.detail ?? problem.title;
   const message =
-    serverMessage ?? (res.status === 429 ? "Too many requests. Wait a minute and try again." : `Request failed (${res.status}).`);
+    serverMessage ?? (res.status === 429 ? "Too many requests. Wait a minute and try again." : res.status >= 500 ? `Ovi couldn't finish that (error ${res.status}). Try again in a moment.` : `Request failed (${res.status}).`);
   return new ApiError(res.status, message, fieldErrors, serverMessage !== undefined);
 }
 

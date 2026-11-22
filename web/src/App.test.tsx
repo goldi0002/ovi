@@ -5,7 +5,7 @@ import { fakeApi, link } from "./test/fakeApi";
 
 const ada = { name: "Ada Lovelace", email: "ada@example.com", provider: "google" as const, isAdmin: false };
 
-/** The header's Log in / Account button (the page can have other "Log in" buttons). */
+/** The header's Sign in / Account button (the page can have other "Sign in" buttons). */
 const headerButton = (name: string) => within(screen.getByRole("banner")).getByRole("button", { name });
 const findHeaderButton = async (name: string) => within(await screen.findByRole("banner")).findByRole("button", { name });
 
@@ -18,14 +18,14 @@ async function signOutFromMenu(user: ReturnType<typeof userEvent.setup>) {
 /** Renders the app and waits until it knows who is signed in. */
 async function renderApp() {
   render(<App />);
-  await within(screen.getByRole("banner")).findByRole("button", { name: /^(Log in|Account)$/ });
+  await within(screen.getByRole("banner")).findByRole("button", { name: /^(Sign in|Account)$/ });
   return userEvent.setup();
 }
 
-/** Signs in as the admin with the API key from the Log in dialog. */
+/** Signs in as the admin with the API key from the Sign in dialog. */
 async function adminSignIn(key = "good-key", remember = false) {
   const user = await renderApp();
-  await user.click(headerButton("Log in"));
+  await user.click(headerButton("Sign in"));
   await user.click(screen.getByRole("button", { name: "Admin? Use an API key" }));
   await user.type(screen.getByLabelText("API key"), key);
   if (remember) await user.click(screen.getByLabelText("Remember on this device"));
@@ -180,9 +180,9 @@ describe("App", () => {
     fakeApi();
     await renderApp();
 
-    expect(headerButton("Log in")).toBeInTheDocument();
+    expect(headerButton("Sign in")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Log in to see your links" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sign in to see your links" })).toBeInTheDocument();
     expect(sessionStorage.getItem("ovi.apiKey")).toBeNull();
   });
 
@@ -192,8 +192,8 @@ describe("App", () => {
 
     await user.click(screen.getByRole("button", { name: "Custom code and expiry" }));
     expect(screen.getByLabelText(/Custom code/)).toBeDisabled();
-    expect(screen.getByText("Log in to choose your own code.")).toBeInTheDocument();
-    expect(screen.getByText(/Without an account, links expire after 30 days/)).toBeInTheDocument();
+    expect(screen.getByText("Sign in to choose your own code.")).toBeInTheDocument();
+    expect(screen.getByText(/Free, no account needed. Links last 30 days/)).toBeInTheDocument();
 
     await user.type(screen.getByLabelText("Long URL"), "https://example.com/later");
     await user.click(screen.getByRole("button", { name: "Shorten URL" }));
@@ -212,8 +212,8 @@ describe("App", () => {
     fakeApi();
     const user = await renderApp();
 
-    await user.click(headerButton("Log in"));
-    const dialog = screen.getByRole("dialog", { name: "Log in or sign up" });
+    await user.click(headerButton("Sign in"));
+    const dialog = screen.getByRole("dialog", { name: "Sign in or sign up" });
     expect(within(dialog).getByRole("link", { name: "Continue with Google" })).toHaveAttribute(
       "href",
       "/auth/login/google?returnUrl=%2Flinks",
@@ -228,7 +228,7 @@ describe("App", () => {
     fakeApi({ providers: [] });
     const user = await renderApp();
 
-    await user.click(headerButton("Log in"));
+    await user.click(headerButton("Sign in"));
     expect(screen.getByText("Sign-in isn't set up on this server yet.")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Continue with/ })).not.toBeInTheDocument();
   });
@@ -238,7 +238,7 @@ describe("App", () => {
     const user = await renderApp();
 
     await signOutFromMenu(user);
-    expect(await findHeaderButton("Log in")).toBeInTheDocument();
+    expect(await findHeaderButton("Sign in")).toBeInTheDocument();
     expect(state.user).toBeNull();
     expect(screen.queryByText("Ada Lovelace")).not.toBeInTheDocument();
   });

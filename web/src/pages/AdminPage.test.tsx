@@ -9,7 +9,7 @@ const ada = { name: "Ada Lovelace", email: "ada@example.com", provider: "google"
 async function openAdmin() {
   window.history.replaceState(null, "", "/admin");
   render(<App />);
-  await within(screen.getByRole("banner")).findByRole("button", { name: /^(Log in|Account)$/ });
+  await within(screen.getByRole("banner")).findByRole("button", { name: /^(Sign in|Account)$/ });
   return userEvent.setup();
 }
 
@@ -30,10 +30,10 @@ describe("Admin page", () => {
     expect(fetchMock.mock.calls.some(([u]) => String(u).startsWith("/api/admin"))).toBe(false);
   });
 
-  it("asks visitors to log in", async () => {
+  it("asks visitors to sign in", async () => {
     fakeApi();
     await openAdmin();
-    expect(screen.getByText("Log in with an admin account to see this page.")).toBeInTheDocument();
+    expect(screen.getByText("Sign in with an admin account to see this page.")).toBeInTheDocument();
   });
 
   it("shows totals, users and links to an admin", async () => {

@@ -30,7 +30,7 @@ export function AnalyticsPage({ api, state, onLogIn, onUnauthorized }: Props) {
       {state === "loading" ? null : state === "signedIn" ? (
         <Analytics api={api} onUnauthorized={onUnauthorized} />
       ) : (
-        <SignedOutPanel title="Log in to see your analytics" onLogIn={onLogIn} />
+        <SignedOutPanel title="Sign in to see your analytics" onLogIn={onLogIn} />
       )}
     </main>
   );

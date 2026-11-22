@@ -45,11 +45,11 @@ export function AdminPage({ api, state, onLogIn, onUnauthorized }: Props) {
           heading
           icon={<ShieldOff />}
           title="Admins only"
-          description={state === "signedOut" ? "Log in with an admin account to see this page." : "Your account doesn't have admin access."}
+          description={state === "signedOut" ? "Sign in with an admin account to see this page." : "Your account doesn't have admin access."}
           action={
             state === "signedOut" && (
               <button type="button" className={button("primary", "md")} onClick={onLogIn}>
-                Log in
+                Sign in
               </button>
             )
           }

@@ -25,7 +25,7 @@ export function SignedOutPanel({ title, description, onLogIn }: { title: string;
       description={description ?? "Sign in with Google or GitHub to keep your links, use custom codes and see click stats."}
       action={
         <button type="button" className={button("primary", "md")} onClick={onLogIn}>
-          Log in
+          Sign in
         </button>
       }
     />
