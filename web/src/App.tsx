@@ -12,6 +12,7 @@ import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { HomePage } from "./pages/HomePage";
 import { LinksPage } from "./pages/LinksPage";
 import { QrCodesPage } from "./pages/QrCodesPage";
+import { PrivacyPage, TermsPage } from "./pages/LegalPage";
 import { ReportPage } from "./pages/ReportPage";
 import { useOnline } from "./pwa";
 import { PAGES, scrollAfterNavigation, usePath } from "./router";
@@ -131,6 +132,10 @@ function OviApp() {
         onUnauthorized={onUnauthorized}
       />
     );
+  } else if (path === PAGES.privacy) {
+    page = <PrivacyPage />;
+  } else if (path === PAGES.terms) {
+    page = <TermsPage />;
   } else if (path === PAGES.report) {
     page = <ReportPage api={api} />;
   } else if (path === PAGES.links) {

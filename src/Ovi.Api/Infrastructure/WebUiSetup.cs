@@ -12,7 +12,10 @@ public static class WebUiSetup
     /// Paths the React app handles itself; each returns index.html. A one-segment page must also be a
     /// reserved code (see CodeGenerator); pages under /links need not be, since codes never contain "/".
     /// </summary>
-    public static readonly string[] Pages = ["/", "/links", "/links/analytics", "/links/qr-codes", "/admin", "/report"];
+    /// <summary>Pages that search engines may index, besides the home page: the privacy policy and the terms.</summary>
+    public static readonly string[] PublicPages = ["/privacy", "/terms"];
+
+    public static readonly string[] Pages = ["/", "/links", "/links/analytics", "/links/qr-codes", "/admin", "/report", "/privacy", "/terms"];
 
     public static void UseOviWebUi(this WebApplication app)
     {
@@ -44,9 +47,9 @@ public static class WebUiSetup
             headers[HeaderNames.XContentTypeOptions] = "nosniff";
             headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
             headers[HeaderNames.ContentSecurityPolicy] = ContentSecurityPolicy(urls);
-            // Only the home page belongs in a search index; the others are someone's own data.
+            // The home page and the two legal pages belong in a search index; the others are someone's own data.
             var isHome = ctx.Request.Path.Equals("/", StringComparison.Ordinal);
-            if (!isHome) headers["X-Robots-Tag"] = "noindex, follow";
+            if (!isHome && !PublicPages.Contains(ctx.Request.Path.Value!)) headers["X-Robots-Tag"] = "noindex, follow";
 
             // The head's canonical link and og:url must be absolute, and the address differs per
             // deployment, so they are added here rather than baked into the build.
@@ -111,6 +114,12 @@ public static class WebUiSetup
                     <loc>{Origin(ctx)}/</loc>
                     <changefreq>weekly</changefreq>
                     <priority>1.0</priority>
+                  </url>
+                  <url>
+                    <loc>{Origin(ctx)}/privacy</loc>
+                  </url>
+                  <url>
+                    <loc>{Origin(ctx)}/terms</loc>
                   </url>
                 </urlset>
                 """, "application/xml; charset=utf-8");

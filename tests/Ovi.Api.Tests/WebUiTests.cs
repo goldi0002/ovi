@@ -79,6 +79,21 @@ public sealed class WebUiTests
     }
 
     [TestMethod]
+    [DataRow("/privacy")]
+    [DataRow("/terms")]
+    public async Task Legal_pages_serve_the_ui_and_may_be_indexed(string path)
+    {
+        using var factory = new OviApiFactory(webRoot: FakeBuiltUi());
+        var res = await factory.CreateUnauthedClient().GetAsync(path);
+
+        Assert.AreEqual(HttpStatusCode.OK, res.StatusCode);
+        Assert.Contains("<div id=root>", await res.Content.ReadAsStringAsync());
+        Assert.IsFalse(res.Headers.Contains("X-Robots-Tag"));
+        var robots = await (await factory.CreateUnauthedClient().GetAsync("/robots.txt")).Content.ReadAsStringAsync();
+        Assert.DoesNotContain($"Disallow: {path}", robots);
+    }
+
+    [TestMethod]
     public void Every_ui_page_is_a_reserved_code()
     {
         foreach (var page in Ovi.Api.Infrastructure.WebUiSetup.Pages.Where(p => p != "/"))
@@ -164,7 +179,7 @@ public sealed class WebUiTests
     }
 
     [TestMethod]
-    public async Task Sitemap_lists_the_home_page()
+    public async Task Sitemap_lists_the_home_page_and_the_legal_pages()
     {
         using var factory = new OviApiFactory(webRoot: FakeBuiltUi());
         var res = await factory.CreateUnauthedClient().GetAsync("/sitemap.xml");
@@ -172,7 +187,10 @@ public sealed class WebUiTests
         Assert.AreEqual(HttpStatusCode.OK, res.StatusCode);
         Assert.AreEqual("application/xml", res.Content.Headers.ContentType!.MediaType);
         var origin = res.RequestMessage!.RequestUri!.GetLeftPart(UriPartial.Authority);
-        Assert.Contains($"<loc>{origin}/</loc>", await res.Content.ReadAsStringAsync());
+        var body = await res.Content.ReadAsStringAsync();
+        Assert.Contains($"<loc>{origin}/</loc>", body);
+        Assert.Contains($"<loc>{origin}/privacy</loc>", body);
+        Assert.Contains($"<loc>{origin}/terms</loc>", body);
     }
 
     [TestMethod]

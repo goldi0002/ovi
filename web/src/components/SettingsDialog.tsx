@@ -1,6 +1,7 @@
 import { Code, Download, LogOut, Monitor, Moon, Share, Sun } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ThemeChoice } from "../storage";
+import { LegalLinks } from "../pages/LegalPage";
 import { useInstall } from "../pwa";
 import { useTheme } from "../theme";
 import { button, eyebrow } from "../ui";
@@ -78,6 +79,7 @@ export function SettingsDialog({ account, onClose, onSignOut }: { account: Accou
           Source code
         </a>
         <p className="text-xs text-muted">Ovi is free software under the AGPL-3.0 licence. Anyone can read the code and run their own copy.</p>
+        <LegalLinks newTab />
       </Section>
 
       <div className="flex justify-end border-t border-line pt-4">

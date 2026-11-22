@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import { ApiError, OviApi, loginUrl, type Provider } from "../api";
 import { button, errorBox, field, focusRing, input } from "../ui";
 import { BrandMark } from "./Header";
+import { LegalLinks } from "../pages/LegalPage";
 import { GitHubIcon, GoogleIcon } from "./ProviderIcons";
 import { Dialog } from "./ui/Dialog";
 import { Spinner } from "./ui/primitives";
@@ -69,6 +70,10 @@ export function LoginDialog({ providers, returnTo, onApiKey, onCancel }: Props) 
             <KeyRound className="size-3.5" aria-hidden="true" />
             Admin? Use an API key
           </button>
+          <div className="grid justify-items-center gap-1 text-center text-xs text-muted">
+            <p>By continuing you agree to our terms and privacy policy.</p>
+            <LegalLinks newTab />
+          </div>
         </>
       ) : (
         <ApiKeyForm onApiKey={onApiKey} onBack={() => setMode("providers")} />

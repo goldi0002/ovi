@@ -12,6 +12,7 @@ import { EmptyState, Skeleton, StatTile } from "../components/ui/primitives";
 import { displayUrl, formatDateTime, formatRelative } from "../format";
 import { AppLink, PAGES } from "../router";
 import { button, card, container, errorBox, focusRing } from "../ui";
+import { LegalLinks } from "./LegalPage";
 import { usePageTitle } from "./common";
 
 const numbers = new Intl.NumberFormat();
@@ -154,6 +155,7 @@ function LandingDetails() {
         ))}
       </ul>
       <Faq />
+      <LegalLinks className="mt-12 justify-center" />
     </div>
   );
 }
