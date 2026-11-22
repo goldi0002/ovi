@@ -14,6 +14,10 @@ Try it at **[getovi.link](https://getovi.link)**, or [run your own in two minute
 |---|---|
 | ![The My Links page: short links with their destination, clicks, age and status](docs/screenshots/links.png) | ![Stats for one link: clicks per day over 30 days, and the top referrers, devices and browsers](docs/screenshots/stats-dark.png) |
 
+The admin dashboard: totals, clicks over the last 14 days, top links, and tabs for users, links and reported links.
+
+![The admin dashboard: totals for users, links and clicks, a clicks-per-day chart, top links, and tabs for users, links and reports](docs/screenshots/admin.png)
+
 ## Features
 
 - **Short links without an account.** Paste a URL and get a short link and a QR code. Anonymous links expire after 30 days.
