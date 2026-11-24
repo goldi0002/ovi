@@ -124,7 +124,7 @@ function Analytics({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () =>
   }
 
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
+    <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
       <aside className={`${card} overflow-hidden lg:sticky lg:top-6`} aria-label="Choose a link">
         {/* On smaller screens the list folds away behind the chosen link. */}
         <button
@@ -191,7 +191,7 @@ function Analytics({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () =>
 
       <section className={`${card} min-w-0 p-5 sm:p-6`} aria-label="Link analytics">
         {selected ? (
-          <div className="grid gap-5">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-lg font-semibold tracking-[-0.01em]">
