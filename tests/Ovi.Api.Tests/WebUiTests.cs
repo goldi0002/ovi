@@ -186,6 +186,33 @@ public sealed class WebUiTests
     }
 
     [TestMethod]
+    public async Task Favicon_ico_is_served_and_holds_16_32_and_48_pixel_icons()
+    {
+        var root = FakeBuiltUi();
+        File.Copy(Path.Combine(RepoRoot(), "web", "public", "favicon.ico"), Path.Combine(root, "favicon.ico"));
+        using var factory = new OviApiFactory(webRoot: root);
+        var res = await factory.CreateUnauthedClient().GetAsync("/favicon.ico");
+
+        Assert.AreEqual(HttpStatusCode.OK, res.StatusCode);
+        Assert.AreEqual("image/x-icon", res.Content.Headers.ContentType!.MediaType);
+        var bytes = await res.Content.ReadAsByteArrayAsync();
+        // An ICO file starts with reserved 0, type 1 (icon) and the number of images, as little-endian 16-bit numbers.
+        Assert.AreEqual(1, BitConverter.ToUInt16(bytes, 2));
+        Assert.AreEqual(3, BitConverter.ToUInt16(bytes, 4));
+        var sizes = Enumerable.Range(0, 3).Select(i => (int)bytes[6 + i * 16]).Order().ToArray();
+        CollectionAssert.AreEqual(new[] { 16, 32, 48 }, sizes);
+    }
+
+    [TestMethod]
+    public void The_page_declares_both_icons_and_the_service_worker_caches_the_ico()
+    {
+        var html = File.ReadAllText(Path.Combine(RepoRoot(), "web", "index.html"));
+        Assert.Contains("<link rel=\"icon\" href=\"/favicon.ico\"", html);
+        Assert.Contains("<link rel=\"icon\" href=\"/favicon.svg\"", html);
+        Assert.Contains("\"/favicon.ico\"", File.ReadAllText(Path.Combine(RepoRoot(), "web", "public", "sw.js")));
+    }
+
+    [TestMethod]
     public async Task Without_a_built_ui_root_is_not_found()
     {
         using var factory = new OviApiFactory();

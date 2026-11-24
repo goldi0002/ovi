@@ -5,7 +5,7 @@
 const CACHE = "ovi-shell-v1";
 const SHELL = "/shell";
 const PAGES = ["/", "/links", "/links/analytics", "/links/qr-codes", "/admin", "/report", "/privacy", "/terms", "/qr-code-generator", "/self-host"];
-const STATIC = ["/theme.js", "/favicon.svg", "/manifest.webmanifest"];
+const STATIC = ["/theme.js", "/favicon.svg", "/favicon.ico", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

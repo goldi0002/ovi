@@ -4,6 +4,8 @@ User-facing changes to Ovi, newest first.
 
 ## Unreleased
 
+- Added `/favicon.ico` (16, 32 and 48 px) beside the SVG icon, so search results, feed readers and other tools that ask for it find the site's icon instead of a 404.
+
 ### Easier to find and share
 
 - New pages for search engines and visitors: `/qr-code-generator` (a free QR code tool, with the shortener on it) and `/self-host` (how to run your own copy). Both are in the sitemap, have their own title, description and canonical link, and are linked from the home page.

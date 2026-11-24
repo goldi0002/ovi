@@ -12,7 +12,9 @@
     <!-- The canonical link and og:url need the site's own address; the server adds them (WebUiSetup). -->
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="application-name" content="Ovi" />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- The SVG for browsers that use it; the .ico for the ones that only ask for /favicon.ico (search results, feed readers). -->
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any" />
     <!-- Installable as an app: the manifest, the service worker (registered in src/pwa.ts) and the iOS icon and title. -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
