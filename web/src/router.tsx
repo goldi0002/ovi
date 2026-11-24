@@ -39,6 +39,7 @@ export function useSearch(): string {
 /** Goes to an in-app URL ("/links", "/#pricing") without reloading the page. */
 export function navigate(to: string, { replace = false } = {}) {
   const url = new URL(to, window.location.href);
+  if (!url.search) url.search = ""; // no dangling "?" when a relative "?" clears the query
   if (replace) window.history.replaceState(null, "", url);
   else window.history.pushState(null, "", url);
   window.dispatchEvent(new Event(NAVIGATE));

@@ -243,8 +243,9 @@ public static class LinkEndpoints
 
     /// <param name="q">Optional search: links whose code or destination contains this, ignoring case (max 100 characters).</param>
     /// <param name="status">"all" (the default), "active" (not expired) or "expired".</param>
+    /// <param name="sort">"newest" (the default), "clicks" (most clicked first) or "expiring" (soonest to expire first, then links that never expire, then expired ones). Ties fall back to newest.</param>
     private static async Task<IResult> ListLinks(HttpContext http, AppDbContext db, ShortUrlBuilder urls, TimeProvider time,
-        int page = 1, int pageSize = 50, string? q = null, string? status = null)
+        int page = 1, int pageSize = 50, string? q = null, string? status = null, string? sort = null)
     {
         if (Caller.From(http) is not { SignedIn: true } caller) return SignInRequired();
 
@@ -262,6 +263,15 @@ public static class LinkEndpoints
         };
         if (filter is null)
             errors["status"] = ["status must be all, active or expired."];
+        var order = sort?.Trim().ToLowerInvariant() switch
+        {
+            null or "" or "newest" => LinkSort.Newest,
+            "clicks" => LinkSort.Clicks,
+            "expiring" => LinkSort.Expiring,
+            _ => (LinkSort?)null,
+        };
+        if (order is null)
+            errors["sort"] = ["sort must be newest, clicks or expiring."];
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
         var visible = db.Links.AsNoTracking().VisibleTo(caller);
@@ -277,8 +287,17 @@ public static class LinkEndpoints
         };
 
         var total = await visible.CountAsync();
-        var links = await visible
-            .OrderByDescending(l => l.CreatedAt).ThenByDescending(l => l.Id)
+        // A fixed set of orders, each ending on CreatedAt and Id so paging is stable. "expiring" lists links that will
+        // expire (soonest first), then those that never do, then those already expired.
+        var ordered = order switch
+        {
+            LinkSort.Clicks => visible.OrderByDescending(l => l.Clicks).ThenByDescending(l => l.CreatedAt).ThenByDescending(l => l.Id),
+            LinkSort.Expiring => visible
+                .OrderBy(l => l.ExpiresAt == null ? 1 : l.ExpiresAt > now ? 0 : 2)
+                .ThenBy(l => l.ExpiresAt).ThenByDescending(l => l.CreatedAt).ThenByDescending(l => l.Id),
+            _ => visible.OrderByDescending(l => l.CreatedAt).ThenByDescending(l => l.Id),
+        };
+        var links = await ordered
             .Skip((page - 1) * pageSize).Take(pageSize)
             .ToListAsync();
 
@@ -498,6 +517,8 @@ public static class LinkEndpoints
         Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "Couldn't make short codes; try again.");
 
     private enum StatusFilter { All, Active, Expired }
+
+    private enum LinkSort { Newest, Clicks, Expiring }
 
     /// <summary>
     /// Changes where a link goes and when it expires. The code, clicks and stats stay. Who may do it follows the same rule

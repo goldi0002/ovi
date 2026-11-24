@@ -1,15 +1,18 @@
-import { ChartColumn, CircleCheck, Download, ExternalLink, X } from "lucide-react";
+import { ChartColumn, CircleCheck, Download, ExternalLink, Palette, X } from "lucide-react";
+import { useState } from "react";
 import type { Link } from "../api";
 import { displayUrl, formatDateTime } from "../format";
 import { AppLink, PAGES } from "../router";
 import { button, card, iconButton } from "../ui";
 import { CopyButton } from "./CopyButton";
+import { QrStyleDialog } from "./QrStyleDialog";
 
 /**
  * The link just made: the short URL large, its QR code, and what to do next. Desktop: details | QR.
  * Phone: details, then the actions, then the QR, so a long link gets the full width.
  */
 export function LinkResult({ link, signedIn, onDismiss }: { link: Link; signedIn: boolean; onDismiss: () => void }) {
+  const [styling, setStyling] = useState(false);
   return (
     <section
       className={`${card} relative grid animate-sheet-in gap-5 overflow-hidden p-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:p-6`}
@@ -47,6 +50,10 @@ export function LinkResult({ link, signedIn, onDismiss }: { link: Link; signedIn
             <Download />
             QR code
           </a>
+          <button type="button" className={button("default", "md")} onClick={() => setStyling(true)}>
+            <Palette />
+            Style QR
+          </button>
           {signedIn && (
             <>
               <AppLink className={button("ghost", "md")} href={`${PAGES.analytics}?code=${encodeURIComponent(link.code)}`}>
@@ -69,6 +76,7 @@ export function LinkResult({ link, signedIn, onDismiss }: { link: Link; signedIn
       <button type="button" className={`${iconButton} absolute top-3 right-3`} onClick={onDismiss} aria-label="Dismiss" data-tip="Dismiss">
         <X />
       </button>
+      {styling && <QrStyleDialog link={link} onClose={() => setStyling(false)} />}
     </section>
   );
 }
