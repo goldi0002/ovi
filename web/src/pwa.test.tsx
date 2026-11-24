@@ -36,7 +36,8 @@ describe("App shell", () => {
     // jsdom's navigator.onLine stays true, so fake it.
     const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
     act(() => void window.dispatchEvent(new Event("offline")));
-    expect(screen.getByRole("status")).toHaveTextContent(/You're offline/);
+    // Other "status" regions (such as a loading placeholder) can be on screen too, so find the banner by its text.
+    expect(screen.getByText(/You're offline/)).toHaveAttribute("role", "status");
     online.mockReturnValue(true);
     act(() => void window.dispatchEvent(new Event("online")));
     expect(screen.queryByText(/You're offline/)).not.toBeInTheDocument();
