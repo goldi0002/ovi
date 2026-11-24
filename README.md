@@ -12,15 +12,27 @@ Try it at **[getovi.link](https://getovi.link)**, or [run your own in two minute
 [![Run with Docker Compose](https://img.shields.io/badge/run%20it-docker%20compose-2496ED?logo=docker&logoColor=white)](#self-host-with-docker-compose)
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/goldi0002/ovi)
 
-![Shortening a link on Ovi: the short link, its QR code, and Copy, Open and QR code buttons](docs/screenshots/home.png)
+![Shortening a link on Ovi: the short link, its QR code, and Copy, Open, QR code and Style QR buttons](docs/screenshots/home.png)
 
 | Your links | Click stats, in dark mode |
 |---|---|
-| ![The My Links page: short links with their destination, clicks, age and status](docs/screenshots/links.png) | ![Stats for one link: clicks per day over 30 days, and the top referrers, devices and browsers](docs/screenshots/stats-dark.png) |
+| ![The My Links page: search, a status filter, a Sort by menu, and short links with their destination, clicks, age and status](docs/screenshots/links.png) | ![Stats for one link: a 7, 30 or 90 day range, an Export CSV button, clicks per day, and the top referrers, devices and browsers](docs/screenshots/stats-dark.png) |
+
+Style a QR code in your browser: your colours, a size and an optional centre logo, downloaded as SVG or PNG.
+
+![The Style QR dialog: a live preview, code and background colour fields with a contrast check, a size choice, a centre logo button, and SVG and PNG downloads](docs/screenshots/qr-style.png)
 
 The admin dashboard: totals, clicks over the last 14 days, top links, and tabs for users, links and reported links.
 
 ![The admin dashboard: totals for users, links and clicks, a clicks-per-day chart, top links, and tabs for users, links and reports](docs/screenshots/admin.png)
+
+## See it in action
+
+Two short tours with no sound, on a phone-sized and a desktop-sized screen, in light and dark mode: shortening a link, searching and sorting, click stats with a range picker and CSV export, and styling a QR code. Select a clip for the full-quality MP4.
+
+| Desktop (35 s) | Phone (22 s) |
+|---|---|
+| <a href="docs/demo/ovi-desktop.mp4"><img src="docs/demo/ovi-desktop.gif" alt="A silent tour of Ovi on a desktop screen: shorten a link, copy it or download its QR code, search and sort My Links, pick a stats range and export a CSV, style a QR code, and switch to dark mode" width="560"></a> | <a href="docs/demo/ovi-mobile.mp4"><img src="docs/demo/ovi-mobile.gif" alt="A silent tour of Ovi on a phone: shorten a link, My Links with search and sort, click stats, the QR code generator page, and dark mode" width="220"></a> |
 
 ## Features
 
@@ -28,10 +40,11 @@ The admin dashboard: totals, clicks over the last 14 days, top links, and tabs f
 - **Accounts with Google or GitHub** (optional): custom codes, your own expiry dates or none, and a list of every link you've made.
 - **Many links at once**: paste up to 25 URLs, or upload a CSV with a custom code and expiry per link.
 - **Click stats that respect visitors**: clicks per day, referring sites, devices and browsers. No IP addresses or full user agents are stored.
-- **A QR code for every link**, as a crisp PNG.
+- **A QR code for every link**, as a crisp PNG, and a style editor in your browser: your colours, a size and a centre logo, downloaded as SVG or PNG.
 - **An admin dashboard**: every user and link, totals, suspending accounts, and a queue of links people reported.
 - **Abuse protection**: rate limits, a blocklist, an optional Google Safe Browsing check on new links, and a public **Report a link** page.
 - **An HTTP API** with an admin API key, documented below.
+- **Guide pages**: `/qr-code-generator` (a free QR code tool with the shortener on it) and `/self-host` (how to run your own copy) are public and listed in the sitemap, next to the `/privacy` and `/terms` pages.
 - **Installable** as an app on phones and desktops, with light and dark mode.
 - **Small and stateless**: one container, all data in Postgres, migrations on start. Several instances can share one database.
 
@@ -91,22 +104,22 @@ The container runs as a non-root user. It keeps no local state: all data is in P
 
 The web app is served by the API itself at `/`, so there's one address and no CORS setup.
 
-- A simple design after macOS: black text on white, the system font, a translucent toolbar with a Shorten / Links segmented control, and sheet-style dialogs. It works from 320px phones up, and long URLs and codes are cut off or wrapped instead of stretching the page.
+- A simple design in the style of macOS, in light and dark mode. Signed in, a sidebar (a tab bar on phones) links to Dashboard, My Links, Analytics, QR Codes and Report a link, plus Admin for admins. Dialogs open as sheets. It works from 320px phones up, and long URLs and codes are cut off or wrapped instead of stretching the page.
 - The home page is just the shortener.
 - Anyone can paste a URL and press **Shorten URL**, no account needed. Those links get a random code and expire after 30 days.
 - **Sign in** with Google or GitHub. The first sign-in creates the account, so there's no separate sign-up. Signed-in users can pick a custom code and expiry (or none), and see their links and stats.
 - The admin can choose **Admin? Use an API key** in the Sign in dialog. The key is kept for the browser tab, or on the device with **Remember on this device**, and gives access to every link.
-- Copy the result or download its QR code.
+- Copy the result or download its QR code. Press **Style QR** to choose the code and background colours (dark on light, at least 4.5:1 contrast), a size of 256 to 2048 px and an optional centre logo (PNG, JPEG or WebP, up to 256 KB), then download an SVG or PNG. It is drawn in your browser and nothing is uploaded. **Style QR** is also on the **QR Codes** page (`/links/qr-codes`) and on `/qr-code-generator`; the server's `/{code}/qr` PNG is unchanged.
 - Signed-in users can switch the form to **Many links** and paste up to 25 URLs, one per line, with one optional expiry for all of them. Blank lines are skipped. To choose a custom code and expiry per link, upload a CSV (or paste one) whose first line is `url,code,expires_at`. If any line is wrong, nothing is shortened and each bad line is listed with its line number. The results can be copied all at once (one short URL per line, in input order) or downloaded as a CSV file (`url,short_url,code,expires_at`).
-- The **Links** page (`/links`) lists your links (every link for the admin) (a table on wide screens, cards on phones) with clicks, creation time and status (active, expiring, expired); search them, filter by status (all, active, expired), sort them (newest, most clicked, expiring soon), page through them and delete them. The search, filter and sort are kept in the address (`/links?q=docs&status=active&sort=clicks`), so you can bookmark or share a view.
-- Anyone, signed in or not, can open **Report a link** (`/report`, linked in the header) to tell the admin about a short link that scams, infects or spams people. Paste the short link or its code, choose phishing, malware, spam or other, and add optional details (up to 500 characters). A report stores only the link, the reason, the details and the time: no IP address, user agent or account. The page can be pre-filled with `/report?link=abc123`.
+- The **Links** page (`/links`) lists your links (every link for the admin), as a table on wide screens and cards on phones, with clicks, creation time and status (active, expiring, expired); search them, filter by status (all, active, expired), sort them (newest, most clicked, expiring soon), page through them and delete them. The search, filter and sort are kept in the address (`/links?q=docs&status=active&sort=clicks`), so you can bookmark or share a view.
+- Anyone, signed in or not, can open **Report a link** (`/report`, linked in the header, or in the sidebar when signed in on a wide screen) to tell the admin about a short link that scams, infects or spams people. Paste the short link or its code, choose phishing, malware, spam or other, and add optional details (up to 500 characters). A report stores only the link, the reason, the details and the time: no IP address, user agent or account. The page can be pre-filled with `/report?link=abc123`.
 - Admins get an **Admin** page (`/admin`):
   - totals and clicks over the last 14 days
   - the top links
   - every user, with their links and clicks; an admin can suspend or restore a user
   - every link, with its owner; filter by owner (anonymous, API key or one user), search, open its stats, or delete it
   - a **Reports** tab, with a badge showing the number of open reports, listing links with open reports, most reported first: the number of reports, a count per reason, the latest details people wrote (up to 5), and the link's owner. Dismiss or mark as actioned closes all of a link's open reports; you can also delete the link or suspend its owner from there
-- Open **Stats** on any link for its clicks per day over the last 7, 30 or 90 days, its top referrers, and the devices and browsers visitors used. Each click stores only the time, the referring site's name (no page path), and a device and browser category: no IP address or full user agent.
+- Open **Stats** on any link (the chart icon on **My Links**, or the **Analytics** page at `/links/analytics?code=abc123&days=90`) for its clicks per day over the last 7, 30 or 90 days, its top referrers, and the devices and browsers visitors used. The Analytics page keeps the link and range in its address (`days` is 7, 30 or 90; anything else means 30). **Export CSV** saves the numbers on screen as a file (`section,name,clicks` rows for daily, referrer, device and browser), built in your browser; cells starting with `=`, `+`, `-`, `@`, a tab or a carriage return get a leading `'` so spreadsheets don't run them. Each click stores only the time, the referring site's name (no page path), and a device and browser category: no IP address or full user agent.
 
 ## Deploy to Render
 
@@ -234,6 +247,7 @@ Both accept Neon's `postgresql://…?sslmode=require&channel_binding=require` UR
 | `ReverseProxy:KnownProxies` | `ReverseProxy__KnownProxies__0` | none | IPs of your reverse proxy / load balancer. Needed so rate limits see real client IPs |
 | `ReverseProxy:KnownNetworks` | `ReverseProxy__KnownNetworks__0` | none | Same, as CIDR ranges (e.g. `10.0.0.0/8`) |
 | `ReverseProxy:TrustAllProxies` | `ReverseProxy__TrustAllProxies` | `false` | Trust forwarded headers from any sender. Only for platforms where the app is reachable solely through the platform's proxy (Render). |
+| `ReverseProxy:ForwardLimit` | `ReverseProxy__ForwardLimit` | `1` | How many proxies deep to read `X-Forwarded-*` headers. Raise it only when several trusted proxies are chained |
 | `ReverseProxy:ClientIpHeader` | `ReverseProxy__ClientIpHeader` | `X-Forwarded-For` | Header holding the client IP, if the platform uses a different one |
 | `KeepAlive:Enabled` | `KeepAlive__Enabled` | `false` | Ping the app's own public URL on a timer so sleeping hosts (Render free) keep it awake |
 | `KeepAlive:IntervalMinutes` | `KeepAlive__IntervalMinutes` | `10` | Time between pings; keep it under the host's idle timeout |
@@ -279,7 +293,7 @@ Redirects and QR codes are public.
 | `POST` | `/api/links/bulk` | user, key | Shorten 1 to 25 URLs in one request, all or nothing. Body: `{ "urls": ["https://...", "https://..."], "expiresAt": "optional, set on every link" }`, or `{ "items": [{ "url": "...", "customCode": "optional", "expiresAt": "optional" }] }` for a code and expiry per link. Without `customCode` codes are random; without `expiresAt` the links never expire. Returns 201 `{ "items": [link, ...] }` in input order, each in the same shape as `POST /api/links`. Any bad URL or expiry gives 400 and creates nothing. Counts as N links against the create rate limit (a 400 or 429 costs nothing, except a 400 from the Safe Browsing check). 503 "Couldn't make short codes; try again." means nothing was created and a retry is safe. See [Bulk create](#bulk-create) |
 | `GET` | `/api/links?page=1&pageSize=50&q=&status=all&sort=newest` | user, key | List links, newest first by default. Returns `{ items, page, pageSize, total }`; `pageSize` max 100, `page` max 100000. Optional `q` searches code and URL (case-insensitive, max 100 characters); `status` is `all` (default), `active` or `expired`; `sort` is `newest` (default), `clicks` (most clicked first) or `expiring` (soonest to expire first, then links that never expire, then expired ones); anything else is a 400 |
 | `GET` | `/api/links/{code}` | user, key | Show one link's details and click count |
-| `GET` | `/api/links/{code}/stats?days=30` | user, key | Click analytics for the last 1–365 days (UTC): clicks per day, top referrers, devices and browsers |
+| `GET` | `/api/links/{code}/stats?days=30` | user, key | Click analytics for the last 1–365 days (UTC): clicks per day, top referrers, devices and browsers. Returns `{ code, totalClicks, days, clicksInRange, daily: [{ date, clicks }], referrers, devices, browsers }`, where each breakdown is `[{ name, clicks }]`; `daily` has one entry per day, oldest first, including empty days; `referrers` and `browsers` show the top 8. `days` outside 1 to 365 gives 400 under `days` |
 | `PATCH` | `/api/links/{code}` | user, key | Edit a link's destination or expiry; the code, clicks and stats stay. Body (every field optional): `{ "url": "https://...", "expiresAt": "2030-01-01T00:00:00Z" }`, or `{ "clearExpiry": true }` to make it never expire. A missing or `null` field is left as it is. Checked like a new link; returns the updated link |
 | `DELETE` | `/api/links/{code}` | user, key | Delete a link (soft delete: the row is kept with `DeletedAt` set, and the link disappears from every endpoint). Counts as 1 link against the create rate limit, so a 429 with `Retry-After` follows a burst of deletes |
 | `GET` | `/api/admin/overview` | admin | Totals, clicks and sign-ups per day for 14 days, top links, and `openReports` (open reports on links that still exist) |
@@ -291,11 +305,14 @@ Redirects and QR codes are public.
 | `GET` | `/api/session` | anyone | Who's signed in, which sign-in providers are on, and how long anonymous links last |
 | `POST` | `/api/logout` | user | End every session for the account, on every device (a copied cookie stops working) |
 | `GET` | `/auth/login/{google\|github}?returnUrl=/links` | public | Start signing in; comes back to `returnUrl` (a path on this site only) |
-| `GET` | `/{code}` | public | 302 redirect and count the click. Returns 410 Gone if expired |
-| `GET` | `/{code}/qr` | public | PNG QR code for the short URL |
+| `GET` | `/{code}` | public | 302 redirect and count the click. 404 if unknown, 410 Gone if expired or disabled (a blocked site or a suspended owner) |
+| `GET` | `/{code}/qr` | public | PNG QR code for the short URL (404 if unknown, 410 if expired or disabled) |
 | `GET` | `/health` | public | Health check, including the database connection (503 if the database is unavailable) |
 | `GET` | `/health/live` | public | Liveness check that doesn't touch the database (used by keep-alive) |
 | `GET` | `/` | public | The web UI, when it has been built into `wwwroot` |
+| `GET` | `/robots.txt`, `/sitemap.xml` | public | Built per request, so the URLs match whatever address answers. The sitemap lists `/`, `/qr-code-generator`, `/self-host`, `/privacy` and `/terms` |
+| `GET` | `/favicon.ico`, `/og.png`, `/llms.txt` | public | The icon, the share image and a plain-text summary for AI assistants |
+| `GET` | `/openapi/v1.json`, `/swagger` | public | The OpenAPI document and its UI, only when `Swagger:Enabled` is on |
 
 Validation rules:
 - URLs are trimmed, then must be absolute `http` or `https` with a host and no spaces, at most 2048 characters (also after encoding).
@@ -303,7 +320,7 @@ Validation rules:
 - A URL can't contain a user name or password (`https://bank.example@evil.example` is a phishing trick).
 - A URL can't point back at the shortener, or at a site in `Links:BlockedHosts`.
 - When `SafeBrowsing:ApiKey` is set, a URL that Google Safe Browsing flags as unsafe is refused with 400 under `url` (see [Abuse protection](#abuse-protection)).
-- A custom code is 3 to 32 characters of letters, digits, `-` or `_`, and only for signed-in users and the admin. It can't be a reserved word (`api`, `auth`, `swagger`, `openapi`, `health`, `qr`, `assets`, `links`, `admin`, `report`).
+- A custom code is 3 to 32 characters of letters, digits, `-` or `_`, and only for signed-in users and the admin. It can't be a reserved word (`api`, `auth`, `swagger`, `openapi`, `health`, `qr`, `assets`, `links`, `admin`, `report`, `privacy`, `terms`, `qr-code-generator`, `self-host`).
 - `expiresAt` must be in the future and at most 10 years away. Anonymous links expire after 30 days by default, and can't be set to last longer.
 - Request bodies over 64 KB are refused.
 - Hosts are compared in one normal form (punycode, lowercase, no trailing dot), so `Evil.COM.` matches a block on `evil.com`. The blocklist also applies when a link is visited: links made before a site was blocked return 410.
@@ -400,7 +417,7 @@ HTTP/1.1 201 Created
 ```
 
 - A missing or empty `urls` list gives `errors.urls` = `["Add at least one URL."]`. More than 25 gives `["You can shorten at most 25 URLs at once."]` before any URL is checked.
-- Custom codes and per-URL expiry dates aren't supported. Other fields, such as `customCode`, are never used.
+- `customCode` and a per-link `expiresAt` are only read from `items`. With `urls`, every link gets a random code and the request-level `expiresAt`. Sending both `urls` and `items` gives 400 under `items`: `"Send either urls or items, not both."`; an empty or over-long `items` list is reported under `items` instead of `urls`.
 
 ## Development
 
@@ -492,7 +509,7 @@ CI then runs every check, publishes the image tags above, and creates the GitHub
 
 ## Dependencies and licenses
 
-All NuGet dependencies are free and open source: MIT, except Npgsql (the .NET Postgres driver) and its EF Core provider, which use the permissive, MIT-like [PostgreSQL License](https://opensource.org/license/postgresql). The web UI ships only MIT and ISC packages (React, and Lucide's icons, whose ISC licence is functionally the same as MIT); it's styled with Tailwind CSS (MIT), which runs at build time. Its build and test tools use other common open-source licenses (Apache-2.0, ISC, BSD, and MPL-2.0 for Vite's CSS minifier, lightningcss), none of which reach users. CI enforces both. Run the same checks locally:
+All NuGet dependencies are free and open source: MIT, except Npgsql (the .NET Postgres driver) and its EF Core provider, which use the permissive, MIT-like [PostgreSQL License](https://opensource.org/license/postgresql). The web UI ships only MIT and ISC packages (React, Lucide's icons, and `uqr`, which draws styled QR codes in the browser, whose ISC licence is functionally the same as MIT); it's styled with Tailwind CSS (MIT), which runs at build time. Its build and test tools use other common open-source licenses (Apache-2.0, ISC, BSD, and MPL-2.0 for Vite's CSS minifier, lightningcss), none of which reach users. CI enforces both. Run the same checks locally:
 
 ```bash
 python3 scripts/check-packages.py                              # NuGet, after dotnet restore

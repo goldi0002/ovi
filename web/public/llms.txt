@@ -10,7 +10,7 @@ Ovi runs on one address: the same site serves the app and the short links, so th
 - Signing in with Google or GitHub creates the account on first use. Signed-in users can choose a custom code (3–32 letters, digits, hyphens or underscores), set an expiry date or none, and keep every link they make.
 - Signed-in users can shorten up to 25 URLs at once, one per line, with one optional expiry for all. It's all or nothing: if any line is wrong, nothing is created and each bad line is listed. The results can be copied in one go or downloaded as a CSV file.
 - Destination URLs can be checked against Google Safe Browsing: a site flagged as unsafe is refused.
-- Every link comes with a downloadable QR code.
+- Every link comes with a downloadable QR code. It can be restyled in the browser (colours, size, a centre logo) and downloaded as SVG or PNG.
 - Click stats show clicks per day over the last 7, 30 or 90 days, the top referring sites, and the devices and browsers visitors used. A click stores only the time, the referring site's name, a device category and a browser category: no IP address and no full user agent.
 - The server admin can sign in with an API key, see totals, every account and every link, and suspend an account.
 - Ovi is free software under the AGPL-3.0 licence. The source code is at https://github.com/goldi0002/ovi, and anyone can run their own copy.
@@ -29,8 +29,8 @@ Ovi runs on one address: the same site serves the app and the short links, so th
 
 - `POST /api/links` with `{"url": "https://example.com"}` creates a link. Optional: `customCode`, `expiresAt`.
 - `POST /api/links/bulk` with `{"urls": ["https://example.com/a", "https://example.com/b"]}` creates 1 to 25 links with random codes, all or nothing, and returns `{"items": [...]}` in input order. Optional: `expiresAt` for every link, or send `items` (`{"url", "customCode", "expiresAt"}` each) instead of `urls` for a custom code and expiry per link. Signed-in users and the API key only. Each URL counts as one link against the create rate limit.
-- `GET /api/links?page=1&pageSize=20` lists the caller's links.
-- `GET /api/links/{code}/stats?days=30` returns the click stats for one link.
+- `GET /api/links?page=1&pageSize=20` lists the caller's links. Optional: `q` (search), `status` (`all`, `active`, `expired`) and `sort` (`newest`, `clicks`, `expiring`).
+- `GET /api/links/{code}/stats?days=30` returns the click stats for one link; `days` is 1 to 365. The analytics page can export the numbers as CSV.
 - `DELETE /api/links/{code}` deletes a link.
 - `POST /api/reports` with `{"link": "abc123", "reason": "phishing"}` reports a link as abusive. Optional: `details`. Needs the `X-Ovi-Request` header; no sign-in.
 - `GET /api/session` says who the caller is and which sign-in providers are turned on.
