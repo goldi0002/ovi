@@ -25,6 +25,21 @@ public static class OpenApiSetup
                 return Task.CompletedTask;
             });
 
+            // The project doesn't build XML docs, so the list endpoint's query parameters are described here.
+            options.AddOperationTransformer((op, ctx, _) =>
+            {
+                if (ctx.Description.RelativePath?.Trim('/') == "api/links" && ctx.Description.HttpMethod == "GET")
+                    foreach (var p in op.Parameters?.OfType<OpenApiParameter>() ?? [])
+                        p.Description = p.Name switch
+                        {
+                            "q" => "Search: links whose code or destination contains this, ignoring case (max 100 characters).",
+                            "status" => "all (default), active (not expired) or expired.",
+                            "sort" => "newest (default), clicks (most clicked first) or expiring (soonest to expire first, then links that never expire, then expired ones). Ties fall back to newest.",
+                            _ => p.Description,
+                        };
+                return Task.CompletedTask;
+            });
+
             options.AddOperationTransformer((op, ctx, _) =>
             {
                 if (!ctx.Description.ActionDescriptor.EndpointMetadata.OfType<AcceptsApiKey>().Any())

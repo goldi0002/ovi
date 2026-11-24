@@ -147,10 +147,14 @@ export interface UpdateLinkInput {
 /** Which links to list: every one, those still working, or those past their expiry. */
 export type LinkStatus = "all" | "active" | "expired";
 
+/** How to order the list: newest first, most clicked first, or soonest to expire first. */
+export type LinkSort = "newest" | "clicks" | "expiring";
+
 export interface LinkFilter {
   /** Matches the code or destination, ignoring case. */
   q?: string;
   status?: LinkStatus;
+  sort?: LinkSort;
 }
 
 /** An error from the API, with a readable message built from its problem-details body. */
@@ -259,10 +263,11 @@ export class OviApi {
     return this.request(`/api/admin/users/${userId}/${blocked ? "block" : "unblock"}`, { method: "POST" });
   }
 
-  list(page = 1, pageSize = 20, { q = "", status = "all" }: LinkFilter = {}): Promise<Page<Link>> {
+  list(page = 1, pageSize = 20, { q = "", status = "all", sort = "newest" }: LinkFilter = {}): Promise<Page<Link>> {
     const search = q.trim() ? `&q=${encodeURIComponent(q.trim())}` : "";
     const filter = status !== "all" ? `&status=${status}` : "";
-    return this.request(`/api/links?page=${page}&pageSize=${pageSize}${search}${filter}`);
+    const order = sort !== "newest" ? `&sort=${sort}` : "";
+    return this.request(`/api/links?page=${page}&pageSize=${pageSize}${search}${filter}${order}`);
   }
 
   create(input: CreateLinkInput): Promise<Link> {
