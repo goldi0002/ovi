@@ -4,6 +4,7 @@ User-facing changes to Ovi, newest first.
 
 ## Unreleased
 
+- Fixed the Analytics page overflowing sideways on phones, which cut off the right side of the link details (the destination URL, the range picker, the stat tiles and the chart). A long destination URL now ends in an ellipsis and the card fits the screen. On desktop the same fix stops the card from clipping its own content.
 - Added `/favicon.ico` (16, 32 and 48 px) beside the SVG icon, so search results, feed readers and other tools that ask for it find the site's icon instead of a 404.
 
 ### Easier to find and share
