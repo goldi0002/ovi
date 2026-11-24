@@ -7,11 +7,11 @@ namespace Ovi.Api.Tests;
 [TestClass]
 public sealed class WebUiTests
 {
-    private static string FakeBuiltUi()
+    private static string FakeBuiltUi(string? indexHtml = null)
     {
         var root = Directory.CreateTempSubdirectory("ovi-ui-").FullName;
         File.WriteAllText(Path.Combine(root, "index.html"),
-            "<!doctype html><html><head><title>Ovi</title></head><body><div id=root></div></body></html>");
+            indexHtml ?? "<!doctype html><html><head><title>Ovi</title></head><body><div id=root></div></body></html>");
         File.WriteAllText(Path.Combine(root, "favicon.svg"), "<svg xmlns='http://www.w3.org/2000/svg'/>");
         Directory.CreateDirectory(Path.Combine(root, "assets"));
         File.WriteAllText(Path.Combine(root, "assets", "index-abc123.js"), "console.log('ovi')");
@@ -91,6 +91,63 @@ public sealed class WebUiTests
         Assert.IsFalse(res.Headers.Contains("X-Robots-Tag"));
         var robots = await (await factory.CreateUnauthedClient().GetAsync("/robots.txt")).Content.ReadAsStringAsync();
         Assert.DoesNotContain($"Disallow: {path}", robots);
+    }
+
+    [TestMethod]
+    [DataRow("/qr-code-generator")]
+    [DataRow("/self-host")]
+    public async Task Guide_pages_are_indexable_and_describe_themselves(string path)
+    {
+        // The real page, as Vite writes it, so a change to its head that breaks the swap is caught here.
+        using var factory = new OviApiFactory(webRoot: FakeBuiltUi(File.ReadAllText(Path.Combine(RepoRoot(), "web", "index.html"))));
+        var client = factory.CreateUnauthedClient();
+        var res = await client.GetAsync(path);
+        var origin = res.RequestMessage!.RequestUri!.GetLeftPart(UriPartial.Authority);
+        var body = await res.Content.ReadAsStringAsync();
+        var meta = Ovi.Api.Infrastructure.WebUiSetup.GuidePages[path];
+
+        Assert.AreEqual(HttpStatusCode.OK, res.StatusCode);
+        Assert.IsFalse(res.Headers.Contains("X-Robots-Tag"));
+        Assert.Contains($"<title>{System.Net.WebUtility.HtmlEncode(meta.Title)}</title>", body);
+        Assert.DoesNotContain("Short links with QR codes and click stats</title>", body);
+        Assert.Contains($"name=\"description\" content=\"{System.Net.WebUtility.HtmlEncode(meta.Description)}\"", body);
+        Assert.Contains($"property=\"og:title\" content=\"{System.Net.WebUtility.HtmlEncode(meta.Title)}\"", body);
+        Assert.Contains($"<link rel=\"canonical\" href=\"{origin}{path}\">", body);
+        Assert.AreEqual(1, System.Text.RegularExpressions.Regex.Matches(body, "<title>").Count);
+        Assert.AreEqual(1, System.Text.RegularExpressions.Regex.Matches(body, "name=\"description\"").Count);
+        var robots = await (await client.GetAsync("/robots.txt")).Content.ReadAsStringAsync();
+        Assert.DoesNotContain($"Disallow: {path}", robots);
+    }
+
+    [TestMethod]
+    public async Task Every_page_names_an_absolute_share_image_that_is_served()
+    {
+        using var factory = new OviApiFactory(webRoot: FakeBuiltUi());
+        var client = factory.CreateUnauthedClient();
+        foreach (var path in new[] { "/", "/self-host", "/privacy" })
+        {
+            var res = await client.GetAsync(path);
+            var origin = res.RequestMessage!.RequestUri!.GetLeftPart(UriPartial.Authority);
+            var body = await res.Content.ReadAsStringAsync();
+            Assert.Contains($"<meta property=\"og:image\" content=\"{origin}/og.png\">", body, path);
+            Assert.Contains($"<meta name=\"twitter:image\" content=\"{origin}/og.png\">", body, path);
+        }
+    }
+
+    [TestMethod]
+    public void The_share_image_exists_and_is_1200_by_630()
+    {
+        var bytes = File.ReadAllBytes(Path.Combine(RepoRoot(), "web", "public", "og.png"));
+        // A PNG's IHDR chunk holds the width and height as big-endian integers at bytes 16 and 20.
+        Assert.AreEqual(1200, System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(bytes.AsSpan(16)));
+        Assert.AreEqual(630, System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(bytes.AsSpan(20)));
+    }
+
+    private static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Ovi.sln"))) dir = dir.Parent;
+        return dir?.FullName ?? throw new InvalidOperationException("Ovi.sln not found above the test output.");
     }
 
     [TestMethod]
@@ -179,7 +236,7 @@ public sealed class WebUiTests
     }
 
     [TestMethod]
-    public async Task Sitemap_lists_the_home_page_and_the_legal_pages()
+    public async Task Sitemap_lists_the_home_page_the_guides_and_the_legal_pages()
     {
         using var factory = new OviApiFactory(webRoot: FakeBuiltUi());
         var res = await factory.CreateUnauthedClient().GetAsync("/sitemap.xml");
@@ -191,6 +248,8 @@ public sealed class WebUiTests
         Assert.Contains($"<loc>{origin}/</loc>", body);
         Assert.Contains($"<loc>{origin}/privacy</loc>", body);
         Assert.Contains($"<loc>{origin}/terms</loc>", body);
+        Assert.Contains($"<loc>{origin}/qr-code-generator</loc>", body);
+        Assert.Contains($"<loc>{origin}/self-host</loc>", body);
     }
 
     [TestMethod]

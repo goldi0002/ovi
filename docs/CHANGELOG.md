@@ -4,6 +4,12 @@ User-facing changes to Ovi, newest first.
 
 ## Unreleased
 
+### Easier to find and share
+
+- New pages for search engines and visitors: `/qr-code-generator` (a free QR code tool, with the shortener on it) and `/self-host` (how to run your own copy). Both are in the sitemap, have their own title, description and canonical link, and are linked from the home page.
+- Shared links to Ovi now show a large preview image (`/og.png`), on every page.
+- The README has a deploy button and a comparison with Shlink, YOURLS and Dub.
+
 ## 1.0.0 — 2026-11-21
 
 The first release. Ovi can now be self-hosted from a published, versioned image: see "Run with Docker Compose" in the README.

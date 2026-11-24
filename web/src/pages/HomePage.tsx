@@ -12,6 +12,7 @@ import { EmptyState, Skeleton, StatTile } from "../components/ui/primitives";
 import { displayUrl, formatDateTime, formatRelative } from "../format";
 import { AppLink, PAGES } from "../router";
 import { button, card, container, errorBox, focusRing } from "../ui";
+import { MoreLinks } from "./GuidePages";
 import { LegalLinks } from "./LegalPage";
 import { usePageTitle } from "./common";
 
@@ -57,7 +58,7 @@ export function HomePage({ api, signedIn, greetingName, anonymousLinkDays, onLog
 }
 
 /** The shortener and, below it, the latest result: one link or a bulk batch. Showing one clears the other. */
-function CreatePanel({
+export function CreatePanel({
   api,
   signedIn,
   anonymousLinkDays,
@@ -155,7 +156,8 @@ function LandingDetails() {
         ))}
       </ul>
       <Faq />
-      <LegalLinks className="mt-12 justify-center" />
+      <MoreLinks className="mt-12 justify-center" />
+      <LegalLinks className="mt-3 justify-center" />
     </div>
   );
 }

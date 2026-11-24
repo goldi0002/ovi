@@ -11,6 +11,8 @@ export const PAGES = {
   report: "/report",
   privacy: "/privacy",
   terms: "/terms",
+  qrCodeGenerator: "/qr-code-generator",
+  selfHost: "/self-host",
 } as const;
 
 const NAVIGATE = "ovi:navigate";
