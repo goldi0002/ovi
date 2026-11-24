@@ -1,9 +1,9 @@
 import { ChartColumn, ChevronLeft, ChevronRight, Link2, Pencil, Plus, QrCode, RefreshCw, SearchX, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, isExpired, type Link, type LinkStatus, type OviApi, type Page } from "../api";
+import { ApiError, isExpired, type Link, type LinkSort, type LinkStatus, type OviApi, type Page } from "../api";
 import { displayUrl, formatDateTime, formatRelative } from "../format";
-import { AppLink, PAGES } from "../router";
-import { button, card, errorBox, iconButton } from "../ui";
+import { AppLink, navigate, PAGES } from "../router";
+import { button, card, errorBox, iconButton, input } from "../ui";
 import { CopyButton } from "./CopyButton";
 import { EditLinkDialog } from "./EditLinkDialog";
 import { StatsDialog } from "./StatsDialog";
@@ -21,6 +21,24 @@ const STATUSES: { value: LinkStatus; label: string; heading: string }[] = [
   { value: "active", label: "Active", heading: "Active links" },
   { value: "expired", label: "Expired", heading: "Expired links" },
 ];
+
+const SORTS: { value: LinkSort; label: string }[] = [
+  { value: "newest", label: "Newest" },
+  { value: "clicks", label: "Most clicked" },
+  { value: "expiring", label: "Expiring soon" },
+];
+
+/** The search, status and sort the address holds (?q=docs&status=active&sort=clicks); anything unknown means the default. */
+function readUrlState(): { q: string; status: LinkStatus; sort: LinkSort } {
+  const params = new URLSearchParams(window.location.search);
+  const status = params.get("status");
+  const sort = params.get("sort");
+  return {
+    q: (params.get("q") ?? "").trim().slice(0, 100),
+    status: STATUSES.find((s) => s.value === status)?.value ?? "all",
+    sort: SORTS.find((s) => s.value === sort)?.value ?? "newest",
+  };
+}
 
 interface Props {
   api: OviApi;
@@ -59,9 +77,11 @@ export function LinksTable({ api, onUnauthorized }: Props) {
   const [editing, setEditing] = useState<Link | null>(null);
   const closeEdit = useCallback(() => setEditing(null), []);
   /** What's typed in the search box; `q` follows it after a pause. */
-  const [search, setSearch] = useState("");
-  const [q, setQ] = useState("");
-  const [status, setStatus] = useState<LinkStatus>("all");
+  const [initial] = useState(readUrlState);
+  const [search, setSearch] = useState(initial.q);
+  const [q, setQ] = useState(initial.q);
+  const [status, setStatus] = useState<LinkStatus>(initial.status);
+  const [sort, setSort] = useState<LinkSort>(initial.sort);
   // Only the latest request may update the table, so a slow earlier search can't overwrite a newer one.
   const latest = useRef(0);
   const confirm = useConfirm();
@@ -72,7 +92,7 @@ export function LinksTable({ api, onUnauthorized }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const result = await api.list(page, PAGE_SIZE, { q, status });
+      const result = await api.list(page, PAGE_SIZE, { q, status, sort });
       if (id === latest.current) setData(result);
     } catch (err) {
       if (id !== latest.current) return;
@@ -81,7 +101,7 @@ export function LinksTable({ api, onUnauthorized }: Props) {
     } finally {
       if (id === latest.current) setLoading(false);
     }
-  }, [api, page, q, status, onUnauthorized]);
+  }, [api, page, q, status, sort, onUnauthorized]);
 
   useEffect(() => {
     void load();
@@ -96,6 +116,22 @@ export function LinksTable({ api, onUnauthorized }: Props) {
     }, SEARCH_DELAY_MS);
     return () => clearTimeout(timer);
   }, [search, q]);
+
+  // Keep the address in step with the search, status and sort (defaults leave no trace), so a reload or a shared link
+  // shows the same list. Replacing, not pushing, so Back doesn't step through every keystroke.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const state = [["q", q], ["status", status === "all" ? "" : status], ["sort", sort === "newest" ? "" : sort]];
+    for (const [key] of state) params.delete(key);
+    for (const [key, value] of state) if (value) params.set(key, value); // a fixed order, so the address is stable
+    const query = params.toString();
+    if (query !== window.location.search.slice(1)) navigate(`${window.location.pathname}${query && `?${query}`}${window.location.hash}`, { replace: true });
+  }, [q, status, sort]);
+
+  function changeSort(next: LinkSort) {
+    setSort(next);
+    setPage(1);
+  }
 
   function changeStatus(next: LinkStatus) {
     setStatus(next);
@@ -160,6 +196,20 @@ export function LinksTable({ api, onUnauthorized }: Props) {
           onChange={changeStatus}
           className="max-sm:flex max-sm:w-full max-sm:[&>button]:flex-1"
         />
+        <label className="flex items-center gap-2 text-[0.8125rem] font-medium text-muted max-sm:w-full">
+          Sort by
+          <select
+            className={`${input} w-auto max-sm:flex-1`}
+            value={sort}
+            onChange={(e) => changeSort(e.target.value as LinkSort)}
+          >
+            {SORTS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {error && (

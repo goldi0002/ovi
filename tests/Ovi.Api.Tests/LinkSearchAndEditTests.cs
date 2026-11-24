@@ -138,6 +138,57 @@ public sealed class LinkSearchAndEditTests : IDisposable
         StringAssert.Contains(await ErrorFor(await _admin.GetAsync($"/api/links?status={status}"), "status"), "all, active or expired");
     }
 
+    // ---- Sort ----
+
+    private static async Task<string[]> OrderedCodes(HttpClient client, string query)
+    {
+        var res = await client.GetAsync($"/api/links?{query}");
+        Assert.AreEqual(HttpStatusCode.OK, res.StatusCode, await res.Content.ReadAsStringAsync());
+        return (await res.Content.ReadFromJsonAsync<PagedResponse<LinkResponse>>())!.Items.Select(l => l.Code).ToArray();
+    }
+
+    [TestMethod]
+    public async Task Sort_orders_the_whole_list_so_paging_follows_it()
+    {
+        var now = _factory.Time.GetUtcNow();
+        await CreateAsync(_admin, "https://example.com/forever", "forever");
+        await CreateAsync(_admin, "https://example.com/later", "later", now.AddDays(2));
+        await CreateAsync(_admin, "https://example.com/soon", "soon", now.AddHours(1));
+        await CreateAsync(_admin, "https://example.com/gone", "gone", now.AddHours(2));
+        _factory.Time.Advance(TimeSpan.FromHours(3)); // "soon" and "gone" are expired now
+
+        // Newest first is the default; the others are explicit.
+        CollectionAssert.AreEqual(new[] { "gone", "soon", "later", "forever" }, await OrderedCodes(_admin, ""));
+        CollectionAssert.AreEqual(new[] { "gone", "soon", "later", "forever" }, await OrderedCodes(_admin, "sort=NEWEST"));
+        // Will expire (soonest first), then never, then already expired (earliest expiry first).
+        CollectionAssert.AreEqual(new[] { "later", "forever", "soon", "gone" }, await OrderedCodes(_admin, "sort=expiring"));
+
+        var page2 = (await _admin.GetFromJsonAsync<PagedResponse<LinkResponse>>("/api/links?sort=expiring&page=2&pageSize=2"))!;
+        Assert.AreEqual(4, page2.Total);
+        CollectionAssert.AreEqual(new[] { "soon", "gone" }, page2.Items.Select(l => l.Code).ToArray());
+    }
+
+    [TestMethod]
+    public async Task Sort_by_clicks_puts_the_most_clicked_first()
+    {
+        await CreateAsync(_admin, "https://example.com/a", "quiet");
+        await CreateAsync(_admin, "https://example.com/b", "popular");
+        await CreateAsync(_admin, "https://example.com/c", "middle");
+        for (var i = 0; i < 3; i++) Assert.AreEqual(HttpStatusCode.Redirect, (await _admin.GetAsync("/popular")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.Redirect, (await _admin.GetAsync("/middle")).StatusCode);
+
+        CollectionAssert.AreEqual(new[] { "popular", "middle", "quiet" }, await OrderedCodes(_admin, "sort=clicks"));
+    }
+
+    [TestMethod]
+    [DataRow("oldest")]
+    [DataRow("clicks;drop")]
+    [DataRow("1")]
+    public async Task Unknown_sort_is_rejected(string sort)
+    {
+        StringAssert.Contains(await ErrorFor(await _admin.GetAsync($"/api/links?sort={sort}"), "sort"), "newest, clicks or expiring");
+    }
+
     // ---- Edit ----
 
     [TestMethod]
