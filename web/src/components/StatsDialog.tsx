@@ -1,7 +1,8 @@
-import { BarChart3, Table2 } from "lucide-react";
+import { BarChart3, Download, Table2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ApiError, type Link, type LinkStats, type NamedCount, type OviApi } from "../api";
 import { formatDay, niceMax } from "../format";
+import { DEFAULT_RANGE, RANGES, downloadStatsCsv } from "../statsExport";
 import { button, card, errorBox, focusRing } from "../ui";
 import { Dialog } from "./ui/Dialog";
 import { SegmentedControl, Skeleton } from "./ui/primitives";
@@ -11,7 +12,6 @@ const tileLabel = "text-[0.8125rem] font-medium text-muted";
 const tileValue = "mt-1.5 text-2xl leading-tight font-semibold tracking-[-0.02em] tabular-nums";
 const subheading = "text-sm font-semibold";
 
-export const RANGES = [7, 30, 90] as const;
 const RANGE_OPTIONS = RANGES.map((r) => ({ value: r as number, label: `Last ${r} days` }));
 const numbers = new Intl.NumberFormat();
 
@@ -74,8 +74,23 @@ export function useLinkStats(api: OviApi, code: string, days: number, onUnauthor
 }
 
 /** The range picker, headline numbers, daily chart and breakdowns for one link. */
-export function LinkStatsView({ api, code, onUnauthorized }: { api: OviApi; code: string; onUnauthorized: () => void }) {
-  const [days, setDays] = useState<number>(30);
+export function LinkStatsView({
+  api,
+  code,
+  onUnauthorized,
+  days: controlledDays,
+  onDaysChange,
+}: {
+  api: OviApi;
+  code: string;
+  onUnauthorized: () => void;
+  /** Pass both to keep the range somewhere else, such as the URL. Otherwise the view remembers it itself. */
+  days?: number;
+  onDaysChange?: (days: number) => void;
+}) {
+  const [localDays, setLocalDays] = useState<number>(DEFAULT_RANGE);
+  const days = controlledDays ?? localDays;
+  const setDays = onDaysChange ?? setLocalDays;
   const { stats, loading, error } = useLinkStats(api, code, days, onUnauthorized);
   // A different link: drop the old one's numbers rather than show them dimmed.
   const current = stats?.code === code ? stats : null;
@@ -83,7 +98,13 @@ export function LinkStatsView({ api, code, onUnauthorized }: { api: OviApi; code
 
   return (
     <div className="grid gap-5">
-      <SegmentedControl label="Date range" options={RANGE_OPTIONS} value={days} onChange={setDays} className="w-fit max-w-full max-sm:flex max-sm:w-full max-sm:[&>button]:flex-1 max-sm:[&>button]:px-1.5" />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SegmentedControl label="Date range" options={RANGE_OPTIONS} value={days} onChange={setDays} className="w-fit max-w-full max-sm:flex max-sm:w-full max-sm:[&>button]:flex-1 max-sm:[&>button]:px-1.5" />
+        <button type="button" className={button("default", "sm", "max-sm:w-full")} disabled={!current || loading || current.days !== days} onClick={() => current && downloadStatsCsv(current)}>
+          <Download aria-hidden="true" />
+          Export CSV
+        </button>
+      </div>
 
       {error && (
         <p className={errorBox} role="alert">

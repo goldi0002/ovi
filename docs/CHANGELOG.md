@@ -4,6 +4,8 @@ User-facing changes to Ovi, newest first.
 
 ## Unreleased
 
+- Link stats: the Analytics page keeps the date range (7, 30 or 90 days) in the address (`?days=`), so it survives a reload and can be shared. Anything else falls back to 30 days. A new **Export CSV** button saves the daily clicks, referrers, devices and browsers on screen as a CSV file, built in your browser. Values that start with `=`, `+`, `-` or `@` are prefixed with `'` so spreadsheets don't run them as formulas. The picker offers 7, 30 and 90 days; the API itself accepts up to 365.
+
 - Added `/favicon.ico` (16, 32 and 48 px) beside the SVG icon, so search results, feed readers and other tools that ask for it find the site's icon instead of a 404.
 
 ### Easier to find and share

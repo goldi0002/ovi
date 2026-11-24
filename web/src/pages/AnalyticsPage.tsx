@@ -7,6 +7,7 @@ import { LinkStatsView } from "../components/StatsDialog";
 import { EmptyState, PageHeader, SearchField, Skeleton } from "../components/ui/primitives";
 import { displayUrl, formatDateTime } from "../format";
 import { AppLink, PAGES, navigate, useSearch } from "../router";
+import { DEFAULT_RANGE, parseRange } from "../statsExport";
 import { button, card, container, errorBox, focusRing, iconButton } from "../ui";
 import { SEARCH_DELAY_MS } from "../components/LinksTable";
 import { SignedOutPanel, usePageTitle } from "./common";
@@ -38,7 +39,12 @@ export function AnalyticsPage({ api, state, onLogIn, onUnauthorized }: Props) {
 
 function Analytics({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () => void }) {
   const search = useSearch();
-  const selectedCode = new URLSearchParams(search).get("code");
+  const params = new URLSearchParams(search);
+  const selectedCode = params.get("code");
+  const days = parseRange(params.get("days"));
+  // The range stays in the URL (?days=), so it survives a reload; the default isn't written out.
+  const analyticsUrl = (code: string, range = days) =>
+    `${PAGES.analytics}?code=${encodeURIComponent(code)}${range === DEFAULT_RANGE ? "" : `&days=${range}`}`;
   const [typed, setTyped] = useState("");
   const [q, setQ] = useState("");
   const [links, setLinks] = useState<Link[] | null>(null);
@@ -75,7 +81,7 @@ function Analytics({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () =>
 
   // Without ?code=, show the newest link.
   useEffect(() => {
-    if (!selectedCode && !q && links && links.length > 0) navigate(`${PAGES.analytics}?code=${encodeURIComponent(links[0].code)}`, { replace: true });
+    if (!selectedCode && !q && links && links.length > 0) navigate(analyticsUrl(links[0].code), { replace: true });
   }, [selectedCode, q, links]);
 
   const inList = links?.find((l) => l.code === selectedCode) ?? null;
@@ -95,7 +101,7 @@ function Analytics({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () =>
   const notFound = !!selectedCode && !!links && !inList && lookup?.code === selectedCode && lookup.link === null;
 
   function choose(link: Link) {
-    navigate(`${PAGES.analytics}?code=${encodeURIComponent(link.code)}`, { replace: true });
+    navigate(analyticsUrl(link.code), { replace: true });
     setPickerOpen(false);
   }
 
@@ -204,7 +210,14 @@ function Analytics({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () =>
                 </a>
               </div>
             </div>
-            <LinkStatsView key={selected.code} api={api} code={selected.code} onUnauthorized={onUnauthorized} />
+            <LinkStatsView
+              key={selected.code}
+              api={api}
+              code={selected.code}
+              onUnauthorized={onUnauthorized}
+              days={days}
+              onDaysChange={(range) => navigate(analyticsUrl(selected.code, range), { replace: true })}
+            />
           </div>
         ) : notFound ? (
           <EmptyState plain icon={<Link2 />} title="That link isn't here" description={`There's no link /${selectedCode} in your account. Pick one from the list.`} />
