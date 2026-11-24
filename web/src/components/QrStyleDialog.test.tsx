@@ -23,13 +23,23 @@ describe("QR style dialog", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("returns focus to the Style QR button when closed", async () => {
+    const user = open();
+    const opener = screen.getByRole("button", { name: "Style QR" });
+    await user.click(opener);
+    await user.click(screen.getAllByRole("button", { name: "Close" })[0]);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
+  });
+
   it("explains low contrast next to the field and blocks the downloads", async () => {
     const user = open();
     await user.click(screen.getByRole("button", { name: "Style QR" }));
     const code = screen.getByLabelText("Code colour");
     await user.clear(code);
     await user.type(code, "#bbbbbb");
-    expect(await screen.findByRole("alert")).toHaveTextContent(/at least 4.5:1/);
+    expect(await screen.findByRole("status")).toHaveTextContent(/at least 4.5:1/);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "SVG" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "PNG" })).toBeDisabled();
 

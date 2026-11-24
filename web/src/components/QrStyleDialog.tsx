@@ -31,10 +31,11 @@ export function QrStyleDialog({ link, onClose }: { link: Link; onClose: () => vo
   const fileRef = useRef<HTMLInputElement>(null);
   const ids = useId();
 
-  const typed = { ...style, foreground: fgText, background: bgText };
-  const errors = validateStyle(typed);
+  const { logo, size } = style;
+  // Memoised so the logo data URL isn't re-checked on every render.
+  const errors = useMemo(() => validateStyle({ foreground: fgText, background: bgText, size, logo }), [fgText, bgText, size, logo]);
   const valid = Object.keys(errors).length === 0;
-  const ratio = currentContrast(typed);
+  const ratio = currentContrast({ foreground: fgText, background: bgText, size, logo });
 
   const svg = useMemo(() => {
     if (!valid) return null;
@@ -126,7 +127,7 @@ export function QrStyleDialog({ link, onClose }: { link: Link; onClose: () => vo
           })}
         </div>
         {contrastText && (
-          <p className={errors.contrast ? fieldError : hint} role={errors.contrast ? "alert" : "status"}>
+          <p className={errors.contrast ? fieldError : hint} role="status">
             {contrastText}
           </p>
         )}
