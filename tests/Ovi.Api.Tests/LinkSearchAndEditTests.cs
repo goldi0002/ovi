@@ -138,6 +138,99 @@ public sealed class LinkSearchAndEditTests : IDisposable
         StringAssert.Contains(await ErrorFor(await _admin.GetAsync($"/api/links?status={status}"), "status"), "all, active or expired");
     }
 
+    // ---- Sort ----
+
+    private static async Task<string[]> OrderedCodes(HttpClient client, string query)
+    {
+        var res = await client.GetAsync($"/api/links?{query}");
+        Assert.AreEqual(HttpStatusCode.OK, res.StatusCode, await res.Content.ReadAsStringAsync());
+        return (await res.Content.ReadFromJsonAsync<PagedResponse<LinkResponse>>())!.Items.Select(l => l.Code).ToArray();
+    }
+
+    [TestMethod]
+    public async Task Sort_orders_the_whole_list_so_paging_follows_it()
+    {
+        var now = _factory.Time.GetUtcNow();
+        await CreateAsync(_admin, "https://example.com/forever", "forever");
+        await CreateAsync(_admin, "https://example.com/later", "later", now.AddDays(2));
+        await CreateAsync(_admin, "https://example.com/soon", "soon", now.AddHours(1));
+        await CreateAsync(_admin, "https://example.com/gone", "gone", now.AddHours(2));
+        _factory.Time.Advance(TimeSpan.FromHours(3)); // "soon" and "gone" are expired now
+
+        // Newest first is the default; the others are explicit.
+        CollectionAssert.AreEqual(new[] { "gone", "soon", "later", "forever" }, await OrderedCodes(_admin, ""));
+        CollectionAssert.AreEqual(new[] { "gone", "soon", "later", "forever" }, await OrderedCodes(_admin, "sort=NEWEST"));
+        // Will expire (soonest first), then never, then already expired (earliest expiry first).
+        CollectionAssert.AreEqual(new[] { "later", "forever", "soon", "gone" }, await OrderedCodes(_admin, "sort=expiring"));
+
+        var page2 = (await _admin.GetFromJsonAsync<PagedResponse<LinkResponse>>("/api/links?sort=expiring&page=2&pageSize=2"))!;
+        Assert.AreEqual(4, page2.Total);
+        CollectionAssert.AreEqual(new[] { "soon", "gone" }, page2.Items.Select(l => l.Code).ToArray());
+    }
+
+    [TestMethod]
+    public async Task Sort_by_clicks_puts_the_most_clicked_first()
+    {
+        await CreateAsync(_admin, "https://example.com/a", "quiet");
+        await CreateAsync(_admin, "https://example.com/b", "popular");
+        await CreateAsync(_admin, "https://example.com/c", "middle");
+        for (var i = 0; i < 3; i++) Assert.AreEqual(HttpStatusCode.Redirect, (await _admin.GetAsync("/popular")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.Redirect, (await _admin.GetAsync("/middle")).StatusCode);
+
+        CollectionAssert.AreEqual(new[] { "popular", "middle", "quiet" }, await OrderedCodes(_admin, "sort=clicks"));
+    }
+
+    [TestMethod]
+    public async Task Sort_combines_with_search_and_status()
+    {
+        var now = _factory.Time.GetUtcNow();
+        await CreateAsync(_admin, "https://example.com/doc-a", "doc-a", now.AddDays(5));
+        await CreateAsync(_admin, "https://example.com/doc-b", "doc-b", now.AddDays(1));
+        await CreateAsync(_admin, "https://example.com/doc-c", "doc-c", now.AddHours(1));
+        await CreateAsync(_admin, "https://example.com/other", "other", now.AddHours(2));
+        await _admin.GetAsync("/doc-a");
+        await _admin.GetAsync("/doc-a");
+        await _admin.GetAsync("/doc-b");
+        _factory.Time.Advance(TimeSpan.FromHours(3)); // doc-c and other are expired
+
+        CollectionAssert.AreEqual(new[] { "doc-b", "doc-a", "doc-c" }, await OrderedCodes(_admin, "sort=expiring&q=doc"));
+        CollectionAssert.AreEqual(new[] { "doc-b", "doc-a" }, await OrderedCodes(_admin, "sort=expiring&q=doc&status=active"));
+        CollectionAssert.AreEqual(new[] { "doc-a", "doc-b" }, await OrderedCodes(_admin, "sort=clicks&q=doc&status=active"));
+        CollectionAssert.AreEqual(new[] { "doc-c", "other" }, await OrderedCodes(_admin, "sort=expiring&status=expired"));
+        CollectionAssert.AreEqual(new[] { "doc-c" }, await OrderedCodes(_admin, "sort=clicks&status=expired&q=doc"));
+    }
+
+    [TestMethod]
+    public async Task Equal_clicks_fall_back_to_newest_then_id()
+    {
+        // first and second share a creation time, so only the id tells them apart; third is newer.
+        await CreateAsync(_admin, "https://example.com/1", "first");
+        await CreateAsync(_admin, "https://example.com/2", "second");
+        _factory.Time.Advance(TimeSpan.FromMinutes(5));
+        await CreateAsync(_admin, "https://example.com/3", "third");
+        foreach (var code in new[] { "first", "second", "third" })
+            Assert.AreEqual(HttpStatusCode.Redirect, (await _admin.GetAsync($"/{code}")).StatusCode);
+
+        CollectionAssert.AreEqual(new[] { "third", "second", "first" }, await OrderedCodes(_admin, "sort=clicks"));
+    }
+
+    [TestMethod]
+    public async Task OpenApi_lists_the_allowed_sort_values()
+    {
+        var json = await _admin.GetStringAsync("/openapi/v1.json");
+        StringAssert.Contains(json, "expiring");
+        StringAssert.Contains(json, "\"sort\"");
+    }
+
+    [TestMethod]
+    [DataRow("oldest")]
+    [DataRow("clicks;drop")]
+    [DataRow("1")]
+    public async Task Unknown_sort_is_rejected(string sort)
+    {
+        StringAssert.Contains(await ErrorFor(await _admin.GetAsync($"/api/links?sort={sort}"), "sort"), "newest, clicks or expiring");
+    }
+
     // ---- Edit ----
 
     [TestMethod]

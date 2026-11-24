@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "../App";
 import { fakeApi } from "../test/fakeApi";
@@ -20,7 +20,7 @@ describe("Privacy policy and terms", () => {
     }
     expect(screen.getByText(/never IP addresses|do not store IP addresses/i)).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "open an issue" })[0]).toHaveAttribute("href", CONTACT_URL);
-    expect(document.title).toBe("Privacy policy · Ovi");
+    await waitFor(() => expect(document.title).toBe("Privacy policy · Ovi"));
   });
 
   it("shows the terms, and points to the report page", async () => {
