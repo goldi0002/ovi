@@ -94,9 +94,38 @@ describe("Export CSV", () => {
 
   it("is off until there are stats to export", async () => {
     fakeApi({ user: ada, links: [link({ code: "docs" })] });
+    // Hold the stats response back, so the disabled state is observed deterministically.
+    const real = globalThis.fetch;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes("/stats")) await gate;
+      return real(input, init);
+    }) as typeof fetch;
     await renderAt("/links/analytics?code=docs");
     expect(await within(detail()).findByRole("button", { name: "Export CSV" })).toBeDisabled();
+    release();
     await within(detail()).findByText("Clicks, last 30 days");
+    expect(within(detail()).getByRole("button", { name: "Export CSV" })).toBeEnabled();
+  });
+
+  it("stays off while a different range is loading, so it never exports data the picker is not showing", async () => {
+    fakeApi({ user: ada, links: [link({ code: "docs" })] });
+    const real = globalThis.fetch;
+    let release!: () => void;
+    let hold = false;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (hold && String(input).includes("/stats")) await gate;
+      return real(input, init);
+    }) as typeof fetch;
+    const user = await renderAt("/links/analytics?code=docs");
+    await within(detail()).findByText("Clicks, last 30 days");
+    hold = true;
+    await user.click(within(detail()).getByRole("button", { name: "Last 7 days" }));
+    expect(within(detail()).getByRole("button", { name: "Export CSV" })).toBeDisabled();
+    release();
+    await within(detail()).findByText("Clicks, last 7 days");
     expect(within(detail()).getByRole("button", { name: "Export CSV" })).toBeEnabled();
   });
 });

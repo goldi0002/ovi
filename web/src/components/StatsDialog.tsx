@@ -100,7 +100,7 @@ export function LinkStatsView({
     <div className="grid gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SegmentedControl label="Date range" options={RANGE_OPTIONS} value={days} onChange={setDays} className="w-fit max-w-full max-sm:flex max-sm:w-full max-sm:[&>button]:flex-1 max-sm:[&>button]:px-1.5" />
-        <button type="button" className={button("default", "sm", "max-sm:w-full")} disabled={!current} onClick={() => current && downloadStatsCsv(current)}>
+        <button type="button" className={button("default", "sm", "max-sm:w-full")} disabled={!current || loading || current.days !== days} onClick={() => current && downloadStatsCsv(current)}>
           <Download aria-hidden="true" />
           Export CSV
         </button>
