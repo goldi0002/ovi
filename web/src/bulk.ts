@@ -1,4 +1,5 @@
 import type { Link } from "./api";
+import { csvRows, saveCsv } from "./csv";
 
 // Pure helpers for bulk shortening: reading the pasted list, mapping server errors to lines, and the CSV download.
 
@@ -133,19 +134,11 @@ export function bulkErrors(fieldErrors: Record<string, string[]>): BulkItemError
   return errors.sort((a, b) => a.index - b.index);
 }
 
-// Spreadsheets run a cell that starts with one of these as a formula (OWASP "CSV injection").
-const FORMULA_START = /^[=+\-@\t\r]/;
-
-function csvCell(value: string): string {
-  const guarded = FORMULA_START.test(value) ? `'${value}` : value;
-  return guarded !== value || /[",\r\n]/.test(guarded) ? `"${guarded.replace(/"/g, '""')}"` : guarded;
-}
-
 /** RFC 4180 CSV (CRLF line endings) of the links, one row each, in order. */
 export function toCsv(links: Link[]): string {
   const rows = [["url", "short_url", "code", "expires_at"]];
   for (const link of links) rows.push([link.url, link.shortUrl, link.code, link.expiresAt ?? ""]);
-  return rows.map((row) => row.map(csvCell).join(",") + "\r\n").join("");
+  return csvRows(rows);
 }
 
 /** "ovi-links-2026-11-18.csv", using the user's local date. */
@@ -154,15 +147,7 @@ export function csvFileName(date: Date): string {
   return `ovi-links-${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}.csv`;
 }
 
-/** Saves the CSV through a temporary object URL; a BOM lets Excel read non-ASCII URLs as UTF-8. */
+/** Saves the links as a CSV file. */
 export function downloadCsv(links: Link[], now = new Date()): void {
-  const url = URL.createObjectURL(new Blob(["﻿", toCsv(links)], { type: "text/csv;charset=utf-8" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = csvFileName(now);
-  document.body.append(a);
-  a.click();
-  a.remove();
-  // Revoke after the click has been handled, so the download has started.
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  saveCsv(toCsv(links), csvFileName(now));
 }

@@ -1,4 +1,5 @@
 import type { LinkStats } from "./api";
+import { csvRows, saveCsv } from "./csv";
 
 /** The longest range the API accepts (LinkEndpoints.MaxStatsDays). */
 export const MAX_STATS_DAYS = 365;
@@ -12,14 +13,6 @@ export function parseRange(value: string | null | undefined): number {
   return (RANGES as readonly number[]).includes(n) && n <= MAX_STATS_DAYS ? n : DEFAULT_RANGE;
 }
 
-/** One CSV cell. Quotes cells holding commas, quotes or line breaks, and defuses spreadsheet formulas. */
-export function csvCell(value: string | number): string {
-  let text = String(value);
-  // A cell starting with = + - @ (or a tab/CR) can run as a formula in Excel or Sheets; a leading ' makes it text.
-  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
-  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
 /** The stats as CSV text: one row per day, referrer, device and browser. */
 export function statsToCsv(stats: LinkStats): string {
   const rows: (string | number)[][] = [["section", "name", "clicks"]];
@@ -27,7 +20,7 @@ export function statsToCsv(stats: LinkStats): string {
   for (const r of stats.referrers) rows.push(["referrer", r.name, r.clicks]);
   for (const r of stats.devices) rows.push(["device", r.name, r.clicks]);
   for (const r of stats.browsers) rows.push(["browser", r.name, r.clicks]);
-  return rows.map((row) => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
+  return csvRows(rows);
 }
 
 /** e.g. ovi-docs-stats-30d-2026-11-16.csv */
@@ -39,14 +32,5 @@ export function statsFileName(stats: LinkStats): string {
 
 /** Saves the stats as a CSV file from the browser; nothing is sent anywhere. */
 export function downloadStatsCsv(stats: LinkStats): void {
-  // The BOM makes Excel read the file as UTF-8.
-  const blob = new Blob(["﻿", statsToCsv(stats)], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = statsFileName(stats);
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  saveCsv(statsToCsv(stats), statsFileName(stats));
 }

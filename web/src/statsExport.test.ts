@@ -1,5 +1,6 @@
 import { stats } from "./test/fakeApi";
-import { MAX_STATS_DAYS, RANGES, csvCell, parseRange, statsFileName, statsToCsv } from "./statsExport";
+import { csvCell } from "./csv";
+import { MAX_STATS_DAYS, RANGES, parseRange, statsFileName, statsToCsv } from "./statsExport";
 
 describe("parseRange", () => {
   it("accepts the offered ranges", () => {
