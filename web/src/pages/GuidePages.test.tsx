@@ -17,7 +17,7 @@ describe("QR code generator page", () => {
   it("explains itself and makes a link with a QR code without an account", async () => {
     const user = await open(PAGES.qrCodeGenerator);
     expect(screen.getByRole("heading", { level: 1, name: "Free QR code generator" })).toBeInTheDocument();
-    expect(document.title).toBe("Free QR code generator · Ovi");
+    await waitFor(() => expect(document.title).toBe("Free QR code generator · Ovi"));
     expect(screen.getByText(/expire after/)).toHaveTextContent("30 days");
 
     await user.type(screen.getByLabelText("Long URL"), "https://example.com/menu");
