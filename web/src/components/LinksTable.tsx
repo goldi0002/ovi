@@ -209,7 +209,7 @@ export function LinksTable({ api, onUnauthorized }: Props) {
           onChange={changeStatus}
           className="max-sm:flex max-sm:w-full max-sm:[&>button]:flex-1"
         />
-        <label className="flex items-center gap-2 text-[0.8125rem] font-medium text-muted max-sm:w-full">
+        <label className="flex items-center gap-2 whitespace-nowrap text-[0.8125rem] font-medium text-muted max-sm:w-full">
           Sort by
           <select
             className={`${input} w-auto max-sm:flex-1`}
