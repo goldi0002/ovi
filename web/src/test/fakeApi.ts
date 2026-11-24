@@ -216,6 +216,14 @@ export function fakeApi({
       const matches = store
         .filter((l) => !q || l.code.toLowerCase().includes(q) || l.url.toLowerCase().includes(q))
         .filter((l) => status === "all" || (status === "expired") === expired(l));
+      // Same orders as the API: "expiring" is will-expire (soonest first), then never, then already expired.
+      const sort = url.searchParams.get("sort") ?? "newest";
+      const expiryGroup = (l: Link) => (l.expiresAt === null ? 1 : expired(l) ? 2 : 0);
+      if (sort === "clicks") matches.sort((a, b) => b.clicks - a.clicks);
+      else if (sort === "expiring")
+        matches.sort(
+          (a, b) => expiryGroup(a) - expiryGroup(b) || new Date(a.expiresAt ?? 0).getTime() - new Date(b.expiresAt ?? 0).getTime(),
+        );
       return json(200, { items: matches.slice((page - 1) * size, page * size), page, pageSize: size, total: matches.length });
     }
     const patch = url.pathname.match(/^\/api\/links\/([^/]+)$/);

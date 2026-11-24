@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { OviApi } from "../api";
 import { fakeApi, link } from "../test/fakeApi";
@@ -13,6 +13,9 @@ function listCalls(fetchMock: ReturnType<typeof fakeApi>["fetchMock"]) {
     .map(([u, init]) => ({ url: new URL(String(u), "http://localhost"), method: init?.method ?? "GET" }))
     .filter(({ url, method }) => method === "GET" && url.pathname === "/api/links");
 }
+
+// The table keeps its filters in the address, so start every test from a clean one.
+beforeEach(() => window.history.replaceState(null, "", "/links"));
 
 async function renderTable() {
   const user = userEvent.setup();
@@ -107,6 +110,116 @@ describe("LinksTable search and filter", () => {
     fakeApi();
     await renderTable();
     expect(await screen.findByText(/No links yet/)).toBeInTheDocument();
+  });
+});
+
+describe("LinksTable sorting and the address", () => {
+  const links = () => [
+    link({ code: "quiet", clicks: 1, expiresAt: null }),
+    link({ code: "busy", clicks: 9, expiresAt: future }),
+    link({ code: "soon", clicks: 4, expiresAt: "2090-01-01T00:00:00Z" }),
+  ];
+
+  it("sorts through the API, so paging follows the order", async () => {
+    const { fetchMock } = fakeApi({ links: links() });
+    const user = await renderTable();
+    await screen.findByRole("table");
+    expect(rowCodes()).toEqual(["/quiet", "/busy", "/soon"]);
+    expect(listCalls(fetchMock).at(-1)!.url.searchParams.has("sort")).toBe(false);
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Sort by" }), "Most clicked");
+    await waitFor(() => expect(rowCodes()).toEqual(["/busy", "/soon", "/quiet"]));
+    expect(listCalls(fetchMock).at(-1)!.url.searchParams.get("sort")).toBe("clicks");
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Sort by" }), "Expiring soon");
+    await waitFor(() => expect(rowCodes()).toEqual(["/soon", "/busy", "/quiet"]));
+    expect(listCalls(fetchMock).at(-1)!.url.searchParams.get("sort")).toBe("expiring");
+  });
+
+  it("goes back to the first page when the sort changes", async () => {
+    const many = Array.from({ length: 25 }, (_, i) => link({ code: `link${i}`, clicks: i }));
+    const { fetchMock } = fakeApi({ links: many });
+    const user = await renderTable();
+    await screen.findByRole("table");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByText("Page 2 of 2")).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Sort by" }), "clicks");
+    expect(await screen.findByText("Page 1 of 2")).toBeInTheDocument();
+    expect(listCalls(fetchMock).at(-1)!.url.searchParams.get("page")).toBe("1");
+  });
+
+  it("writes the search, status and sort to the address, and drops the defaults", async () => {
+    fakeApi({ links: links() });
+    const user = await renderTable();
+    await screen.findByRole("table");
+    expect(window.location.search).toBe("");
+
+    await user.type(screen.getByRole("searchbox", { name: "Search links" }), "busy");
+    await user.click(screen.getByRole("button", { name: "Active" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Sort by" }), "clicks");
+    await waitFor(() => expect(window.location.search).toBe("?q=busy&status=active&sort=clicks"));
+    expect(window.location.pathname).toBe("/links");
+
+    await user.click(screen.getByRole("button", { name: "All" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Sort by" }), "newest");
+    await waitFor(() => expect(window.location.search).toBe("?q=busy"));
+  });
+
+  it("starts from the address", async () => {
+    window.history.replaceState(null, "", "/links?q=busy&status=active&sort=clicks");
+    const { fetchMock } = fakeApi({ links: links() });
+    await renderTable();
+    await screen.findByRole("table");
+
+    expect(screen.getByRole("searchbox", { name: "Search links" })).toHaveValue("busy");
+    expect(screen.getByRole("button", { name: "Active" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("combobox", { name: "Sort by" })).toHaveValue("clicks");
+    const first = listCalls(fetchMock)[0].url.searchParams;
+    expect([first.get("q"), first.get("status"), first.get("sort")]).toEqual(["busy", "active", "clicks"]);
+    expect(rowCodes()).toEqual(["/busy"]);
+  });
+
+  it("follows the address on browser back and forward", async () => {
+    const { fetchMock } = fakeApi({ links: links() });
+    const user = await renderTable();
+    await screen.findByRole("table");
+    await user.click(screen.getByRole("button", { name: "Expired" }));
+    await waitFor(() => expect(window.location.search).toBe("?status=expired"));
+
+    // The browser goes to another address for the same page.
+    act(() => {
+      window.history.pushState(null, "", "/links?q=busy&sort=clicks");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    await waitFor(() => expect(rowCodes()).toEqual(["/busy"]));
+    expect(screen.getByRole("searchbox", { name: "Search links" })).toHaveValue("busy");
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("combobox", { name: "Sort by" })).toHaveValue("clicks");
+    const last = listCalls(fetchMock).at(-1)!.url.searchParams;
+    expect([last.get("q"), last.get("status"), last.get("sort")]).toEqual(["busy", null, "clicks"]);
+    expect(window.location.search).toBe("?q=busy&sort=clicks");
+
+    act(() => {
+      window.history.pushState(null, "", "/links");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    await waitFor(() => expect(rowCodes()).toHaveLength(3));
+    expect(screen.getByRole("searchbox", { name: "Search links" })).toHaveValue("");
+    expect(screen.getByRole("combobox", { name: "Sort by" })).toHaveValue("newest");
+    expect(window.location.search).toBe("");
+  });
+
+  it("falls back to the defaults for an unknown status or sort", async () => {
+    window.history.replaceState(null, "", "/links?status=bogus&sort=oldest");
+    const { fetchMock } = fakeApi({ links: links() });
+    await renderTable();
+    await screen.findByRole("table");
+
+    const first = listCalls(fetchMock)[0].url.searchParams;
+    expect(first.has("status") || first.has("sort")).toBe(false);
+    expect(screen.getByRole("combobox", { name: "Sort by" })).toHaveValue("newest");
+    expect(window.location.search).toBe("");
   });
 });
 
