@@ -1,7 +1,8 @@
-import { Download, ExternalLink, Plus, QrCode, SearchX } from "lucide-react";
+import { Download, ExternalLink, Palette, Plus, QrCode, SearchX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ApiError, isExpired, type Link, type OviApi, type Page } from "../api";
 import { CopyButton } from "../components/CopyButton";
+import { QrStyleDialog } from "../components/QrStyleDialog";
 import { Pager, SEARCH_DELAY_MS } from "../components/LinksTable";
 import { Badge, EmptyState, PageHeader, SearchField, Skeleton } from "../components/ui/primitives";
 import { displayUrl } from "../format";
@@ -23,7 +24,7 @@ export function QrCodesPage({ api, state, onLogIn, onUnauthorized }: Props) {
   usePageTitle("QR Codes");
   return (
     <main className={`${container} flex-1 py-8 sm:py-10`}>
-      <PageHeader title="QR Codes" description="Each short link has a QR code. Download it as a PNG for print, slides or packaging." />
+      <PageHeader title="QR Codes" description="Each short link has a QR code. Download it as a PNG for print, slides or packaging, or restyle it with your colours and logo." />
       {state === "loading" ? null : state === "signedIn" ? (
         <QrGrid api={api} onUnauthorized={onUnauthorized} />
       ) : (
@@ -39,6 +40,7 @@ function QrGrid({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () => vo
   const [page, setPage] = useState(1);
   const [data, setData] = useState<Page<Link> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [styling, setStyling] = useState<Link | null>(null);
   const latest = useRef(0);
 
   useEffect(() => {
@@ -161,6 +163,16 @@ function QrGrid({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () => vo
                   PNG
                 </a>
               )}
+              <button
+                type="button"
+                className={iconButton}
+                disabled={isExpired(link)}
+                onClick={() => setStyling(link)}
+                aria-label={`Style the QR code for /${link.code}`}
+                data-tip="Style QR"
+              >
+                <Palette />
+              </button>
               <CopyButton text={link.shortUrl} iconOnly label="Copy link" ariaLabel={`Copy ${displayUrl(link.shortUrl)}`} />
               <a className={iconButton} href={link.shortUrl} target="_blank" rel="noreferrer" aria-label={`Open /${link.code}`} data-tip="Open link">
                 <ExternalLink />
@@ -169,6 +181,8 @@ function QrGrid({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () => vo
           </li>
         ))}
       </ul>
+
+      {styling && <QrStyleDialog link={styling} onClose={() => setStyling(null)} />}
 
       {data && totalPages > 1 && (
         <Pager

@@ -131,6 +131,16 @@ describe("QR Codes page", () => {
     expect(within(grid).getByRole("link", { name: "Download the QR code for /shop" })).toBeInTheDocument();
   });
 
+  it("styles a link's QR code in the browser, and not an expired one's", async () => {
+    fakeApi({ user: ada, links: [link({ code: "docs" }), link({ code: "old", expiresAt: past })] });
+    const user = await renderAt("/links/qr-codes");
+    await screen.findByRole("list", { name: "QR codes" });
+    expect(await screen.findByRole("button", { name: "Style the QR code for /old" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Style the QR code for /docs" }));
+    expect(screen.getByRole("dialog", { name: "Style the QR code for /docs" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "SVG" })).toBeEnabled();
+  });
+
   it("doesn't offer an expired link's QR code, which the server no longer serves", async () => {
     fakeApi({ user: ada, links: [link({ code: "old", expiresAt: past })] });
     await renderAt("/links/qr-codes");

@@ -4,6 +4,7 @@ User-facing changes to Ovi, newest first.
 
 ## Unreleased
 
+- Style a QR code in the browser: pick the code and background colours, a size (256 to 2048 px) and an optional centre logo, then download an SVG or PNG. Use **Style QR** on a new link's result card, on `/links/qr-codes`, or on `/qr-code-generator`. A contrast check keeps the code scannable (dark on light, at least 4.5:1), and a logo switches on the highest error correction. The code is drawn on your device with the small MIT-licensed `uqr` library; the logo is never uploaded. The server's `/{code}/qr` PNG is unchanged.
 - Added `/favicon.ico` (16, 32 and 48 px) beside the SVG icon, so search results, feed readers and other tools that ask for it find the site's icon instead of a 404.
 
 ### Easier to find and share

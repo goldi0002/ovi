@@ -79,7 +79,7 @@ export function QrCodeGeneratorPage({ api, signedIn, anonymousLinkDays, onLogIn,
   return (
     <Guide
       title="Free QR code generator"
-      intro="Paste a URL and get a QR code you can download as a PNG, in a second, without an account. The code points to a short link, so it stays simple to scan."
+      intro="Paste a URL and get a QR code you can download as a PNG, in a second, without an account. Then style it with your colours and logo and download an SVG. The code points to a short link, so it stays simple to scan."
     >
       <div className="mt-8 grid gap-4">
         <section className={`${card} p-4 sm:p-5`} aria-label="Make a QR code">
@@ -100,7 +100,7 @@ export function QrCodeGeneratorPage({ api, signedIn, anonymousLinkDays, onLogIn,
       <Section title="How it works">
         <ol className="grid list-decimal gap-1.5 pl-5">
           <li>Paste the web address you want people to reach and press <strong>Shorten URL</strong>.</li>
-          <li>Press <strong>QR code</strong> next to the new short link to see and download the PNG.</li>
+          <li>Press <strong>QR code</strong> next to the new short link to download the PNG, or <strong>Style QR</strong> to pick colours, a size and a centre logo, and download an SVG or PNG.</li>
           <li>Print it, put it on a slide, or share the image. Anyone who scans it lands on your page.</li>
         </ol>
       </Section>
