@@ -243,6 +243,7 @@ public static class LinkEndpoints
 
     /// <param name="q">Optional search: links whose code or destination contains this, ignoring case (max 100 characters).</param>
     /// <param name="status">"all" (the default), "active" (not expired) or "expired".</param>
+    /// <param name="sort">"newest" (the default), "clicks" (most clicked first) or "expiring" (soonest to expire first, then links that never expire, then expired ones). Ties fall back to newest.</param>
     private static async Task<IResult> ListLinks(HttpContext http, AppDbContext db, ShortUrlBuilder urls, TimeProvider time,
         int page = 1, int pageSize = 50, string? q = null, string? status = null, string? sort = null)
     {

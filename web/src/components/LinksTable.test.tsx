@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { OviApi } from "../api";
 import { fakeApi, link } from "../test/fakeApi";
@@ -178,6 +178,36 @@ describe("LinksTable sorting and the address", () => {
     const first = listCalls(fetchMock)[0].url.searchParams;
     expect([first.get("q"), first.get("status"), first.get("sort")]).toEqual(["busy", "active", "clicks"]);
     expect(rowCodes()).toEqual(["/busy"]);
+  });
+
+  it("follows the address on browser back and forward", async () => {
+    const { fetchMock } = fakeApi({ links: links() });
+    const user = await renderTable();
+    await screen.findByRole("table");
+    await user.click(screen.getByRole("button", { name: "Expired" }));
+    await waitFor(() => expect(window.location.search).toBe("?status=expired"));
+
+    // The browser goes to another address for the same page.
+    act(() => {
+      window.history.pushState(null, "", "/links?q=busy&sort=clicks");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    await waitFor(() => expect(rowCodes()).toEqual(["/busy"]));
+    expect(screen.getByRole("searchbox", { name: "Search links" })).toHaveValue("busy");
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("combobox", { name: "Sort by" })).toHaveValue("clicks");
+    const last = listCalls(fetchMock).at(-1)!.url.searchParams;
+    expect([last.get("q"), last.get("status"), last.get("sort")]).toEqual(["busy", null, "clicks"]);
+    expect(window.location.search).toBe("?q=busy&sort=clicks");
+
+    act(() => {
+      window.history.pushState(null, "", "/links");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    await waitFor(() => expect(rowCodes()).toHaveLength(3));
+    expect(screen.getByRole("searchbox", { name: "Search links" })).toHaveValue("");
+    expect(screen.getByRole("combobox", { name: "Sort by" })).toHaveValue("newest");
+    expect(window.location.search).toBe("");
   });
 
   it("falls back to the defaults for an unknown status or sort", async () => {

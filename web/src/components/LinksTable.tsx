@@ -2,7 +2,7 @@ import { ChartColumn, ChevronLeft, ChevronRight, Link2, Pencil, Plus, QrCode, Re
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, isExpired, type Link, type LinkSort, type LinkStatus, type OviApi, type Page } from "../api";
 import { displayUrl, formatDateTime, formatRelative } from "../format";
-import { AppLink, navigate, PAGES } from "../router";
+import { AppLink, navigate, PAGES, useSearch } from "../router";
 import { button, card, errorBox, iconButton, input } from "../ui";
 import { CopyButton } from "./CopyButton";
 import { EditLinkDialog } from "./EditLinkDialog";
@@ -29,8 +29,8 @@ const SORTS: { value: LinkSort; label: string }[] = [
 ];
 
 /** The search, status and sort the address holds (?q=docs&status=active&sort=clicks); anything unknown means the default. */
-function readUrlState(): { q: string; status: LinkStatus; sort: LinkSort } {
-  const params = new URLSearchParams(window.location.search);
+function readUrlState(search: string): { q: string; status: LinkStatus; sort: LinkSort } {
+  const params = new URLSearchParams(search);
   const status = params.get("status");
   const sort = params.get("sort");
   return {
@@ -77,7 +77,7 @@ export function LinksTable({ api, onUnauthorized }: Props) {
   const [editing, setEditing] = useState<Link | null>(null);
   const closeEdit = useCallback(() => setEditing(null), []);
   /** What's typed in the search box; `q` follows it after a pause. */
-  const [initial] = useState(readUrlState);
+  const [initial] = useState(() => readUrlState(window.location.search));
   const [search, setSearch] = useState(initial.q);
   const [q, setQ] = useState(initial.q);
   const [status, setStatus] = useState<LinkStatus>(initial.status);
@@ -125,8 +125,21 @@ export function LinksTable({ api, onUnauthorized }: Props) {
     for (const [key] of state) params.delete(key);
     for (const [key, value] of state) if (value) params.set(key, value); // a fixed order, so the address is stable
     const query = params.toString();
-    if (query !== window.location.search.slice(1)) navigate(`${window.location.pathname}${query && `?${query}`}${window.location.hash}`, { replace: true });
+    if (query !== window.location.search.slice(1)) navigate(`?${query}${window.location.hash}`, { replace: true });
   }, [q, status, sort]);
+
+  // Back and forward change the address without touching our state, so follow it.
+  const urlSearch = useSearch();
+  useEffect(() => {
+    const fromUrl = readUrlState(urlSearch);
+    if (fromUrl.q === q && fromUrl.status === status && fromUrl.sort === sort) return;
+    setSearch(fromUrl.q);
+    setQ(fromUrl.q);
+    setStatus(fromUrl.status);
+    setSort(fromUrl.sort);
+    setPage(1);
+    // Only an address change should pull state in; our own writes keep them equal.
+  }, [urlSearch]);
 
   function changeSort(next: LinkSort) {
     setSort(next);
