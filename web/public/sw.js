@@ -4,7 +4,7 @@
 // The page list must match WebUiSetup.Pages and PAGES in src/router.tsx (a test checks it).
 const CACHE = "ovi-shell-v1";
 const SHELL = "/shell";
-const PAGES = ["/", "/links", "/links/analytics", "/links/qr-codes", "/admin", "/report", "/privacy", "/terms"];
+const PAGES = ["/", "/links", "/links/analytics", "/links/qr-codes", "/admin", "/report", "/privacy", "/terms", "/qr-code-generator", "/self-host"];
 const STATIC = ["/theme.js", "/favicon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

@@ -9,6 +9,7 @@ import { Spinner } from "./components/ui/primitives";
 import { ToastProvider } from "./components/ui/Toast";
 import { AdminPage } from "./pages/AdminPage";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
+import { QrCodeGeneratorPage, SelfHostPage } from "./pages/GuidePages";
 import { HomePage } from "./pages/HomePage";
 import { LinksPage } from "./pages/LinksPage";
 import { QrCodesPage } from "./pages/QrCodesPage";
@@ -136,6 +137,10 @@ function OviApp() {
     page = <PrivacyPage />;
   } else if (path === PAGES.terms) {
     page = <TermsPage />;
+  } else if (path === PAGES.qrCodeGenerator) {
+    page = <QrCodeGeneratorPage api={api} signedIn={signedIn} anonymousLinkDays={current?.anonymousLinkDays ?? 30} onLogIn={openLogin} onUnauthorized={onUnauthorized} />;
+  } else if (path === PAGES.selfHost) {
+    page = <SelfHostPage />;
   } else if (path === PAGES.report) {
     page = <ReportPage api={api} />;
   } else if (path === PAGES.links) {

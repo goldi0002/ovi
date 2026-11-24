@@ -8,6 +8,10 @@
 
 Try it at **[getovi.link](https://getovi.link)**, or [run your own in two minutes](#self-host-with-docker-compose).
 
+[![Try it live](https://img.shields.io/badge/try%20it-getovi.link-black)](https://getovi.link)
+[![Run with Docker Compose](https://img.shields.io/badge/run%20it-docker%20compose-2496ED?logo=docker&logoColor=white)](#self-host-with-docker-compose)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/goldi0002/ovi)
+
 ![Shortening a link on Ovi: the short link, its QR code, and Copy, Open and QR code buttons](docs/screenshots/home.png)
 
 | Your links | Click stats, in dark mode |
@@ -30,6 +34,20 @@ The admin dashboard: totals, clicks over the last 14 days, top links, and tabs f
 - **An HTTP API** with an admin API key, documented below.
 - **Installable** as an app on phones and desktops, with light and dark mode.
 - **Small and stateless**: one container, all data in Postgres, migrations on start. Several instances can share one database.
+
+## Why Ovi
+
+Ovi is for people who want a short-link service they can run in a couple of minutes, with stats that don't follow visitors around. How it compares with the usual self-hosted choices, going by their public documentation (check them for the details that matter to you):
+
+| | **Ovi** | [Shlink](https://shlink.io) | [YOURLS](https://yourls.org) | [Dub](https://dub.co) |
+|---|---|---|---|---|
+| Runs as | One container plus Postgres | A server, with a separate web client or its own UI | A PHP app on a web server | A larger stack of separate services |
+| Web UI included | Yes, in the same container | Separate project | Yes | Yes |
+| QR code for every link | Yes, built in | Yes | Via plugin | Yes |
+| Click stats that never store IP addresses or full user agents | Yes, by design | See its docs | See its docs | See its docs |
+| Licence | AGPL-3.0 | MIT | MIT | AGPL-3.0 core |
+
+Choose Shlink if you want a mature, API-first service with many integrations, YOURLS for its plugin ecosystem, and Dub for a full link-management product. Choose Ovi if you want something small, with a UI and QR codes out of the box, and privacy-respecting stats from the first click. If something in the table is out of date, [open an issue](https://github.com/goldi0002/ovi/issues).
 
 ## Self-host with Docker Compose
 
