@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/ovi-logo.png" alt="Ovi" width="420"></p>
+
 # Ovi
 
 [![CI](https://github.com/goldi0002/ovi/actions/workflows/ci.yml/badge.svg)](https://github.com/goldi0002/ovi/actions/workflows/ci.yml)
