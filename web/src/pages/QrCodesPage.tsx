@@ -1,7 +1,8 @@
-import { Download, ExternalLink, Palette, Plus, QrCode, SearchX } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Download, ExternalLink, Palette, Plus, Printer, QrCode, SearchX, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, isExpired, type Link, type OviApi, type Page } from "../api";
 import { CopyButton } from "../components/CopyButton";
+import { MAX_SHEET_CODES, QrSheet } from "../components/QrSheet";
 import { QrStyleDialog } from "../components/QrStyleDialog";
 import { Pager, SEARCH_DELAY_MS } from "../components/LinksTable";
 import { Badge, EmptyState, PageHeader, SearchField, Skeleton } from "../components/ui/primitives";
@@ -41,6 +42,10 @@ function QrGrid({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () => vo
   const [data, setData] = useState<Page<Link> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [styling, setStyling] = useState<Link | null>(null);
+  /** The links ticked for the print sheet, kept across pages and searches. */
+  const [selected, setSelected] = useState<Map<string, Link>>(new Map());
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const closeSheet = useCallback(() => setSheetOpen(false), []);
   const latest = useRef(0);
 
   useEffect(() => {
@@ -69,6 +74,16 @@ function QrGrid({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () => vo
       });
   }, [api, page, q, onUnauthorized]);
 
+  function toggle(link: Link) {
+    setSelected((prev) => {
+      const next = new Map(prev);
+      if (!next.delete(link.code)) next.set(link.code, link);
+      return next;
+    });
+  }
+
+  const printable = [...selected.values()];
+  const tooMany = printable.length > MAX_SHEET_CODES;
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
   if (data && data.total === 0 && !q) {
@@ -90,6 +105,22 @@ function QrGrid({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () => vo
   return (
     <div className="grid gap-5">
       <SearchField value={typed} onChange={setTyped} label="Search QR codes" placeholder="Search by code or destination" className="sm:max-w-sm" />
+
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-subtle px-4 py-2 text-[0.8125rem]" role="region" aria-label="Selected QR codes">
+          <span className="mr-auto font-medium tabular-nums" aria-live="polite">
+            {selected.size} selected
+            {tooMany && <span className="ml-2 font-normal text-muted">A sheet holds {MAX_SHEET_CODES}, so the first {MAX_SHEET_CODES} will print.</span>}
+          </span>
+          <button type="button" className={button("default", "sm")} onClick={() => setSheetOpen(true)} disabled={printable.length === 0}>
+            <Printer />
+            Print sheet
+          </button>
+          <button type="button" className={iconButton} onClick={() => setSelected(new Map())} aria-label="Clear selection" data-tip="Clear selection">
+            <X />
+          </button>
+        </div>
+      )}
 
       {error && (
         <p className={errorBox} role="alert">
@@ -119,7 +150,15 @@ function QrGrid({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () => vo
             </li>
           ))}
         {data?.items.map((link) => (
-          <li key={link.code} className={`${card} group grid content-start gap-3 p-4 transition-shadow hover:shadow-card-hover`}>
+          <li key={link.code} className={`${card} group relative grid content-start gap-3 p-4 transition-shadow hover:shadow-card-hover`}>
+            <input
+              type="checkbox"
+              className="absolute top-2 left-2 z-10 size-5 rounded bg-surface accent-accent disabled:opacity-40"
+              aria-label={`Select /${link.code} for printing`}
+              disabled={isExpired(link)}
+              checked={selected.has(link.code)}
+              onChange={() => toggle(link)}
+            />
             {isExpired(link) ? (
               // The server stops serving a link's QR code once the link expires.
               <div className="relative grid aspect-square place-items-center rounded-lg bg-subtle text-center">
@@ -182,6 +221,7 @@ function QrGrid({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () => vo
         ))}
       </ul>
 
+      {sheetOpen && <QrSheet links={printable} onClose={closeSheet} />}
       {styling && <QrStyleDialog link={styling} onClose={() => setStyling(null)} />}
 
       {data && totalPages > 1 && (

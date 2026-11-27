@@ -62,6 +62,51 @@ describe("Dashboard", () => {
     await waitFor(() => expect(tile(overview, "Total links")).toHaveTextContent("2"));
   });
 
+  it("prints a sheet of the selected QR codes, keeping the selection across a search", async () => {
+    fakeApi({ user: ada, links: [link({ code: "docs" }), link({ code: "shop", url: "https://shop.example.com" }), link({ code: "old", expiresAt: past })] });
+    const print = vi.spyOn(window, "print").mockImplementation(() => {});
+    const user = await renderAt("/links/qr-codes");
+    expect(await screen.findByRole("checkbox", { name: "Select /old for printing" })).toBeDisabled();
+    await user.click(screen.getByRole("checkbox", { name: "Select /docs for printing" }));
+
+    await user.type(screen.getByRole("searchbox", { name: "Search QR codes" }), "shop");
+    await waitFor(() => expect(screen.queryByRole("checkbox", { name: "Select /docs for printing" })).not.toBeInTheDocument());
+    await user.click(screen.getByRole("checkbox", { name: "Select /shop for printing" }));
+    expect(screen.getByText("2 selected")).toBeInTheDocument();
+
+    const opener = screen.getByRole("button", { name: "Print sheet" });
+    await user.click(opener);
+    const sheet = screen.getByRole("dialog", { name: "Print QR codes" });
+    expect(within(sheet).getByText("2 QR codes on this sheet")).toBeInTheDocument();
+    expect(within(sheet).getByRole("img", { name: "QR code for /docs" })).toHaveAttribute("src", "https://ovi.test/docs/qr");
+    expect(within(sheet).queryByRole("img", { name: "QR code for /old" })).not.toBeInTheDocument();
+
+    await user.click(within(sheet).getByRole("button", { name: "Print" }));
+    expect(print).toHaveBeenCalledOnce();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Print QR codes" })).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "Clear selection" }));
+    expect(screen.queryByRole("region", { name: "Selected QR codes" })).not.toBeInTheDocument();
+    print.mockRestore();
+  });
+
+  it("says when more than one sheet's worth is selected", async () => {
+    fakeApi({ user: ada, links: Array.from({ length: 49 }, (_, i) => link({ code: `a${i}` })) });
+    const user = await renderAt("/links/qr-codes");
+    for (let p = 0; p < 3; p++) {
+      const boxes = await screen.findAllByRole("checkbox");
+      for (const box of boxes) if (!(box as HTMLInputElement).checked) await user.click(box);
+      const next = screen.queryByRole("button", { name: "Next" });
+      if (!next) break;
+      await user.click(next);
+      await waitFor(() => expect(screen.queryByRole("checkbox", { name: "Select /a0 for printing" })).not.toBeInTheDocument());
+    }
+    expect(await screen.findByText(/A sheet holds 48, so the first 48 will print/)).toBeInTheDocument();
+    expect(screen.getByText("49 selected")).toBeInTheDocument();
+  });
+
   it("invites a first link when there are none", async () => {
     fakeApi({ user: ada });
     await renderAt("/");
