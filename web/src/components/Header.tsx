@@ -193,14 +193,7 @@ export function Brand({ href }: { href?: string }) {
   );
 }
 
-/** Two interlocking rounded links on the accent: Ovi's own mark. */
+/** Ovi's mark: the gradient link on its navy tile (the same image as the app icon). */
 export function BrandMark({ className = "size-7" }: { className?: string }) {
-  return (
-    <span className={`grid shrink-0 place-items-center rounded-[8px] bg-accent text-on-accent shadow-primary ${className}`} aria-hidden="true">
-      <svg viewBox="0 0 24 24" className="size-[62%]" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-        <rect x="3" y="8.5" width="11" height="7" rx="3.5" />
-        <rect x="10" y="8.5" width="11" height="7" rx="3.5" opacity="0.7" />
-      </svg>
-    </span>
-  );
+  return <img src="/icons/icon-192.png" alt="" width={192} height={192} className={`shrink-0 rounded-[8px] ${className}`} aria-hidden="true" />;
 }
