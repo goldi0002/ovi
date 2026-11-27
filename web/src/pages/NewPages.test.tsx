@@ -62,6 +62,30 @@ describe("Dashboard", () => {
     await waitFor(() => expect(tile(overview, "Total links")).toHaveTextContent("2"));
   });
 
+  it("prints a sheet of the selected QR codes, skipping expired links, across a search", async () => {
+    fakeApi({ user: ada, links: [link({ code: "docs" }), link({ code: "shop", url: "https://shop.example.com" }), link({ code: "old", expiresAt: past })] });
+    const print = vi.spyOn(window, "print").mockImplementation(() => {});
+    const user = await renderAt("/links/qr-codes");
+    await user.click(await screen.findByRole("checkbox", { name: "Select /docs for printing" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select /old for printing" }));
+    expect(screen.getByText("2 selected")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Print sheet" }));
+    const sheet = screen.getByRole("dialog", { name: "Print QR codes" });
+    expect(within(sheet).getByText("1 QR code on this sheet")).toBeInTheDocument();
+    expect(within(sheet).getByRole("img", { name: "QR code for /docs" })).toHaveAttribute("src", "https://ovi.test/docs/qr");
+    expect(within(sheet).queryByRole("img", { name: "QR code for /old" })).not.toBeInTheDocument();
+
+    await user.click(within(sheet).getByRole("button", { name: "Print" }));
+    expect(print).toHaveBeenCalledOnce();
+    await user.click(within(sheet).getByRole("button", { name: "Close print preview" }));
+    expect(screen.queryByRole("dialog", { name: "Print QR codes" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Clear selection" }));
+    expect(screen.queryByRole("region", { name: "Selected QR codes" })).not.toBeInTheDocument();
+    print.mockRestore();
+  });
+
   it("invites a first link when there are none", async () => {
     fakeApi({ user: ada });
     await renderAt("/");

@@ -221,3 +221,21 @@
     display: none;
   }
 }
+
+/* Printing the QR sheet: only the sheet prints, always black on white, and no cell splits across pages. */
+@media print {
+  body:has(.qr-sheet) > #root {
+    display: none;
+  }
+  .qr-sheet {
+    position: static;
+    overflow: visible;
+    color-scheme: light;
+    background: #fff;
+    color: #000;
+  }
+  .qr-cell {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
