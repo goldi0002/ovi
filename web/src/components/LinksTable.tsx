@@ -1,7 +1,8 @@
-import { ChartColumn, ChevronLeft, ChevronRight, Link2, Pencil, Plus, QrCode, RefreshCw, SearchX, Trash2 } from "lucide-react";
+import { ChartColumn, ChevronLeft, ChevronRight, Copy, Download, Link2, Pencil, Plus, QrCode, RefreshCw, SearchX, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, isExpired, type Link, type LinkSort, type LinkStatus, type OviApi, type Page } from "../api";
 import { displayUrl, formatDateTime, formatRelative } from "../format";
+import { downloadLinksCsv, shortLinksText } from "../linksExport";
 import { AppLink, navigate, PAGES, useSearch } from "../router";
 import { button, card, errorBox, iconButton, input } from "../ui";
 import { CopyButton } from "./CopyButton";
@@ -86,6 +87,9 @@ export function LinksTable({ api, onUnauthorized }: Props) {
   const latest = useRef(0);
   const confirm = useConfirm();
   const notify = useToast();
+  /** The links ticked for bulk actions, kept across pages and searches. */
+  const [selected, setSelected] = useState<Map<string, Link>>(new Map());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = useCallback(async () => {
     const id = ++latest.current;
@@ -188,6 +192,73 @@ export function LinksTable({ api, onUnauthorized }: Props) {
     }
   }
 
+  function toggle(link: Link) {
+    setSelected((prev) => {
+      const next = new Map(prev);
+      if (!next.delete(link.code)) next.set(link.code, link);
+      return next;
+    });
+  }
+
+  function togglePage(on: boolean) {
+    if (!data) return;
+    setSelected((prev) => {
+      const next = new Map(prev);
+      for (const l of data.items) {
+        if (on) next.set(l.code, l);
+        else next.delete(l.code);
+      }
+      return next;
+    });
+  }
+
+  async function copySelected() {
+    try {
+      await navigator.clipboard.writeText(shortLinksText([...selected.values()]));
+      notify(selected.size === 1 ? "Copied 1 link" : `Copied ${selected.size} links`);
+    } catch {
+      notify("Couldn't copy. Export a CSV instead.", "error");
+    }
+  }
+
+  async function removeSelected() {
+    const codes = [...selected.keys()];
+    const ok = await confirm({
+      title: codes.length === 1 ? `Delete /${codes[0]}?` : `Delete ${codes.length} links?`,
+      message: "Anyone using them will get “not found”, and the codes can't be used again.",
+      confirmLabel: codes.length === 1 ? "Delete link" : `Delete ${codes.length} links`,
+      destructive: true,
+    });
+    if (!ok) return;
+    setBulkBusy(true);
+    const failed: string[] = [];
+    let unauthorized = false;
+    for (const code of codes) {
+      try {
+        await api.remove(code);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) unauthorized = true;
+        failed.push(code);
+        if (unauthorized) break;
+      }
+    }
+    setBulkBusy(false);
+    if (unauthorized) return onUnauthorized();
+    // Only the links that couldn't be deleted stay selected.
+    setSelected(new Map([...selected].filter(([code]) => failed.includes(code))));
+    const deleted = codes.length - failed.length;
+    if (failed.length === 0) notify(deleted === 1 ? "Deleted 1 link" : `Deleted ${deleted} links`);
+    // The page may now be past the end; step back if everything on it went (the reload then follows from the page change).
+    if (failed.length === 0 && data && deleted >= data.items.length && page > 1) return setPage(page - 1);
+    await load();
+    // Set after the reload, which clears the error.
+    if (failed.length > 0)
+      setError(`Deleted ${deleted} of ${codes.length} links. Couldn't delete ${failed.map((c) => `/${c}`).join(", ")}.`);
+  }
+
+  const pageAll = !!data && data.items.length > 0 && data.items.every((l) => selected.has(l.code));
+  const pageSome = !!data && data.items.some((l) => selected.has(l.code));
+
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
   const first = data ? (page - 1) * PAGE_SIZE + 1 : 0;
   const lastShown = data ? Math.min(data.total, (page - 1) * PAGE_SIZE + data.items.length) : 0;
@@ -251,6 +322,33 @@ export function LinksTable({ api, onUnauthorized }: Props) {
           </button>
         </div>
 
+        {selected.size > 0 && (
+          <div
+            className="flex flex-wrap items-center gap-2 border-t border-line bg-subtle px-5 py-2 text-[0.8125rem] max-md:rounded-xl max-md:border-0 max-md:px-3"
+            role="region"
+            aria-label="Selected links"
+          >
+            <span className="mr-auto font-medium tabular-nums" aria-live="polite">
+              {selected.size} selected
+            </span>
+            <button type="button" className={button("default", "sm")} onClick={() => void copySelected()} disabled={bulkBusy}>
+              <Copy />
+              Copy links
+            </button>
+            <button type="button" className={button("default", "sm")} onClick={() => downloadLinksCsv([...selected.values()])} disabled={bulkBusy}>
+              <Download />
+              Export CSV
+            </button>
+            <button type="button" className={button("default", "sm")} onClick={() => void removeSelected()} disabled={bulkBusy}>
+              <Trash2 />
+              Delete
+            </button>
+            <button type="button" className={iconButton} onClick={() => setSelected(new Map())} aria-label="Clear selection" data-tip="Clear selection">
+              <X />
+            </button>
+          </div>
+        )}
+
         {!data && loading && <TableSkeleton />}
 
         {data &&
@@ -287,6 +385,18 @@ export function LinksTable({ api, onUnauthorized }: Props) {
           <table className="w-full table-fixed border-collapse text-sm max-md:block">
             <thead className="max-md:hidden">
               <tr>
+                <th className={`${th} w-10 pr-0!`}>
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-accent"
+                    aria-label="Select all links on this page"
+                    checked={pageAll}
+                    ref={(el) => {
+                      if (el) el.indeterminate = pageSome && !pageAll;
+                    }}
+                    onChange={(e) => togglePage(e.target.checked)}
+                  />
+                </th>
                 <th className={`${th} w-44`}>Short link</th>
                 <th className={th}>Destination</th>
                 <th className={`${th} w-20 text-right`}>Clicks</th>
@@ -307,6 +417,20 @@ export function LinksTable({ api, onUnauthorized }: Props) {
                       deleting === link.code ? "opacity-50" : ""
                     }`}
                   >
+                    <td className={`${td} w-10 pr-0! max-md:col-span-2 max-md:row-start-4 max-md:w-auto max-md:border-t max-md:border-line max-md:pt-2`}>
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="size-4 accent-accent"
+                          aria-label={`Select /${link.code}`}
+                          checked={selected.has(link.code)}
+                          onChange={() => toggle(link)}
+                        />
+                        <span className="text-xs text-muted md:hidden" aria-hidden>
+                          Select
+                        </span>
+                      </label>
+                    </td>
                     <td className={`${td} truncate max-md:col-start-1 max-md:row-start-1`}>
                       <a
                         href={link.shortUrl}
