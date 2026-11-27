@@ -324,7 +324,7 @@ export function LinksTable({ api, onUnauthorized }: Props) {
 
         {selected.size > 0 && (
           <div
-            className="flex flex-wrap items-center gap-2 border-t border-line bg-subtle px-5 py-2 text-[0.8125rem] max-md:rounded-xl max-md:border-0 max-md:px-3"
+            className="flex flex-wrap items-center gap-2 border-t border-line bg-subtle px-5 py-2 text-[0.8125rem] max-md:mb-3 max-md:rounded-xl max-md:border-0 max-md:px-3"
             role="region"
             aria-label="Selected links"
           >
