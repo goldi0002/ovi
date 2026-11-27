@@ -82,7 +82,7 @@ function QrGrid({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () => vo
     });
   }
 
-  const printable = [...selected.values()].filter((l) => !isExpired(l));
+  const printable = [...selected.values()];
   const tooMany = printable.length > MAX_SHEET_CODES;
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
@@ -153,8 +153,9 @@ function QrGrid({ api, onUnauthorized }: { api: OviApi; onUnauthorized: () => vo
           <li key={link.code} className={`${card} group relative grid content-start gap-3 p-4 transition-shadow hover:shadow-card-hover`}>
             <input
               type="checkbox"
-              className="absolute top-2.5 left-2.5 z-10 size-4 accent-accent"
+              className="absolute top-2 left-2 z-10 size-5 rounded bg-surface accent-accent disabled:opacity-40"
               aria-label={`Select /${link.code} for printing`}
+              disabled={isExpired(link)}
               checked={selected.has(link.code)}
               onChange={() => toggle(link)}
             />

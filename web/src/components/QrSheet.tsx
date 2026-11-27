@@ -18,13 +18,14 @@ export function QrSheet({ links, onClose }: { links: Link[]; onClose: () => void
   return createPortal(
     <div
       ref={ref}
+      // Pure white and black on purpose, in both themes: this is paper, and scanners need dark modules on a light ground.
       className="qr-sheet fixed inset-0 z-50 overflow-auto bg-white text-black"
       role="dialog"
       aria-modal="true"
       aria-label="Print QR codes"
       onKeyDown={(e) => trapFocus(e, ref)}
     >
-      <div className="qr-sheet-bar sticky top-0 flex items-center gap-2 border-b border-black/15 bg-white px-5 py-3 print:hidden">
+      <div className="sticky top-0 flex items-center gap-2 border-b border-black/15 bg-white px-5 py-3 print:hidden">
         <p className="mr-auto text-sm font-medium">
           {printable.length} QR {printable.length === 1 ? "code" : "codes"} on this sheet
         </p>

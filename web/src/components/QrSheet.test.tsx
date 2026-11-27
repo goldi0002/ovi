@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { link } from "../test/fakeApi";
 import { MAX_SHEET_CODES, QrSheet } from "./QrSheet";
@@ -14,5 +15,15 @@ describe("QrSheet", () => {
   it("keeps each cell whole across print pages", () => {
     render(<QrSheet links={[link({ code: "docs" })]} onClose={() => {}} />);
     expect(screen.getByRole("img", { name: "QR code for /docs" }).closest("li")).toHaveClass("qr-cell");
+  });
+
+  it("keeps Tab inside the sheet", async () => {
+    const user = userEvent.setup();
+    render(<QrSheet links={[link({ code: "docs" })]} onClose={() => {}} />);
+    expect(screen.getByRole("button", { name: "Print" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Close print preview" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Print" })).toHaveFocus();
   });
 });
